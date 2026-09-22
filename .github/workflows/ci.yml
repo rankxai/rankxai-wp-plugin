@@ -35,7 +35,7 @@ jobs:
         run: composer run lint -- --report=full --report-summary
 
   guardrails:
-    name: Guardrails (plan 80 §7)
+    name: Guardrails
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,9 +53,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Plugin Check activates the plugin in a real WordPress and audits it. With no
-      # plugin file in the repository there is nothing to activate, so it fails — as
-      # it did on the very first push here.
+      # Plugin Check activates the plugin in a real WordPress and audits it, so it
+      # needs a plugin file to exist.
       - id: detect
         name: Is there a plugin to check yet?
         run: |
@@ -66,12 +65,8 @@ jobs:
             echo '::notice::No plugin header found yet — Plugin Check skipped. It self-enables with the first plugin file.'
           fi
 
-      # Check the ARCHIVE, not the repository.
-      # Pointed at the repo root, Plugin Check fails on `hidden_files` and
-      # `application_detected` — it sees .github, .gitignore, composer.json and the
-      # probe harness, none of which ship. That is a true finding about the wrong
-      # directory: the artefact a customer installs is what `git archive` produces,
-      # because .gitattributes export-ignores all of it.
+      # Check the archive, not the repository: .github, composer.json and the probe
+      # harness are all export-ignored, so only `git archive` output is what ships.
       - if: steps.detect.outputs.present == 'true'
         name: Build the release archive
         run: |

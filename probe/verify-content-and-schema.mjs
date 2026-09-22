@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Plan 80 Phase 3 — verified content writes and JSON-LD in the head, proven
+ * Verified content writes and JSON-LD in the head, proven
  * against a real WordPress.
  *
  * Run:  npx wp-env start   then   node probe/verify-content-and-schema.mjs
@@ -33,6 +33,8 @@
  * changed — not the product — and the measurement is worthless until that is
  * explained.
  */
+
+import { cliContainer, wpContainer } from './containers.mjs'
 
 const BASE = process.env.WP_BASE ?? 'http://localhost:8888'
 const USER = process.env.WP_USER ?? 'admin'
@@ -108,7 +110,7 @@ function parsesTo(block, expectedJson) {
 
 async function wpOption(name) {
   const { execFileSync } = await import('node:child_process')
-  const container = process.env.WP_CLI_CONTAINER ?? 'wp-env-rankxai-wordpress-plugin-599f954e-cli-1'
+  const container = cliContainer()
   try {
     const out = execFileSync('docker', ['exec', '-u', '33', container, 'wp', 'option', 'get', name, '--format=json'], {
       encoding: 'utf8',
@@ -130,7 +132,7 @@ async function wpOption(name) {
  */
 async function dbPostContent(id) {
   const { execFileSync } = await import('node:child_process')
-  const container = process.env.WP_CLI_CONTAINER ?? 'wp-env-rankxai-wordpress-plugin-599f954e-cli-1'
+  const container = cliContainer()
   try {
     const out = execFileSync('docker', ['exec', '-u', '33', container, 'wp', 'post', 'get', String(id), '--field=post_content'], {
       encoding: 'utf8',
@@ -145,7 +147,7 @@ async function dbPostContent(id) {
 
 async function apacheLog() {
   const { execFileSync } = await import('node:child_process')
-  const container = process.env.WP_CONTAINER ?? 'wp-env-rankxai-wordpress-plugin-599f954e-wordpress-1'
+  const container = wpContainer()
   try {
     return execFileSync('docker', ['logs', '--tail', '2000', container], { encoding: 'utf8', stdio: 'pipe' })
   } catch {
@@ -248,7 +250,6 @@ async function run() {
         ? 'BYTES — CONTROL: could not read the database, so the byte check above proves nothing'
         : 'BYTES — CONTROL: the database disagrees with what /content reported as stored')
 
-  // MEASURED on this rig 2026-09-22: WordPress re-encodes an escaped quote
   // inside BLOCK ATTRIBUTE JSON to a unicode escape — on the way out of
   // `wp/v2`, and on the way IN through a `wp/v2` write, which is how the
   // platform writes today. The database row above proves the connector reports
@@ -613,7 +614,7 @@ async function run() {
  *
  * ── WHY THESE FIVE, AND WHY THIS IS THE PHASE'S STRONGEST CLAIM ────────────
  *
- * D80-1 says a site with the plugin must never be WORSE than one without it,
+ * A site with the plugin must never be worse off than one without it,
  * and every other assertion here checks the connector against itself or against
  * the database. This checks it against `wp/v2` — the thing it is allowed to be
  * no worse than — on the inputs where an update is not a simple field write:

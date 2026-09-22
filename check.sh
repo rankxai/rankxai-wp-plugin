@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# Everything CI checks, before you push.
-# On 2026-09-21 this repository's CI went 6 failures in 14 runs — 43% — in a
-# single day, every one of them "push, let CI find it, fix". There is no PHP on
-# the workstation that produced them, so CI had become the linter: a shared,
-# slow, public resource used as a local tool, leaving a wall of red on a repo
-# that carries the product's name.
+# Everything CI checks, before you push. There is no PHP on this workstation,
+# so without a local runner CI ends up being used as the linter.
 
 set -euo pipefail
 
@@ -31,20 +27,15 @@ echo "== PHPCS =="
 run_php php vendor/bin/phpcs --standard=phpcs.xml.dist
 
 echo
-echo "== Guardrails (plan 80 §7) =="
-# A pure source scan — no Docker, no WordPress — over the SHIPPED PHP tree.
-# §7 lists eight rules and claimed four of them were "held by a source scan";
-# none existed until 2026-09-22. It is here rather than only in CI because it is
-# the cheapest check in this file and the one whose failure is most expensive:
+echo "== Guardrails =="
+# A pure source scan — no Docker, no WordPress — over the shipped PHP tree.
+# The cheapest check here, and the one whose failure is most expensive.
 node probe/verify-guardrails.mjs
 
 echo
 echo "== What the release archive would contain =="
-# CI has THREE jobs and the first version of this script ran two, then printed
-# "Safe to push". The push failed on the third — Plugin Check — because
-# `check.sh` ITSELF was in the release archive: a developer script shipped to
-# customers, flagged as `FILE: check.sh`. The checker written to stop CI
-# failures caused one, by not checking the thing the third job inspects.
+# CI's third job inspects the release ARCHIVE, not the repository. A developer
+# file that is not export-ignored ships to customers and fails it.
 ARCHIVE_FILES=$(git archive --format=tar HEAD | tar -t 2>/dev/null | grep -v '/$' || true)
 if [ -z "$ARCHIVE_FILES" ]; then
   echo "Could not list the archive contents — is anything committed?" >&2
@@ -64,12 +55,9 @@ if [ -n "$STRAYS" ]; then
 fi
 
 
-# `build-zip.mjs` already refuses a dirty tree, which covers building too EARLY.
-# What nothing covered was never building at all: measured 2026-09-22,
-# `dist/rankxai.zip` sat at 0.4.1 from commit 94095f92 while the source, both
-# release notes and the plan's owner action all said 0.4.2. The owner action is
-# "upload dist/rankxai.zip", so a stale file there is a stale plugin on a
-# customer's live site, and the only clue is inside the zip.
+# `build-zip.mjs` refuses a dirty tree, which covers building too EARLY but not
+# never building at all. A stale archive is a stale plugin on a live site, and
+# the only clue is inside the zip.
 plugin_version() { grep -m1 'Version:' | awk '{ print $NF }' | tr -d '[:space:]'; }
 SRC_VERSION=$(plugin_version < rankxai.php)
 if [ -f dist/rankxai.zip ]; then
@@ -91,9 +79,7 @@ fi
 echo
 echo "php -l, PHPCS, the guardrails and the archive contents are clean."
 echo
-# HONEST ABOUT ITS OWN BOUNDARY. Plugin Check proper runs wp-env — a whole
-# WordPress — which is not worth standing up on every push. What is checked
-# here is the failure it actually catches in this repo. Saying "safe to push"
-# unqualified is what made the first version of this script wrong.
+# Plugin Check proper needs a whole WordPress, which is not worth standing up on
+# every push. Name what is not covered rather than claiming "safe to push".
 echo "NOT covered here: WordPress Plugin Check itself, which CI runs against a"
 echo "real WordPress. The stray-file class it catches IS covered above."

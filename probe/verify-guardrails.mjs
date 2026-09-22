@@ -1,36 +1,17 @@
 #!/usr/bin/env node
 /**
- * Plan 80 §7 — "What must not happen", as a DERIVED source scan.
+ * The plugin's hard limits, as a derived source scan.
  *
  * Run:  node probe/verify-guardrails.mjs      (no Docker, no WordPress)
  *
- * ── WHY THIS EXISTS, AND WHY IT EXISTS NOW ──────────────────────────────────
- *
- * §7 lists eight rules and says of four of them that they are "held by a source
- * scan over the PHP tree". **No such scan was ever written.** The rules were
- * acceptance prose with nothing executing them — which is the shape the plan's
- * own §77 notes record four times: a rule WRITTEN and never WIRED.
- *
- * Phase 3 is the phase that most tempts a violation of the third one. It added
- * the content surface, and "the plugin holds no business logic" is exactly the
- * promise a content route erodes: a sanity check here, a block-boundary rule
- * there, and the rules that protect a customer's page are suddenly frozen at
- * whatever version each install happens to run.
- *
- * ── HOW IT IS DERIVED, AND WHAT ITS CONTROLS ARE ────────────────────────────
- *
  * The candidate set is every `.php` file in the shipped tree, taken from the
- * FILESYSTEM rather than from a list here — `lib/testing/guard-scan.ts` in the
- * platform repo records why an explicit candidate set is the bug: a member
- * missing from the list is never examined at all.
+ * filesystem rather than from a list here: a member missing from a hand-written
+ * list is never examined at all.
  *
- * Every scan carries a two-part control: it found files, AND it found the file
- * it is known to be about. A scan that silently matches nothing passes
- * everything.
- *
- * Comments are stripped before matching. Every file here documents the defect
- * it fixes, quoting the old behaviour, and a scan over prose fires on its own
- * fix note — a live false pass this codebase has already paid for once.
+ * Every scan carries a two-part control — it found files, and it found the file
+ * it is known to be about — because a scan that silently matches nothing passes
+ * everything. Comments are stripped before matching, so a scan cannot fire on
+ * the note describing the thing it forbids.
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -59,7 +40,7 @@ function shippedPhpFiles(dir = ROOT, acc = []) {
  *
  * Not a block-comment `.replace()` followed by a line-comment one: a `/*`
  * mentioned inside a line comment then swallows everything to the next `*` and
- * slash, which measured 1,717 characters of real code in the platform repo.
+ * slash, taking real code with it.
  */
 function stripComments(src) {
   let out = ''
@@ -138,8 +119,8 @@ for (const [name, src] of code) {
   }
 }
 diskOffenders.length === 0
-  ? ok('§7.2 — no file-writing function anywhere in the shipped tree')
-  : bad(`§7.2 — a file writer appeared: ${diskOffenders.join(', ')}`)
+  ? ok('no file-writing function anywhere in the shipped tree')
+  : bad(`a file writer appeared: ${diskOffenders.join(', ')}`)
 
 // The platform owns every rule about what may be written, how content is
 // preserved and whether a write succeeded, because those change with a deploy
@@ -159,19 +140,19 @@ for (const [name, src] of code) {
   }
 }
 ruleOffenders.length === 0
-  ? ok('§7.3 — none of the platform\u2019s decision vocabulary appears in PHP')
-  : bad(`§7.3 — a platform rule may have moved into the plugin: ${ruleOffenders.join(', ')}`)
+  ? ok('none of the platform\u2019s decision vocabulary appears in PHP')
+  : bad(`a platform rule may have moved into the plugin: ${ruleOffenders.join(', ')}`)
 
 const rest = code.get('includes/class-rankxai-rest.php') ?? ''
 const openRoutes = (rest.match(/__return_true/g) ?? []).length
 openRoutes === 1
-  ? ok('§7.4 — exactly one `__return_true` permission callback')
-  : bad(`§7.4 — ${openRoutes} open permission callbacks; only the presence probe may be one`)
+  ? ok('exactly one `__return_true` permission callback')
+  : bad(`${openRoutes} open permission callbacks; only the presence probe may be one`)
 // ...and it is the one we mean. A count alone would pass if somebody opened a
 // different route and closed `/status`.
 STATUS_IS_OPEN.test(rest)
-  ? ok('§7.4 — and it is `/status`, the presence probe')
-  : bad('§7.4 — the open callback is not on `/status`')
+  ? ok('and it is `/status`, the presence probe')
+  : bad('the open callback is not on `/status`')
 
 // Snow SEO's `/ping` is `__return_true` and returns `pluginVersion`, which is a
 // free fingerprint of which sites run a release with a known defect.
@@ -180,8 +161,8 @@ statusFn.length > 20
   ? ok('CONTROL — the status handler was located')
   : bad('CONTROL — could not locate `handle_status`, so the version check proves nothing')
 !VERSION_LEAK.test(statusFn)
-  ? ok('§7.5 — the unauthenticated probe returns no version of any kind')
-  : bad('§7.5 — the unauthenticated probe discloses a version')
+  ? ok('the unauthenticated probe returns no version of any kind')
+  : bad('the unauthenticated probe discloses a version')
 
 // `register_rest_route` does NOT require a `permission_callback`, and a method
 // entry without one is open to the world.
@@ -193,8 +174,8 @@ methodEntries > 5
   ? ok(`CONTROL — ${methodEntries} method entries found`)
   : bad(`CONTROL — only ${methodEntries} method entries found, so the gating check proves nothing`)
 callbacks === methodEntries
-  ? ok(`§7 — every method entry has its own permission callback (${callbacks} of ${methodEntries})`)
-  : bad(`§7 — ${methodEntries} method entries and ${callbacks} permission callbacks; one of them is open`)
+  ? ok(`every method entry has its own permission callback (${callbacks} of ${methodEntries})`)
+  : bad(`${methodEntries} method entries and ${callbacks} permission callbacks; one of them is open`)
 
 // MEASURED, and its absence is silent: `wp_update_post` expects slashed data and
 // `update_metadata` unslashes every value, so an unslashed write strips every

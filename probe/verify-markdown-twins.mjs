@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Plan 80 §22 — markdown twins, proven against a real WordPress.
+ * Markdown twins, proven against a real WordPress.
  *
  * Run:  npx wp-env start   then   node probe/verify-markdown-twins.mjs
  *
@@ -13,20 +13,13 @@
  * `X-Robots-Tag` another plugin queued is removed. The plugin has no PHP unit
  * suite; this is the gate.
  *
- * ── THE FIXTURES IT NEEDS, BECAUSE A FRESH RIG DOES NOT HAVE THEM ──────────
+ * ── THE FIXTURES ───────────────────────────────────────────────────────────
  *
- * On a wp-env created from scratch these do not exist and the run fails in ways
- * that read as product defects rather than as a missing rig:
+ * `provision()` creates them, so a wp-env made from scratch is enough. They
+ * used to be made by hand, which meant they vanished with the container and
+ * every conversion check then failed as though the converter had broken.
  *
- *   wp post create --post_type=page --post_title="Agents" --post_name=agents  *     --post_status=publish
- *       The COLLISION fixture. `/agents.md` is one of our own root documents AND
- *       a `.md` path, so without a page slugged `agents` the guard that stops
- *       the twin interceptor claiming it is never exercised against anything.
- *
- *   wp post update 4 --post_content="<the markup the CONV block asserts>"
- *       The probe post needs a body with a table, a nested list, a code block, a
- *       figure, an iframe and a paragraph starting with `*`. Without it every
- *       CONV assertion fails.
+ * The only thing to supply is the credential:
  *
  *   wp user application-password create admin twins-probe --porcelain
  *       Passed as WP_APP_PASSWORD.
@@ -34,9 +27,10 @@
  * ── IT PUTS THE SITE BACK ───────────────────────────────────────────────────
  *
  * Twins are switched off, the stored document removed and the fixture meta
- * cleared at the end, and the cleanup is ASSERTED rather than hoped for — the
- * same rule every live harness in the platform repo follows.
+ * cleared at the end, and the cleanup is asserted rather than hoped for.
  */
+
+import { cliContainer, wpContainer } from './containers.mjs'
 
 const BASE = process.env.WP_BASE ?? 'http://localhost:8888'
 const USER = process.env.WP_USER ?? 'admin'
@@ -148,7 +142,7 @@ const CONTEXT = [
  */
 async function apacheLog() {
   const { execFileSync } = await import('node:child_process')
-  const container = process.env.WP_CONTAINER ?? 'wp-env-rankxai-wordpress-plugin-599f954e-wordpress-1'
+  const container = wpContainer()
   try {
     return execFileSync('docker', ['logs', '--tail', '2000', container], { encoding: 'utf8', stdio: 'pipe' })
   } catch {
@@ -175,6 +169,7 @@ function linesSince(before, after) {
 
 async function run() {
   const logBefore = await apacheLog()
+  const FIX = await provision()
 
   // Every option this feature stores is deleted, so the plugin is in the state
   // a site is in the moment it is activated or updated. That is the acceptance
@@ -188,9 +183,9 @@ async function run() {
   freshState.json?.enabled === false
     ? ok('FRESH — with no options at all, the plugin reports twins OFF')
     : bad(`FRESH — a fresh install reported enabled=${freshState.json?.enabled}`)
-  const freshMd = await raw('/2026/09/21/plan-80-probe-post.md')
+  const freshMd = await raw(`${FIX.path}.md`)
   const freshMap = await raw('/sitemap-md.xml')
-  const freshHtml = await raw('/2026/09/21/plan-80-probe-post/')
+  const freshHtml = await raw(`${FIX.path}/`)
   const freshRobots = await raw('/robots.txt')
   freshMd.status === 404 && freshMap.status === 404
     ? ok('FRESH — no .md URL and no sitemap exist')
@@ -218,10 +213,10 @@ async function run() {
     ? ok('OFF — and a measured sample, so the customer sees the saving before committing')
     : bad('OFF — no sample while off')
 
-  const offMd = await raw('/2026/09/21/plan-80-probe-post.md')
+  const offMd = await raw(`${FIX.path}.md`)
   offMd.status === 404 ? ok('OFF — the .md URL 404s') : bad(`OFF — .md answered ${offMd.status}`)
 
-  const offHtml = await raw('/2026/09/21/plan-80-probe-post/')
+  const offHtml = await raw(`${FIX.path}/`)
   !has(/text\/markdown/, offHtml.link)
     ? ok('OFF — no alternate Link header on the HTML page')
     : bad('OFF — the page still advertises a twin')
@@ -232,7 +227,7 @@ async function run() {
   const offSitemap = await raw('/sitemap-md.xml')
   offSitemap.status === 404 ? ok('OFF — sitemap-md.xml 404s') : bad(`OFF — sitemap answered ${offSitemap.status}`)
 
-  const offNegotiated = await raw('/2026/09/21/plan-80-probe-post/', { headers: { Accept: 'text/markdown' } })
+  const offNegotiated = await raw(`${FIX.path}/`, { headers: { Accept: 'text/markdown' } })
   has(/text\/html/, offNegotiated.ct)
     ? ok('OFF — Accept: text/markdown still gets HTML')
     : bad(`OFF — negotiated response was ${offNegotiated.ct}`)
@@ -271,9 +266,9 @@ async function run() {
     : bad(`ON — /agents.md was taken over: source=${docOn.source} body=${docOn.body.slice(0, 60)}`)
 
   const shapes = {
-    suffix: await raw('/2026/09/21/plan-80-probe-post.md'),
-    index: await raw('/2026/09/21/plan-80-probe-post/index.md'),
-    query: await raw('/2026/09/21/plan-80-probe-post/?format=md'),
+    suffix: await raw(`${FIX.path}.md`),
+    index: await raw(`${FIX.path}/index.md`),
+    query: await raw(`${FIX.path}/?format=md`),
   }
   for (const [name, res] of Object.entries(shapes)) {
     res.status === 200 && has(/text\/markdown/, res.ct)
@@ -305,11 +300,11 @@ async function run() {
     ? ok('ON — ?format=md does not noindex the page’s own URL')
     : bad(`ON — the query shape emitted X-Robots-Tag: ${shapes.query.robots}`)
 
-  const negotiated = await raw('/2026/09/21/plan-80-probe-post/', { headers: { Accept: 'text/markdown' } })
+  const negotiated = await raw(`${FIX.path}/`, { headers: { Accept: 'text/markdown' } })
   has(/text\/markdown/, negotiated.ct)
     ? ok('ON — Accept: text/markdown returns markdown at the page’s own URL')
     : bad(`ON — negotiated response was ${negotiated.ct}`)
-  const browser = await raw('/2026/09/21/plan-80-probe-post/', {
+  const browser = await raw(`${FIX.path}/`, {
     headers: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
   })
   has(/text\/html/, browser.ct)
@@ -370,7 +365,7 @@ async function run() {
   sitemap.status === 200 && has(/<urlset/, sitemap.body)
     ? ok('ON — sitemap-md.xml is a urlset')
     : bad(`ON — sitemap answered ${sitemap.status} ${sitemap.ct}`)
-  has(/plan-80-probe-post\.md<\/loc>/, sitemap.body)
+  sitemap.body.includes(`${FIX.path}.md</loc>`)
     ? ok('ON — the sitemap lists the probe post’s twin')
     : bad('ON — the sitemap does not list the twin')
 
@@ -418,7 +413,7 @@ async function run() {
 
   // It rewrites REQUEST_URI before WordPress parses it, which is the most
   // invasive thing this plugin does. Reads only.
-  const posted = await http(`${BASE}/2026/09/21/plan-80-probe-post.md`, { method: 'POST', redirect: 'manual' })
+  const posted = await http(`${BASE}${FIX.path}.md`, { method: 'POST', redirect: 'manual' })
   !(posted.headers.get('content-type') ?? '').includes('text/markdown')
     ? ok('ON — a POST to a twin URL is not served as a twin')
     : bad('ON — a POST was rewritten and served markdown')
@@ -429,9 +424,9 @@ async function run() {
   await setTwins({ enabled: false, context: '' })
   await apiJson('/rankxai/v1/documents/agents_md', { method: 'DELETE' })
 
-  const afterMd = await raw('/2026/09/21/plan-80-probe-post.md')
+  const afterMd = await raw(`${FIX.path}.md`)
   afterMd.status === 404 ? ok('CLEANUP — twins are off and the .md URL 404s again') : bad(`CLEANUP — .md still answers ${afterMd.status}`)
-  const afterHtml = await raw('/2026/09/21/plan-80-probe-post/')
+  const afterHtml = await raw(`${FIX.path}/`)
   !has(/text\/markdown/, afterHtml.link) && !has(/type="text\/markdown"/, afterHtml.body)
     ? ok('CLEANUP — the advertisement is gone from header and head')
     : bad('CLEANUP — the page still advertises a twin')
@@ -441,6 +436,12 @@ async function run() {
   !has(/This is the stored document/, afterDoc.body)
     ? ok('CLEANUP — the probe document is removed')
     : bad('CLEANUP — the document is still served')
+
+  await wpCapture(['post', 'delete', FIX.id, '--force'])
+  const gone = await wpCapture(['post', 'list', '--post_type=post', `--name=${FIXTURE_SLUG}`, '--field=ID'])
+  gone.trim() === ''
+    ? ok('CLEANUP — the fixture post is removed')
+    : bad(`CLEANUP — the fixture post survives as ${gone.trim()}`)
 
   // MEASURED ON A LIVE SITE, and it made the product look broken: LiteSpeed
   // Cache answered `GET /?rest_route=/rankxai/v1/twins` with
@@ -472,9 +473,8 @@ async function run() {
   complaints.length === 0
     ? ok('LOG — PHP logged nothing during the run')
     : bad(`LOG — PHP complained ${complaints.length} time(s):\n        ${complaints.slice(0, 4).join('\n        ')}`)
-  // CONTROL: a log read that returned nothing would pass the line above
-  // vacuously, which is the shape `guard-scan.ts` warns about.
-  fresh.includes('plan-80-probe-post')
+  // CONTROL: a log read that returned nothing would pass the line above vacuously.
+  fresh.includes(FIXTURE_SLUG)
     ? ok('LOG — CONTROL: the log read covers this run’s own requests')
     : bad('LOG — CONTROL: the log read found none of this run’s requests, so it proved nothing')
 
@@ -492,7 +492,7 @@ async function run() {
  */
 async function wpOption(name) {
   const { execFileSync } = await import('node:child_process')
-  const container = process.env.WP_CLI_CONTAINER ?? 'wp-env-rankxai-wordpress-plugin-599f954e-cli-1'
+  const container = cliContainer()
   try {
     const out = execFileSync('docker', ['exec', '-u', '33', container, 'wp', 'option', 'get', name, '--format=json'], {
       encoding: 'utf8',
@@ -504,10 +504,88 @@ async function wpOption(name) {
   }
 }
 
+/** Run a wp-cli command and return its output. Throws, because a fixture that
+ *  was not created is a run that proves nothing. */
+async function wpCapture(args) {
+  const { execFileSync } = await import('node:child_process')
+  return execFileSync(
+    'docker',
+    ['exec', '-u', '33', cliContainer(), 'wp', ...args],
+    { encoding: 'utf8', stdio: 'pipe' }
+  ).trim()
+}
+
+const FIXTURE_SLUG = 'rankxai-twin-fixture'
+
+/**
+ * One body carrying every construct the CONV block asserts.
+ *
+ * It lives beside those assertions on purpose: the previous fixture was made
+ * by hand in one container, so it vanished with that container and every
+ * conversion check then failed as though the converter had broken.
+ */
+const FIXTURE_BODY = [
+  '<h2>What this page proves</h2>',
+  '<p>A paragraph with <strong>bold</strong>, <em>italic</em> and <code>inline code</code>,'
+  + ' plus <a href="https://example.com/a b">link with a space</a>.</p>',
+  '<ul><li>First item<ul><li>Nested one</li></ul></li><li>Second item</li></ul>',
+  '<ol><li>Step one</li><li>Step two</li></ol>',
+  '<blockquote><p>A quotation worth keeping.</p></blockquote>',
+  '<table><thead><tr><th>Plan</th><th>Price | per month</th></tr></thead>'
+  + '<tbody><tr><td>Starter</td><td>10</td></tr></tbody></table>',
+  '<figure><img src="https://example.com/pic.png" alt="A picture of a thing" />'
+  + '<figcaption>The caption</figcaption></figure>',
+  '<pre class="language-php"><code>echo \'hello\';</code></pre>',
+  '<div>Inside a div.</div>',
+  '<iframe src="https://www.youtube.com/embed/xyz" title="A video"></iframe>',
+  '<p>* Not a list item</p>',
+  "<script>var leak = 'should not appear';<" + "/script>",
+  '<form><button type="submit">Submit</button></form>',
+].join('\n')
+
+/**
+ * Create the two posts this probe needs and return the fixture's own path.
+ *
+ * The permalink is READ back rather than assembled, because the structure is a
+ * site setting and a guessed path 404s in a way that reads as a broken feature.
+ *
+ * A page slugged `agents` is the collision fixture: `/agents.md` is both one of
+ * our root documents and a `.md` path, so without it the guard that stops the
+ * twin interceptor claiming it is never exercised against anything.
+ */
+async function provision() {
+  const stale = await wpCapture(['post', 'list', '--post_type=post', `--name=${FIXTURE_SLUG}`, '--field=ID'])
+  for (const id of stale.split('\n').map((l) => l.trim()).filter(Boolean)) {
+    await wpCapture(['post', 'delete', id, '--force'])
+  }
+
+  const agents = await wpCapture(['post', 'list', '--post_type=page', '--name=agents', '--field=ID'])
+  if (!agents.trim()) {
+    await wpCapture([
+      'post', 'create', '--post_type=page', '--post_title=Agents',
+      '--post_name=agents', '--post_status=publish',
+    ])
+  }
+
+  const id = await wpCapture([
+    'post', 'create', '--post_type=post',
+    '--post_title=RankX AI twin fixture',
+    `--post_name=${FIXTURE_SLUG}`,
+    '--post_status=publish',
+    // An explicit excerpt, so the front-matter `description` is the fixture's
+    // own and not WordPress's summary of it — which includes a form's button
+    // label and would fail the "form controls are dropped" check.
+    '--post_excerpt=A fixture page for the markdown converter.',
+    `--post_content=${FIXTURE_BODY}`,
+    '--porcelain',
+  ])
+  const url = await wpCapture(['eval', `echo get_permalink(${id});`])
+  return { id, path: new URL(url).pathname.replace(/\/$/, '') }
+}
 /** Run a wp-cli command inside the wp-env container. */
 async function wpExec(args) {
   const { execFileSync } = await import('node:child_process')
-  const container = process.env.WP_CLI_CONTAINER ?? 'wp-env-rankxai-wordpress-plugin-599f954e-cli-1'
+  const container = cliContainer()
   try {
     execFileSync('docker', ['exec', '-u', '33', container, 'wp', ...args], { stdio: 'pipe' })
   } catch (e) {

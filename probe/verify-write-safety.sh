@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Regression tests for the three write-path defects found in the 2026-09-21 audit.
 # All three were proven against a live site BEFORE being fixed, which is the only
 # reason they are known to be real. Each check below fails on the old behaviour.
 set -u
 
+. "$(dirname "$0")/containers.sh"
+
 API="${API:-http://localhost:8888/wp-json/rankxai/v1}"
 AUTH="${WP_AUTH:?set WP_AUTH=user:app-password}"
 POST_ID="${POST_ID:-4}"
-CLI="${CLI_CONTAINER:-wp-env-rankxai-wordpress-plugin-599f954e-cli-1}"
+CLI="${CLI_CONTAINER:-$(rankxai_require_container -cli-1)}"
 
 pass=0; fail=0
 ok()  { echo "  PASS  $1"; pass=$((pass+1)); }

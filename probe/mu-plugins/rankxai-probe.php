@@ -1,6 +1,6 @@
 <?php
 /**
- * Plan 80 Phase 0 — empirical test of D80-13 rung 2.
+ * Which SEO output filters actually fire, measured rather than read.
  *
  * Registers a sentinel on every candidate output filter across the five major SEO
  * plugins and records which ones ACTUALLY FIRE on a real front-end request. Reading
@@ -55,7 +55,7 @@ $GLOBALS['rankxai_probe_fired'] = array();
 
 foreach (rankxai_probe_filters() as $plugin => $hooks) {
 	foreach ($hooks as $hook) {
-		// Priority 99999: we want to be the LAST word, which is the whole claim in D80-13.
+		// Priority 99999: we want to be the last word.
 		add_filter($hook, function ($value) use ($hook, $plugin) {
 			$GLOBALS['rankxai_probe_fired'][$hook] = array(
 				'plugin'    => $plugin,

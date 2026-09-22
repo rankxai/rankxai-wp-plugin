@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Plan 80 — end-to-end verification of the SEO capability, on the REAL credential.
+# End-to-end verification of the SEO capability, on the real credential.
 # For every scenario (no SEO plugin, then each of the five alone) this:
 set -u
 
-CLI="${CLI_CONTAINER:-wp-env-rankxai-wordpress-plugin-599f954e-cli-1}"
+. "$(dirname "$0")/containers.sh"
+
+CLI="${CLI_CONTAINER:-$(rankxai_require_container -cli-1)}"
 URL="${POST_URL:-http://localhost:8888/2026/09/21/plan-80-probe-post/}"
 POST_ID="${POST_ID:-4}"
 AUTH="${WP_AUTH:?set WP_AUTH=user:app-password}"

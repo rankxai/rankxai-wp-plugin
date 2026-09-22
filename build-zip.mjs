@@ -2,26 +2,14 @@
 /**
  * Build the distributable plugin ZIP.
  *
- * ── DO NOT REPLACE THIS WITH `Compress-Archive` ────────────────────────────
- *
- * PowerShell 5.1's `Compress-Archive` writes entry names with BACKSLASHES
- * (`rankxai\rankxai.php`). The ZIP specification requires forward slashes, and
- * WordPress's unzipper mis-resolves the path: the first upload of this plugin
- * landed at `rankxai/rankxai/rankxai.php`, two levels deep, where WordPress
- * cannot see it at all — it scans `wp-content/plugins` exactly one level deep.
- * The admin screen said only "Plugin file does not exist", which names the
- * symptom and not the cause, and the plugin does not even appear in the REST
- * plugin list to be deleted.
+ * Not `Compress-Archive`: PowerShell 5.1 writes entry names with backslashes,
+ * which the ZIP spec forbids and WordPress's unzipper mis-resolves. The plugin
+ * lands a level too deep, where it cannot be seen or deleted, and the admin
+ * screen says only "Plugin file does not exist".
  *
  * `git archive --format=zip` writes a correct archive, applies `--prefix` for the
- * plugin folder, and honours `.gitattributes` `export-ignore` — so what ships is
- * exactly the release: no CI config, no probe harness, no composer manifest, and
- * nothing uncommitted from the working tree.
- *
- * Two earlier attempts are recorded because both are Windows-specific traps a
- * future reader will otherwise re-enter: GNU tar parses `-f C:\...` as a REMOTE
- * HOST spec ("Cannot connect to C: resolve failed"), and its `-C` wants a POSIX
- * path. Neither is needed now.
+ * plugin folder, and honours `.gitattributes` export-ignore, so what ships is
+ * exactly the release and nothing from the working tree.
  *
  * Usage: node build-zip.mjs [outfile]
  */
@@ -34,11 +22,8 @@ const SLUG = 'rankxai'
 
 mkdirSync(dirname(OUT), { recursive: true })
 
-// Which is the right source for a release and a silent trap while building one.
-// Caught 2026-09-21: the plugin version was bumped to 0.2.0, the zip was rebuilt,
-// and it contained 0.1.0 — every FILE was present and correct, because the files
-// are committed; only the one edit that had not been was missing. The build
-// printed a clean 13-entry listing throughout.
+// A dirty tree is the wrong source for a release: every file is committed, so
+// the listing looks complete while the one uncommitted edit is missing.
 const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()
 if (dirty && !process.env.RANKXAI_ALLOW_DIRTY_BUILD) {
   console.error('Refusing to build: the working tree has uncommitted changes, and `git archive`')

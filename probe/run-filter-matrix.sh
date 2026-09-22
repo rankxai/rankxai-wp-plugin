@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Plan 80 Phase 0 — D80-13 rung 2, measured rather than read.
+# Which SEO output filters fire and win, measured rather than read.
 # For each scenario (no SEO plugin, then each of the five alone) it activates that
 # plugin, fetches a real front-end post, and records which candidate output filters
 # FIRED and which sentinels reached the rendered <head>. Reading a plugin's docs
 # tells you a filter is documented; only this tells you it runs and wins.
 set -u
 
-CLI="${CLI_CONTAINER:-wp-env-rankxai-wordpress-plugin-599f954e-cli-1}"
-WP="${WP_CONTAINER:-wp-env-rankxai-wordpress-plugin-599f954e-wordpress-1}"
+. "$(dirname "$0")/containers.sh"
+
+CLI="${CLI_CONTAINER:-$(rankxai_require_container -cli-1)}"
+WP="${WP_CONTAINER:-$(rankxai_require_container -wordpress-1)}"
 URL="${POST_URL:-http://localhost:8888/2026/09/21/plan-80-probe-post/}"
 OUT="${OUT_DIR:-./probe/results}"
 ALL="wordpress-seo seo-by-rank-math wp-seopress all-in-one-seo-pack autodescription"
