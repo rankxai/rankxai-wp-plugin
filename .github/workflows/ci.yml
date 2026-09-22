@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  phpcs:
+    name: Coding standards (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 7.4 is the floor declared in `Requires PHP`. It is in the matrix because
+        # WordPress.org will install this on 7.4 hosts, and a syntax feature from 8.0
+        # is a fatal on activation rather than a warning.
+        php: ['7.4', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: PHPCS
+        run: composer run lint -- --report=full --report-summary
+
+  guardrails:
+    name: Guardrails (plan 80 §7)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A pure source scan over the shipped PHP tree: no file writer, no
+      # platform decision vocabulary, exactly one unauthenticated route and no
+      # version on it, a permission callback per method entry, and `wp_slash` on
+      # every write of caller-supplied bytes. Needs nothing but node, which the
+      # runner has.
+      - run: node probe/verify-guardrails.mjs
+
+  plugin-check:
+    name: WordPress Plugin Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Plugin Check activates the plugin in a real WordPress and audits it. With no
+      # plugin file in the repository there is nothing to activate, so it fails — as
+      # it did on the very first push here.
+      - id: detect
+        name: Is there a plugin to check yet?
+        run: |
+          if grep -rlE '^[[:space:]]*\*[[:space:]]*Plugin Name:' --include='*.php' . >/dev/null 2>&1; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::No plugin header found yet — Plugin Check skipped. It self-enables with the first plugin file.'
+          fi
+
+      # Check the ARCHIVE, not the repository.
+      # Pointed at the repo root, Plugin Check fails on `hidden_files` and
+      # `application_detected` — it sees .github, .gitignore, composer.json and the
+      # probe harness, none of which ship. That is a true finding about the wrong
+      # directory: the artefact a customer installs is what `git archive` produces,
+      # because .gitattributes export-ignores all of it.
+      - if: steps.detect.outputs.present == 'true'
+        name: Build the release archive
+        run: |
+          mkdir -p build/rankxai
+          git archive HEAD | tar -x -C build/rankxai
+          echo "--- what ships ---"
+          find build/rankxai -type f | sort
+
+      - if: steps.detect.outputs.present == 'true'
+        uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: './build/rankxai'

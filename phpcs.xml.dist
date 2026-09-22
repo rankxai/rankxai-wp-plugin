@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<ruleset name="RankX AI for WordPress">
+	<description>
+		Coding standards for the RankX AI WordPress plugin.
+
+		Two rules here are not style and should not be relaxed without reading plan 80:
+
+		  - PrefixAllGlobals enforces `rankxai` / `RankXAI` on every global symbol. WordPress has
+		    no namespace isolation at runtime, so an unprefixed function collides with whatever
+		    else the site runs, and the failure lands on a customer's live site rather than here.
+
+		  - PHPCompatibilityWP with testVersion 7.4- is what keeps `Requires PHP: 7.4` honest.
+		    WordPress.org will install this plugin on PHP 7.4 hosts and a syntax feature from 8.0
+		    is a fatal error on activation, not a warning.
+	</description>
+
+	<file>.</file>
+
+	<exclude-pattern>/vendor/*</exclude-pattern>
+	<exclude-pattern>/node_modules/*</exclude-pattern>
+	<exclude-pattern>/build/*</exclude-pattern>
+	<exclude-pattern>/dist/*</exclude-pattern>
+
+	<!--
+		The measurement harness. It is mapped into a throwaway wp-env, never ships, and is
+		export-ignored from the release archive. Holding a probe to shipping standards costs
+		real effort and buys nothing, so it is excluded DELIBERATELY and narrowly — only this
+		directory, so every byte of actual plugin code stays covered.
+	-->
+	<exclude-pattern>/probe/*</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg name="basepath" value="."/>
+	<arg value="sp"/>
+	<arg name="parallel" value="8"/>
+
+	<rule ref="WordPress">
+		<!-- The plugin ships no compiled PHP and no third-party PHP, so file naming is ours. -->
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+	</rule>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="rankxai"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!--
+		DOM property names are PHP's, not ours.
+
+		`WordPress.NamingConventions.ValidVariableName` flags `$node->nodeType` and its
+		siblings as not snake_case, which is true and not actionable: they are ext-dom's
+		own API and renaming them is not available. The markdown converter reads them on
+		nearly every line, so the alternative is ~30 `phpcs:ignore` comments that would
+		train a reader to skim past ignores in the one file where escaping and structure
+		decisions are made. The list is exactly the properties this plugin reads.
+	-->
+	<rule ref="WordPress.NamingConventions.ValidVariableName">
+		<properties>
+			<property name="allowed_custom_properties" type="array">
+				<element value="nodeType"/>
+				<element value="nodeName"/>
+				<element value="nodeValue"/>
+				<element value="childNodes"/>
+				<element value="textContent"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="rankxai"/>
+				<element value="RankXAI"/>
+				<element value="RANKXAI"/>
+			</property>
+		</properties>
+	</rule>
+
+	<config name="minimum_wp_version" value="6.0"/>
+
+	<rule ref="PHPCompatibilityWP"/>
+	<config name="testVersion" value="7.4-"/>
+</ruleset>

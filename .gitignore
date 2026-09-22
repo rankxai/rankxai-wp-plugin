@@ -1,0 +1,26 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Build output — compiled assets are committed only in the release tag, never on main.
+/build/
+/dist/
+*.zip
+
+# Local environment
+.env
+.env.local
+.wp-env.override.json
+
+# Tooling caches
+.phpcs-cache
+.phpunit.result.cache
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local probe artefacts — captured HTML and JSON from wp-env runs.
+/probe/results/
