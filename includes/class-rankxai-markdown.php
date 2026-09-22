@@ -97,15 +97,8 @@ class RankXAI_Markdown {
 		$permalink = (string) get_permalink( $post );
 		$title     = self::plain( get_the_title( $post ) );
 
-		/*
-		 * `source:` IS the citation pointer, and it is deliberately here rather
-		 * than in a `rel="canonical"`. Pairing a canonical with the twin's own
-		 * `noindex` is the combination Google's own guidance says to avoid, and
-		 * the risk is that the drop applies to the consolidated cluster rather
-		 * than to the twin alone (plan 80 §22.2). A front-matter field states
-		 * the relationship to a reader without asking a search engine for
-		 * anything.
-		 */
+		// `source:` is the citation pointer rather than a `rel="canonical"`,
+		// which Google advises against pairing with the twin's own `noindex`.
 		$front = array(
 			'title'  => $title,
 			'source' => $permalink,
@@ -152,10 +145,8 @@ class RankXAI_Markdown {
 	 * Run the stored content through the normal filters, so blocks and
 	 * shortcodes are resolved before conversion.
 	 *
-	 * The global post is set and restored around `the_content` because plugins
-	 * and themes hooked there expect a loop context. At `template_redirect` the
-	 * main query has run but `the_post()` has not, so without this the global is
-	 * whatever the previous request left.
+	 * The global post is set and restored because anything hooked to
+	 * `the_content` expects a loop context.
 	 *
 	 * @param WP_Post $post              Post object.
 	 * @param bool    $pre_render_blocks Render blocks before the filter chain. Default true.

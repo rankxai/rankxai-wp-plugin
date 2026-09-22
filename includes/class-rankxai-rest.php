@@ -42,14 +42,8 @@ class RankXAI_REST {
 		}
 
 		/**
-		 * LiteSpeed Cache's own control, which is the cache MEASURED serving our
-		 * responses stale. A no-op on a site without it, so it costs nothing to
-		 * address the one we have evidence about by name.
-		 *
-		 * PHPCS asks for a prefix on every hook a plugin invokes, which is right
-		 * for hooks a plugin OWNS and wrong here: this is LiteSpeed's documented
-		 * name, and prefixing it would fire something nothing listens to — the
-		 * exact defect the rule exists to prevent, in reverse.
+		 * LiteSpeed Cache's own control. A no-op without that plugin, and the
+		 * hook name is LiteSpeed's, so it is not prefixed.
 		 */
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Another plugin's documented public hook; see above.
 		do_action( 'litespeed_control_set_nocache', 'RankX AI connector responses are per-request state' );
@@ -255,10 +249,9 @@ class RankXAI_REST {
 	/**
 	 * Write a post's body, and return the bytes WordPress stored.
 	 *
-	 * The response carries no verdict (plan 80 D80-9). `object` is the post in
-	 * `wp/v2`'s own shape so the platform parses it with the code it already
-	 * has, `revisionId` saves a second round trip, and `unfilteredHtml` is the
-	 * FACT that turns "your script tag is missing" from a guess into an answer.
+	 * The response carries no verdict. `object` is the post in `wp/v2`'s own
+	 * shape, `revisionId` saves a second round trip, and `unfilteredHtml` says
+	 * whether the writing account can store script tags at all.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -266,12 +259,12 @@ class RankXAI_REST {
 	public static function handle_content_set( $request ) {
 		$post_id = (int) $request['id'];
 		if ( ! get_post( $post_id ) ) {
-			return new WP_Error( 'rankxai_not_found', 'No such post.', array( 'status' => 404 ) );
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
 		}
 
 		$fields = $request->get_param( 'fields' );
 		if ( ! is_array( $fields ) ) {
-			return new WP_Error( 'rankxai_bad_fields', '`fields` must be an object.', array( 'status' => 400 ) );
+			return new WP_Error( 'rankxai_bad_fields', __( '`fields` must be an object.', 'rankxai' ), array( 'status' => 400 ) );
 		}
 
 		$known   = array_keys( RankXAI_Content::fields() );
@@ -283,7 +276,11 @@ class RankXAI_REST {
 			// what happened. Everything outside this set belongs on `wp/v2`.
 			return new WP_Error(
 				'rankxai_unknown_field',
-				'Unknown field(s): ' . implode( ', ', $unknown ),
+				sprintf(
+					/* translators: %s: comma-separated list of field names. */
+					__( 'Unknown field(s): %s', 'rankxai' ),
+					implode( ', ', $unknown )
+				),
 				array(
 					'status' => 400,
 					'known'  => $known,
@@ -298,7 +295,11 @@ class RankXAI_REST {
 		if ( ! array_intersect( $known, array_keys( $fields ) ) ) {
 			return new WP_Error(
 				'rankxai_no_fields',
-				'No writable field was supplied. Known fields: ' . implode( ', ', $known ) . '.',
+				sprintf(
+					/* translators: %s: comma-separated list of field names. */
+					__( 'No writable field was supplied. Known fields: %s.', 'rankxai' ),
+					implode( ', ', $known )
+				),
 				array( 'status' => 400 )
 			);
 		}
@@ -311,7 +312,11 @@ class RankXAI_REST {
 			}
 			return new WP_Error(
 				'rankxai_invalid_field',
-				'Refused, nothing was written: ' . implode( ', ', $detail ),
+				sprintf(
+					/* translators: %s: comma-separated list of fields and why each was refused. */
+					__( 'Refused, nothing was written: %s', 'rankxai' ),
+					implode( ', ', $detail )
+				),
 				array(
 					'status'   => 400,
 					'rejected' => $rejected,
@@ -336,7 +341,7 @@ class RankXAI_REST {
 			// record a verified write of nothing.
 			return new WP_Error(
 				'rankxai_read_back_failed',
-				'The write was applied and the post could not be read back.',
+				__( 'The write was applied and the post could not be read back.', 'rankxai' ),
 				array( 'status' => 500 )
 			);
 		}
@@ -391,7 +396,7 @@ class RankXAI_REST {
 	public static function handle_schema_get( $request ) {
 		$post_id = (int) $request['id'];
 		if ( ! get_post( $post_id ) ) {
-			return new WP_Error( 'rankxai_not_found', 'No such post.', array( 'status' => 404 ) );
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
 		}
 		return new WP_REST_Response( self::schema_state( $post_id ), 200 );
 	}
@@ -405,7 +410,7 @@ class RankXAI_REST {
 	public static function handle_schema_put( $request ) {
 		$post_id = (int) $request['id'];
 		if ( ! get_post( $post_id ) ) {
-			return new WP_Error( 'rankxai_not_found', 'No such post.', array( 'status' => 404 ) );
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
 		}
 
 		$content = $request->get_param( 'content' );
@@ -413,15 +418,18 @@ class RankXAI_REST {
 		if ( '' !== $reason ) {
 			return new WP_Error(
 				'rankxai_invalid_schema',
-				'Refused, nothing was written: the graph ' . $reason . '.',
+				sprintf(
+					/* translators: %s: why the graph was refused. */
+					__( 'Refused, nothing was written: the graph %s.', 'rankxai' ),
+					$reason
+				),
 				array( 'status' => 400 )
 			);
 		}
 
 		RankXAI_Schema::set( $post_id, $content );
 
-		// The STORED bytes come back, exactly as the SEO and document writes do
-		// (D80-9). Nothing here reports `verified`.
+		// The stored bytes come back; nothing here reports `verified`.
 		return new WP_REST_Response( self::schema_state( $post_id ), 200 );
 	}
 
@@ -434,7 +442,7 @@ class RankXAI_REST {
 	public static function handle_schema_delete( $request ) {
 		$post_id = (int) $request['id'];
 		if ( ! get_post( $post_id ) ) {
-			return new WP_Error( 'rankxai_not_found', 'No such post.', array( 'status' => 404 ) );
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
 		}
 		RankXAI_Schema::delete( $post_id );
 		return new WP_REST_Response( self::schema_state( $post_id ), 200 );
@@ -510,20 +518,13 @@ class RankXAI_REST {
 			$post_types = $raw;
 		}
 
-		if ( null !== $enabled || null !== $post_types ) {
-			$current = RankXAI_Twins::settings();
-			RankXAI_Twins::save_settings(
-				null === $enabled ? $current['enabled'] : $enabled,
-				$post_types
-			);
-		}
-
+		$context = null;
 		if ( null !== $request->get_param( 'context' ) ) {
 			$context = $request->get_param( 'context' );
 			if ( ! is_string( $context ) ) {
 				return new WP_Error( 'rankxai_twins_bad_context', __( '`context` must be a string.', 'rankxai' ), array( 'status' => 400 ) );
 			}
-			if ( ! RankXAI_Twins::save_context( $context ) ) {
+			if ( strlen( $context ) > RankXAI_Twins::MAX_CONTEXT_BYTES ) {
 				return new WP_Error(
 					'rankxai_twins_context_too_large',
 					sprintf(
@@ -536,9 +537,23 @@ class RankXAI_REST {
 			}
 		}
 
-		// The STATE comes back, exactly as the SEO and document writes do
-		// (D80-9). Nothing here reports `verified`; comparing what came back
-		// against what was sent is the platform's job.
+		// Everything is validated before anything is written. Writing the
+		// settings first and then refusing the context would change the site
+		// and report failure.
+		if ( null !== $enabled || null !== $post_types ) {
+			$current = RankXAI_Twins::settings();
+			RankXAI_Twins::save_settings(
+				null === $enabled ? $current['enabled'] : $enabled,
+				$post_types
+			);
+		}
+
+		if ( null !== $context ) {
+			RankXAI_Twins::save_context( $context );
+		}
+
+		// The state comes back; comparing it against what was sent is the
+		// caller's job.
 		return self::handle_twins_get();
 	}
 
@@ -577,7 +592,11 @@ class RankXAI_REST {
 	 */
 	public static function handle_document_put( $request ) {
 		$slug    = (string) $request['slug'];
-		$content = (string) $request['content'];
+		$content = $request->get_param( 'content' );
+
+		if ( ! is_string( $content ) ) {
+			return new WP_Error( 'rankxai_document_bad_content', __( '`content` must be a string.', 'rankxai' ), array( 'status' => 400 ) );
+		}
 
 		if ( strlen( $content ) > RankXAI_Documents::MAX_BYTES ) {
 			return new WP_Error(
@@ -595,10 +614,8 @@ class RankXAI_REST {
 			return new WP_Error( 'rankxai_document_unknown', __( 'Unknown document.', 'rankxai' ), array( 'status' => 404 ) );
 		}
 
-		// The STORED bytes come back, exactly as the SEO write does (D80-9).
-		// Nothing here reports `verified` — comparing what came back against
-		// what was sent is the platform's job, and a plugin that graded its own
-		// work would be the thing making `write_not_verified` untrue.
+		// The stored bytes come back; comparing them against what was sent is
+		// the caller's job.
 		return self::handle_document_get( $request );
 	}
 
@@ -617,7 +634,8 @@ class RankXAI_REST {
 	}
 
 	/**
-	 * Presence only. No version, by design (plan 80 D80-12).
+	 * Presence only, and deliberately no version: this is the one unauthenticated
+	 * route.
 	 *
 	 * @return WP_REST_Response
 	 */
@@ -655,12 +673,6 @@ class RankXAI_REST {
 				// offers exactly what this install can publish rather than
 				// discovering a 404 after the customer pressed the button.
 				'documents'       => array_keys( RankXAI_Documents::catalogue() ),
-				// It was written and then removed before release. `capabilities`
-				// already carries `twins.read`/`twins.write`, which is the part
-				// the platform needs from a manifest — the same job `documents`
-				// does for its half: offer exactly what this install can do,
-				// rather than discovering a 404 after a customer pressed a
-				// button.
 			),
 			200
 		);
@@ -699,7 +711,7 @@ class RankXAI_REST {
 	public static function handle_seo_get( $request ) {
 		$post_id = (int) $request['id'];
 		if ( ! get_post( $post_id ) ) {
-			return new WP_Error( 'rankxai_not_found', 'No such post.', array( 'status' => 404 ) );
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
 		}
 		return new WP_REST_Response(
 			array(
@@ -715,10 +727,8 @@ class RankXAI_REST {
 	/**
 	 * Write, then return what is STORED.
 	 *
-	 * The response never says `verified` (plan 80 D80-9). It reports what the
-	 * database holds after the write and the platform compares that against what
-	 * it sent — so the judgement stays in code we can change with a deploy, rather
-	 * than in a plugin frozen at whatever version each site happens to run.
+	 * The response never says `verified`. It reports what the database holds
+	 * after the write, and the caller compares that against what it sent.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -726,12 +736,12 @@ class RankXAI_REST {
 	public static function handle_seo_set( $request ) {
 		$post_id = (int) $request['id'];
 		if ( ! get_post( $post_id ) ) {
-			return new WP_Error( 'rankxai_not_found', 'No such post.', array( 'status' => 404 ) );
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
 		}
 
 		$fields = $request->get_param( 'fields' );
 		if ( ! is_array( $fields ) ) {
-			return new WP_Error( 'rankxai_bad_fields', '`fields` must be an object.', array( 'status' => 400 ) );
+			return new WP_Error( 'rankxai_bad_fields', __( '`fields` must be an object.', 'rankxai' ), array( 'status' => 400 ) );
 		}
 
 		$known   = RankXAI_SEO_Registry::fields();
@@ -741,7 +751,11 @@ class RankXAI_REST {
 			// to be written needs to be told, not to get a 200 and no effect.
 			return new WP_Error(
 				'rankxai_unknown_field',
-				'Unknown field(s): ' . implode( ', ', $unknown ),
+				sprintf(
+					/* translators: %s: comma-separated list of field names. */
+					__( 'Unknown field(s): %s', 'rankxai' ),
+					implode( ', ', $unknown )
+				),
 				array(
 					'status' => 400,
 					'known'  => $known,
@@ -749,10 +763,9 @@ class RankXAI_REST {
 			);
 		}
 
-		// Validate EVERY field before writing ANY of them. Until 2026-09-21 an
-		// invalid value was silently coerced to '' — which means clear — so a bad
-		// canonical or a non-string title deleted the good value already on the post
-		// and answered 200. All-or-nothing, and the refusal names each field.
+		// Validate every field before writing any of them. Coercing an invalid
+		// value to '' would clear whatever was already on the post, so the whole
+		// request is refused and the error names each field.
 		$rejected = RankXAI_SEO::rejections( $fields );
 		if ( $rejected ) {
 			$detail = array();
@@ -761,7 +774,11 @@ class RankXAI_REST {
 			}
 			return new WP_Error(
 				'rankxai_invalid_field',
-				'Refused, nothing was written: ' . implode( ', ', $detail ),
+				sprintf(
+					/* translators: %s: comma-separated list of fields and why each was refused. */
+					__( 'Refused, nothing was written: %s', 'rankxai' ),
+					implode( ', ', $detail )
+				),
 				array(
 					'status'   => 400,
 					'rejected' => $rejected,

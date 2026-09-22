@@ -251,14 +251,9 @@ class RankXAI_Twins {
 			}
 		}
 
-		/*
-		 * `/agents.md` is one of OUR OWN root documents and it ends in `.md`.
-		 * Without this, switching twins on would strip the suffix, rewrite the
-		 * URI to `/agents`, and `RankXAI_Documents` — which runs later, at
-		 * `init` — would never see the request. The customer's published
-		 * `agents.md` would silently become a twin of whatever post is slugged
-		 * `agents`.
-		 */
+		// `/agents.md` is one of our own root documents and ends in `.md`.
+		// Without this the suffix would be stripped and Documents, which runs
+		// later at `init`, would never see the request.
 		if ( null !== RankXAI_Documents::slug_for_request( $raw ) ) {
 			return;
 		}
@@ -334,16 +329,9 @@ class RankXAI_Twins {
 			$_SERVER['RANKXAI_REQUEST_URI'] = $_SERVER['REQUEST_URI'];
 		}
 
-		/*
-		 * This runs at `plugins_loaded`, and `$wp_rewrite` is not instantiated
-		 * until `wp-settings.php` gets to it — AFTER this hook. So
-		 * `user_trailingslashit()` reads a property off null: PHP logs
-		 * "Trying to get property 'use_trailing_slashes' of non-object" on
-		 * EVERY twin request (seen in the container's error log, never by any
-		 * assertion), and the null reads as falsy, so it UNTRAILINGSLASHES
-		 * unconditionally — the opposite of what a trailing-slash site wants,
-		 * and an invitation for `redirect_canonical` to bounce the request.
-		 */
+		// Not `user_trailingslashit()`: `$wp_rewrite` does not exist yet at
+		// `plugins_loaded`, so it would read a property off null and always
+		// untrailingslash. This is the same expression `WP_Rewrite::init()` uses.
 		$structure = (string) get_option( 'permalink_structure' );
 		if ( '/' !== $path && '' !== $structure && '/' === substr( $structure, -1 ) ) {
 			$path = trailingslashit( $path );
@@ -854,6 +842,7 @@ class RankXAI_Twins {
 			header_remove( 'X-Robots-Tag' );
 			status_header( 200 );
 			header( 'Content-Type: application/xml; charset=utf-8', true );
+			header( 'X-Content-Type-Options: nosniff', true );
 			header( 'X-RankXAI-Source: markdown-twin-sitemap', true );
 			header( 'X-Robots-Tag: noindex, follow', true );
 		}

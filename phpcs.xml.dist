@@ -3,7 +3,7 @@
 	<description>
 		Coding standards for the RankX AI WordPress plugin.
 
-		Two rules here are not style and should not be relaxed without reading plan 80:
+		Two rules here are not style and should not be relaxed:
 
 		  - PrefixAllGlobals enforces `rankxai` / `RankXAI` on every global symbol. WordPress has
 		    no namespace isolation at runtime, so an unprefixed function collides with whatever

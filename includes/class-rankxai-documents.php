@@ -222,6 +222,9 @@ class RankXAI_Documents {
 		$type      = $catalogue[ $slug ]['type'];
 
 		header( 'Content-Type: ' . $type );
+		// Plain text; a sniffing client that guessed HTML would render the
+		// document as markup.
+		header( 'X-Content-Type-Options: nosniff' );
 		// So a reader can tell this virtual route from a real file.
 		header( 'X-RankXAI-Source: virtual-route' );
 		// No caching directive of our own — the site's cache plugin and host

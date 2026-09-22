@@ -111,11 +111,8 @@ class RankXAI_SEO_Registry {
 	/**
 	 * Rung 2 — the filters that decide what reaches the <head>.
 	 *
-	 * Two of these are not the obvious choice. Yoast's `wpseo_title` fires but
-	 * does not land, because Yoast takes the document title from core. And
-	 * SEOPress's storage keys are not its filter names: the Twitter filters are
-	 * `..._twitter_card_title`/`_desc` and the canonical is
-	 * `seopress_titles_canonical`.
+	 * Yoast and SEOPress both take the document title from core, so
+	 * `pre_get_document_title` wins for them rather than their own title filter.
 	 *
 	 * @return array<string, array<string, string>>
 	 */

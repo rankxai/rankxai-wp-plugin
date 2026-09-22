@@ -149,13 +149,10 @@ class RankXAI_Content {
 	}
 
 	/**
-	 * The post in the same shape `wp/v2` returns, so the platform keeps one
-	 * parser for both sources.
+	 * The post in the same shape `wp/v2` returns.
 	 *
-	 * `modified_gmt` goes through `mysql_to_rfc3339()` — the function core's
-	 * REST controller uses — because the database and REST formats are different
-	 * strings for the same instant, and the platform compares one against the
-	 * other across a write.
+	 * `modified_gmt` uses `mysql_to_rfc3339()` so the timestamp matches what
+	 * `wp/v2` would have returned.
 	 *
 	 * @param int $post_id Post ID.
 	 * @return array<string, mixed>|null
@@ -189,16 +186,8 @@ class RankXAI_Content {
 	/**
 	 * `the_content` applied, as `wp/v2` returns it.
 	 *
-	 * The platform's builder classification reads the rendered body to recognise
-	 * an Elementor page, so dropping this field would make such a page classify
-	 * as ordinary.
-	 *
-	 * `rendered_content` is called WITHOUT its block pre-pass: `the_content`
-	 * runs `do_blocks` itself at priority 9, and rendering twice collapses the
-	 * whitespace between block delimiters, which would stop this matching what
-	 * `wp/v2` returns.
-	 *
-	 * A password-protected post returns '', as core does.
+	 * No block pre-pass: `the_content` runs `do_blocks` at priority 9, and
+	 * rendering twice collapses the whitespace between block delimiters.
 	 *
 	 * @param WP_Post $post Post.
 	 * @return string
