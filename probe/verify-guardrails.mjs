@@ -130,6 +130,34 @@ diskOffenders.length === 0
   ? ok('no file-writing function anywhere in the shipped tree')
   : bad(`a file writer appeared: ${diskOffenders.join(', ')}`)
 
+// ── GUIDELINE 7, AND THE SENTENCE IN readme.txt THAT DEPENDS ON IT ─────────
+//
+// "Plugins may not contact external servers without explicit and authorized
+// consent" is the guideline that sinks most SaaS-client plugins, and this one
+// answers it before it is asked: the platform calls IN and nothing here calls
+// out. readme.txt states that as a fact to every customer and to the reviewer.
+//
+// It was measured once, by hand, before the public release. A claim in a public
+// readme with no standing guard is a claim that drifts — and this phase added a
+// whole new class that builds a document, which is exactly where a helpful
+// `wp_remote_get` would arrive. So the scan and the sentence are checked
+// TOGETHER: if one ever stops being true the other has to change with it.
+const OUTBOUND = [
+  'wp_remote_get', 'wp_remote_post', 'wp_remote_head', 'wp_remote_request', 'wp_safe_remote_get',
+  'wp_safe_remote_post', 'wp_safe_remote_head', 'wp_safe_remote_request',
+  'curl_init', 'curl_exec', 'curl_multi_init', 'fsockopen', 'stream_socket_client',
+  'file_get_contents', 'fopen', 'readfile', 'get_headers', 'dns_get_record',
+]
+const outboundOffenders = []
+for (const [name, src] of code) {
+  for (const fn of OUTBOUND) {
+    if (new RegExp(`\\b${fn}\\s*\\(`).test(src)) outboundOffenders.push(`${name}: ${fn}`)
+  }
+}
+outboundOffenders.length === 0
+  ? ok('nothing in the shipped tree can make an outbound request')
+  : bad(`an outbound call appeared: ${outboundOffenders.join(', ')}`)
+
 // The platform owns every rule about what may be written, how content is
 // preserved and whether a write succeeded, because those change with a deploy
 // while this plugin is frozen at whatever version each site runs. The vocabulary
@@ -310,6 +338,14 @@ const shortDescription = (readme.split(SECTION_SPLIT)[0] ?? '')
 shortDescription.length > 0 && shortDescription.length <= 150
   ? ok(`the short description is ${shortDescription.length} of 150 characters`)
   : bad(`the short description is ${shortDescription.length} characters; the directory trims at 150`)
+
+// The other half of the outbound scan above. Two ways to fail: the code starts
+// calling out while the readme says it does not, or somebody removes the
+// sentence while it is still true and hands a reviewer a question to ask.
+const CLAIMS_NO_OUTBOUND = /contacts no external service/i
+CLAIMS_NO_OUTBOUND.test(readme)
+  ? ok('readme.txt states that the plugin contacts no external service, which the scan above proves')
+  : bad('readme.txt no longer carries the no-outbound claim that the code supports')
 
 const tags = readmeHeader('Tags').split(',').map((t) => t.trim()).filter(Boolean)
 tags.length > 0 && tags.length <= 5
