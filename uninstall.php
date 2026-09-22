@@ -62,6 +62,14 @@ function rankxai_uninstall_current_site() {
 			}
 		}
 	}
+
+	// Which documents were generated locally. One option holding every slug, so
+	// unlike the catalogue above there is nothing to derive.
+	$generate = __DIR__ . '/includes/class-rankxai-generate.php';
+	if ( file_exists( $generate ) ) {
+		require_once $generate;
+		delete_option( RankXAI_Generate::OPTION );
+	}
 }
 
 /**

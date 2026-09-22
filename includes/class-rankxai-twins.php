@@ -766,7 +766,31 @@ class RankXAI_Twins {
 			return 'page' === (string) get_option( 'show_on_front' ) ? home_url( '/index.md' ) : '';
 		}
 
-		return $base . '.md';
+		$suffixed = $base . '.md';
+
+		/*
+		 * A PAGE SLUGGED `agents` PRODUCES `/agents.md`, WHICH IS A ROOT
+		 * DOCUMENT'S ADDRESS AND NOT THIS PAGE'S.
+		 *
+		 * The documents route owns that URL and the interceptor stands down for
+		 * it, correctly — so the suffixed form serves the root document while
+		 * every consumer of this function was publishing it as the page: the
+		 * twin sitemap listed it, the HTML page advertised it in a Link header
+		 * and a <link>, and a generated llms.txt named it as where to read the
+		 * page. Four surfaces pointing an assistant at the wrong content.
+		 *
+		 * The hint form is a real, working address for the same page — the
+		 * interceptor asks the documents catalogue before it looks at `format`,
+		 * so `/agents/?format=md` resolves to the page — so the twin is kept
+		 * rather than dropped. Measured on a real WordPress with a page slugged
+		 * `agents`.
+		 */
+		$path = (string) wp_parse_url( $suffixed, PHP_URL_PATH );
+		if ( null !== RankXAI_Documents::slug_for_request( $path ) ) {
+			return add_query_arg( 'format', 'md', $permalink );
+		}
+
+		return $suffixed;
 	}
 
 	/** The twin sitemap's URL.

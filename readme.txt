@@ -3,58 +3,73 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.0.1
+Stable tag: 0.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Bring SEO metadata from your RankX AI account to this site, through whichever SEO plugin you use, or with none at all.
+Publish llms.txt, agents.md and markdown copies of your pages for AI assistants, and write SEO metadata through any SEO plugin, or none.
 
 == Description ==
 
-RankX AI is an AI-search and SEO platform. This plugin is the site-side half of
-it: SEO metadata you approve in your RankX AI account is written to this site
-and reaches the page.
+Assistants like ChatGPT, Claude, Gemini and Perplexity read websites. They read
+markup written for a browser, wrapped in a theme, and they have no agreed place
+to look for a plain description of what a business does. This plugin gives them
+one.
 
-The plugin generates nothing on its own. All generation, editing and approval
-happen in your RankX AI account, which is a paid service. This plugin is free
-and GPLv2 or later.
+Two halves, and the first needs no account anywhere.
 
-= What it does that the REST API cannot =
+= Works on its own, with no account =
 
-* **Works with every major SEO plugin.** Yoast, Rank Math, SEOPress, All in One
-  SEO and The SEO Framework. Values are written into that plugin's own fields,
-  so they stay visible and editable in the screens you already use.
-* **Works with no SEO plugin at all.** If you do not run one, RankX AI prints the
-  title, description, Open Graph and Twitter tags itself. Install an SEO plugin
-  later and it stands down automatically, on the next page load, so you never end
-  up with two titles on one page.
-* **Writes All in One SEO.** AIOSEO keeps its data in its own database tables
+* **Publish an llms.txt and an agents.md.** Built from this site — its name, its
+  tagline, its published pages and posts — and served from the site's own root
+  address. Nothing is written to your server: WordPress answers when the address
+  is requested. Off until you switch it on, under Settings → RankX AI.
+* **Publish a markdown copy of every page.** Each copy is generated from the page
+  itself, so it changes when the page does. Assistants read your words instead of
+  your theme's markup. Also off by default.
+* A page you have marked `noindex` is never listed and never gets a copy.
+* If another plugin already serves one of these addresses, it keeps it.
+
+= Works better with a RankX AI account =
+
+[RankX AI](https://rankxai.com) is an AI-search and SEO platform. It is a paid
+service, and this plugin is the site-side half of it. Connected, the plugin also:
+
+* **Writes SEO metadata through every major SEO plugin.** Yoast, Rank Math,
+  SEOPress, All in One SEO and The SEO Framework. Values are written into that
+  plugin's own fields, so they stay visible and editable in the screens you
+  already use.
+* **Writes SEO metadata with no SEO plugin at all.** If you do not run one,
+  RankX AI prints the title, description, Open Graph and Twitter tags itself.
+  Install an SEO plugin later and it stands down automatically, on the next page
+  load, so you never end up with two titles on one page.
+* **Reaches All in One SEO.** AIOSEO keeps its data in its own database tables
   rather than in post meta, so no external tool can reach it. This plugin can.
-* **Serves llms.txt, agents.md and ai.txt.** Published from your RankX AI
-  account and served from this site's own root address, without a file being
-  written anywhere. If another plugin already serves one of those addresses, it
-  keeps it.
-* **Publishes a markdown copy of every page.** Off by default. When you switch it
-  on from your RankX AI account, each published page also answers at `/page.md`,
-  `/page/index.md` and `/page/?format=md`, and at its normal address for a client
-  that asks for `text/markdown`. AI assistants read your words instead of your
-  theme's markup.
 * **Puts structured data in the page head, not in the page.** Search engines and
   assistants read JSON-LD to understand what a business does. Without the plugin
   it has to be written into the page content, where WordPress removes it unless
   the account writing it holds a capability many sites take away. Stored here it
   is emitted from the document head instead, so it is never stripped and your
   page content is left exactly as you wrote it.
+* **Fills llms.txt with your own words.** With an account the file carries the
+  description of the business you approved — what you sell, who it is for, what
+  it costs — rather than a list of page titles. A published file always takes
+  precedence over a generated one.
+* **Adds a short business summary to every markdown copy.**
 * **Tells RankX AI what this site actually stored.** When RankX AI updates a
   page, the plugin returns the saved content in the same request, so a change
   that WordPress altered on the way in is reported to you rather than assumed to
   have worked.
 
+Nothing is locked, reduced or switched off when there is no account. The account
+adds more to say, not permission to say it.
+
 = Markdown copies, in detail =
 
-* Off until you turn it on. Activating or updating the plugin never publishes a
-  new URL on its own.
-* Each copy is generated from the page itself, so it changes when the page does.
+* Off until you turn it on, from Settings → RankX AI or from your RankX AI
+  account. Activating or updating the plugin never publishes a new URL on its own.
+* Each copy answers at `/page.md`, `/page/index.md` and `/page/?format=md`, and at
+  the page's normal address for a client that asks for `text/markdown`.
 * Copies are served `noindex, follow` and carry a link back to the HTML page, so
   they are read by assistants and stay out of search results. There is
   deliberately no canonical tag on them.
@@ -65,22 +80,43 @@ and GPLv2 or later.
 * Developers: `rankxai_twins_enabled` forces the whole feature on or off in
   code, `rankxai_twin_eligible` vetoes one post, `rankxai_twin_cache_ttl` sets
   how long a rendered copy is cached, and `rankxai_twins_bypass_page_cache`
-  controls whether markdown responses skip your page cache. Which post types get
-  a copy is chosen in your RankX AI account.
+  controls whether markdown responses skip your page cache.
+
+= Root documents, in detail =
+
+* `llms.txt` and `agents.md` can be generated here from the site's own content.
+  `ai.txt` cannot, and that is deliberate: it states a position on whether your
+  work may be used to train machine-learning models, which is yours to take and
+  not ours to guess. It can still be published from a RankX AI account.
+* The order is always the same: a real file on your server wins, then a document
+  published from a RankX AI account, then a generated one. If none of those
+  applies the address is left alone, so anything else that would have served it
+  still does.
+* Developers: `rankxai_generate_document` forces generation on or off per
+  document, and `rankxai_generated_document_post_types` chooses what is listed.
 
 = It is optional =
 
-RankX AI works without it, over the standard WordPress REST API and an
-application password. This plugin removes that setup step and adds the
+RankX AI works without this plugin, over the standard WordPress REST API and an
+application password. The plugin removes that setup step and adds the
 capabilities above. Nothing in RankX AI requires it, and removing it never costs
 you your metadata — see below.
 
 == Installation ==
 
 1. Install and activate.
-2. Connect the site from your RankX AI account.
+2. Visit **Settings → RankX AI** to switch on markdown copies and root documents.
+   Nothing is published until you do.
+3. Optionally, connect the site from your RankX AI account.
 
 == Frequently Asked Questions ==
+
+= Do I need a RankX AI account? =
+
+No. Markdown copies, `llms.txt` and `agents.md` are generated from this site and
+work with no account and no connection. An account adds SEO metadata writing,
+structured data, and your own approved description of the business in place of a
+generated one.
 
 = Does this send my content anywhere? =
 
@@ -100,6 +136,11 @@ cannot identify it, RankX AI stores its metadata and prints nothing, rather than
 adding a second title to the page. Developers can use the
 `rankxai_active_seo_plugins` filter to declare a plugin this list does not know,
 or `rankxai_may_own_head` to stop RankX AI printing tags entirely.
+
+= Another plugin already publishes an llms.txt. =
+
+It keeps it. This plugin registers its route late and stands down for any
+address that is already answered, and for any real file on your server.
 
 == External services ==
 
@@ -131,6 +172,10 @@ write, exactly as the editor does.
 
 == Changelog ==
 
+= 0.1.0 =
+* Markdown copies, `llms.txt` and `agents.md` now work with no RankX AI account.
+* New settings screen at Settings → RankX AI.
+* `llms.txt` and `agents.md` can be generated from the site's own content.
+
 = 0.0.1 =
 * First release.
-

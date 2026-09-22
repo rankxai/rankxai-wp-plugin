@@ -571,14 +571,24 @@ class RankXAI_REST {
 
 		return new WP_REST_Response(
 			array(
-				'slug'       => $slug,
-				'stored'     => null !== $doc,
-				'content'    => null !== $doc ? $doc['content'] : '',
-				'updated'    => null !== $doc ? $doc['updated'] : '',
+				'slug'             => $slug,
+				'stored'           => null !== $doc,
+				'content'          => null !== $doc ? $doc['content'] : '',
+				'updated'          => null !== $doc ? $doc['updated'] : '',
 				// FALSE when a real file owns the path. Never conflated with `stored`.
-				'serving'    => null !== $doc && ! $blocked,
-				'fileOnDisk' => $blocked,
-				'publicUrl'  => home_url( '/' . $catalogue[ $slug ]['path'] ),
+				'serving'          => null !== $doc && ! $blocked,
+				'fileOnDisk'       => $blocked,
+
+				/*
+				 * `serving` answers "is the document you sent what answers".
+				 * WHAT answers is a wider question the moment this site can
+				 * generate one of its own, and after a DELETE the two diverge:
+				 * the stored document is gone and the address still replies.
+				 * A separate field, so neither answer has to change meaning.
+				 */
+				'generatedLocally' => RankXAI_Generate::is_local( $slug ),
+				'servingSource'    => RankXAI_Documents::effective( $slug )['source'],
+				'publicUrl'        => home_url( '/' . $catalogue[ $slug ]['path'] ),
 			),
 			200
 		);

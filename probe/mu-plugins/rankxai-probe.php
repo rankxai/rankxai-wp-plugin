@@ -120,14 +120,33 @@ add_action('shutdown', function () {
 /**
  * Phase 0 item: can a plugin serve /llms.txt as a VIRTUAL route (no file on disk),
  * and what happens when a physical file exists at the same path?
+ *
+ * BEHIND AN OPTION, DEFAULT OFF — and that is not tidiness. Unconditional, this
+ * claims `/llms.txt` at `init` priority 0, ahead of the plugin's own route at
+ * 99, so it OWNED the URL permanently in every rig it was installed in. The
+ * no-account probe then measured this fixture instead of the generator and
+ * reported six failures that read exactly like product defects: no header, no
+ * nosniff, no section, no fixture page. The same class as the containers that
+ * had gone blind — a rig artefact producing a confident wrong answer.
+ *
+ * Switched on it is now a CONTROLLED COMPETITOR, which is worth more than it
+ * was as a default: it is the only way to prove the promise that a plugin
+ * already serving one of these addresses keeps it.
+ *
+ *   wp option update rankxai_phase0_llms 1     # take the URL
+ *   wp option delete rankxai_phase0_llms       # give it back
  */
 add_action('init', function () {
+	if (!get_option('rankxai_phase0_llms')) {
+		return;
+	}
 	$path = isset($_SERVER['REQUEST_URI']) ? parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) : '';
 	if ($path !== '/llms.txt') {
 		return;
 	}
 	header('Content-Type: text/plain; charset=utf-8');
 	header('X-RankXAI-Source: virtual-route');
+	header('X-RankXAI-Probe: phase0-competitor');
 	echo "# RankX AI virtual llms.txt\nserved-by: plugin init hook\n";
 	exit;
 }, 0);

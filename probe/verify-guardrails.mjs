@@ -90,7 +90,15 @@ console.log(`== scanning ${code.size} shipped PHP file(s) ==`)
 // Two parts. A `found > 0` control on its own passes vacuously the day the
 // walker stops seeing the tree, and covering the KNOWN members is what makes it
 // a control rather than a smoke test.
-const MUST_SEE = ['rankxai.php', 'uninstall.php', 'includes/class-rankxai-rest.php', 'includes/class-rankxai-content.php', 'includes/class-rankxai-schema.php']
+const MUST_SEE = [
+  'rankxai.php',
+  'uninstall.php',
+  'includes/class-rankxai-rest.php',
+  'includes/class-rankxai-content.php',
+  'includes/class-rankxai-schema.php',
+  'includes/class-rankxai-admin.php',
+  'includes/class-rankxai-generate.php',
+]
 code.size > 5
   ? ok(`CONTROL — the walker found ${code.size} files`)
   : bad(`CONTROL — only ${code.size} files found; this scan is measuring nothing`)
@@ -192,6 +200,143 @@ for (const file of ['includes/class-rankxai-content.php', 'includes/class-rankxa
     ? ok(`wp_slash — ${file} slashes every write (${slashes} for ${writes})`)
     : bad(`wp_slash — ${file} has ${writes} writes and only ${slashes} wp_slash calls`)
 }
+
+// ── THE ADMIN SURFACE ──────────────────────────────────────────────────────
+//
+// The directory's own guidance is that a plugin's prompts and notices belong on
+// its settings page and nowhere else, and a plugin that greets you on every
+// screen in wp-admin is the reason that guidance exists. The plugin states the
+// same rule in its own header; this is the derived version, so it survives
+// somebody adding a "just one banner".
+const NOTICE_HOOKS = ['admin_notices', 'all_admin_notices', 'network_admin_notices', 'user_admin_notices']
+const noticeOffenders = []
+for (const [name, src] of code) {
+  for (const hook of NOTICE_HOOKS) {
+    if (src.includes(hook)) noticeOffenders.push(`${name}: ${hook}`)
+  }
+}
+noticeOffenders.length === 0
+  ? ok('no admin notice is registered anywhere in wp-admin')
+  : bad(`an admin notice appeared: ${noticeOffenders.join(', ')}`)
+
+// A form posted to `admin-post.php` is reachable by any logged-in user and by
+// any site that can make that browser submit it. The capability check answers
+// WHO, the nonce answers WHETHER THEY MEANT TO, and a handler needs both —
+// neither substitutes for the other.
+//
+// SCOPED TO THE HANDLER, not to the file. A file-level `includes()` was the
+// first version and it could not fail: deleting the capability check from
+// `handle_save` left the identical line in `render()` a few lines below, and
+// the scan went on passing while the form was writable by any logged-in user.
+// Mutation-proved both ways after the fix.
+const ADMIN_POST = /add_action\(\s*['"]admin_post_/
+const adminSrc = code.get('includes/class-rankxai-admin.php') ?? ''
+const saveStart = adminSrc.indexOf('function handle_save')
+const saveEnd = adminSrc.indexOf('function ', saveStart + 10)
+const saveBody = saveStart === -1 ? '' : adminSrc.slice(saveStart, saveEnd === -1 ? adminSrc.length : saveEnd)
+
+ADMIN_POST.test(adminSrc)
+  ? ok('CONTROL — an `admin_post_` handler is registered, so the checks below have a subject')
+  : bad('CONTROL — no `admin_post_` registration found; the form-handling checks prove nothing')
+saveBody.length > 100
+  ? ok(`CONTROL — the save handler was located (${saveBody.length} chars)`)
+  : bad('CONTROL — could not isolate `handle_save`, so the checks below prove nothing')
+saveBody.includes('check_admin_referer(')
+  ? ok('the settings form verifies its nonce, inside the handler')
+  : bad('`handle_save` has no `check_admin_referer` — it is cross-site submittable')
+saveBody.includes("current_user_can( 'manage_options' )")
+  ? ok('and `handle_save` checks the capability itself, not only on the menu entry')
+  : bad('`handle_save` does not check a capability of its own')
+
+// The admin class is loaded ONLY in wp-admin, so a front-end request never
+// parses it. That guard is what makes `is_admin()` false under WP-CLI and in a
+// REST request — which is correct, and which is why the probe has to load the
+// class itself and cannot prove this arm. So it is proved here.
+const BOOT = code.get('rankxai.php') ?? ''
+const ADMIN_GUARD = new RegExp('is_admin\\(\\)[^]{0,240}?class-rankxai-admin\\.php')
+BOOT.includes('class-rankxai-admin.php')
+  ? ok('CONTROL — the bootstrap references the admin class')
+  : bad('CONTROL — the bootstrap does not mention the admin class; the guard check proves nothing')
+ADMIN_GUARD.test(BOOT)
+  ? ok('the settings screen is loaded only inside an `is_admin()` guard')
+  : bad('the admin class is loaded on front-end requests too')
+
+// `add_options_page` takes the capability as its third argument, and `read` —
+// which every subscriber holds — would put this screen in front of everyone.
+//
+// The window is 200 characters rather than `[^)]*`: the arguments before the
+// capability are `__( 'RankX AI', 'rankxai' )` calls, so a character class
+// excluding `)` stops at the first of them and the scan silently measures
+// nothing. Mutation-proved — with the capability changed the nearest other
+// occurrence is ~1,900 characters away, well outside the window.
+const OPTIONS_PAGE = new RegExp("add_options_page\\([^]{0,200}?'manage_options'")
+OPTIONS_PAGE.test(adminSrc)
+  ? ok('the settings page itself requires `manage_options`')
+  : bad('the settings page does not require `manage_options`')
+
+// ── THE LISTING'S OWN LIMITS ───────────────────────────────────────────────
+//
+// readme.txt is the wordpress.org product page, and the directory TRIMS rather
+// than refuses: over-length content is cut with an ellipsis on the public page
+// and the plugin still ships. So a breach is invisible from here and visible to
+// every customer.
+//
+// The numbers are READ OFF THE DIRECTORY'S OWN PARSER
+// (plugin-directory/readme/class-parser.php), not from documentation, and the
+// UNITS are the trap: `maximum_field_lengths` is 150 for `short_description`,
+// 2500 for a section and 5000 for the changelog and the FAQ — but
+// `trim_length()` is called with `'char'` for the first and `'words'` for the
+// sections. Measured as characters, this readme's Description looked 2× over
+// its limit and was comfortably inside it.
+const readme = readFileSync(join(ROOT, 'readme.txt'), 'utf8')
+const readmeHeader = (field) => {
+  const m = new RegExp(`^${field}\\s*:\\s*(.+)$`, 'im').exec(readme)
+  return m ? m[1].trim() : ''
+}
+const SECTION_SPLIT = new RegExp('^== (.+?) ==\\s*$', 'm')
+const sections = readme.split(new RegExp(SECTION_SPLIT.source, 'gm'))
+const SECTION_WORD_LIMIT = { changelog: 5000, 'frequently asked questions': 5000 }
+
+readme.length > 500 && sections.length > 3
+  ? ok(`CONTROL — readme.txt parsed into ${(sections.length - 1) / 2} sections`)
+  : bad('CONTROL — readme.txt did not parse; every check below proves nothing')
+
+// The short description is the line between the header block and `== Description ==`.
+const shortDescription = (readme.split(SECTION_SPLIT)[0] ?? '')
+  .split('\n')
+  .map((l) => l.trim())
+  .filter((l) => l && !l.startsWith('===') && !/^[A-Za-z ]+:/.test(l))
+  .join(' ')
+shortDescription.length > 0 && shortDescription.length <= 150
+  ? ok(`the short description is ${shortDescription.length} of 150 characters`)
+  : bad(`the short description is ${shortDescription.length} characters; the directory trims at 150`)
+
+const tags = readmeHeader('Tags').split(',').map((t) => t.trim()).filter(Boolean)
+tags.length > 0 && tags.length <= 5
+  ? ok(`${tags.length} tags, of the 5 the directory keeps`)
+  : bad(`${tags.length} tags; everything past the fifth is dropped`)
+
+const overLong = []
+for (let i = 1; i < sections.length; i += 2) {
+  const name = sections[i].trim()
+  const words = sections[i + 1].trim().split(/\s+/).filter(Boolean).length
+  const limit = SECTION_WORD_LIMIT[name.toLowerCase()] ?? 2500
+  if (words > limit) overLong.push(`${name} ${words}/${limit} words`)
+}
+overLong.length === 0
+  ? ok('no section exceeds the word count the directory trims at')
+  : bad(`a section would be cut short on the listing page: ${overLong.join(', ')}`)
+
+// One fact in three files. `check.sh` already pins the built archive against
+// the source; this pins the readme the directory reads against both.
+const pluginVersion = (/^\s*\*\s*Version:\s*(.+)$/im.exec(readFileSync(join(ROOT, 'rankxai.php'), 'utf8')) ?? [])[1]?.trim()
+const stableTag = readmeHeader('Stable tag')
+pluginVersion && stableTag
+  ? ok(`CONTROL — found both versions (plugin ${pluginVersion}, Stable tag ${stableTag})`)
+  : bad(`CONTROL — could not read a version (plugin "${pluginVersion}", Stable tag "${stableTag}")`)
+pluginVersion === stableTag
+  ? ok('readme.txt Stable tag matches the plugin header')
+  : bad(`Stable tag is ${stableTag} and the plugin header says ${pluginVersion}`)
 
 console.log('\n================================================')
 console.log(`PASSED ${pass}   FAILED ${fail}`)

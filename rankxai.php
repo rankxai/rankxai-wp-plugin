@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       RankX AI
  * Plugin URI:        https://github.com/rankxai/rankxai-wp-plugin
- * Description:       Connects this site to RankX AI, so SEO metadata written in your RankX AI account reaches the page — whichever SEO plugin you use, or none.
- * Version:           0.0.1
+ * Description:       Publishes llms.txt, agents.md and markdown copies of your pages for AI assistants, and writes SEO metadata from your RankX AI account through whichever SEO plugin you use, or none.
+ * Version:           0.1.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            RankX AI
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'RANKXAI_VERSION', '0.0.1' );
+define( 'RANKXAI_VERSION', '0.1.0' );
 
 /**
  * REST contract version, separate from the plugin version.
@@ -38,6 +38,7 @@ require_once __DIR__ . '/includes/class-rankxai-schema.php';
 require_once __DIR__ . '/includes/class-rankxai-documents.php';
 require_once __DIR__ . '/includes/class-rankxai-markdown.php';
 require_once __DIR__ . '/includes/class-rankxai-twins.php';
+require_once __DIR__ . '/includes/class-rankxai-generate.php';
 require_once __DIR__ . '/includes/class-rankxai-rest.php';
 
 RankXAI_REST::init();
@@ -46,3 +47,11 @@ RankXAI_Head::init();
 RankXAI_Schema::init();
 RankXAI_Documents::init();
 RankXAI_Twins::init();
+
+// The settings screen exists only in wp-admin, and `admin-post.php` — where its
+// form is handled — is part of it. Loading it on a front-end request would cost
+// a file read on every page for code that can never run there.
+if ( is_admin() ) {
+	require_once __DIR__ . '/includes/class-rankxai-admin.php';
+	RankXAI_Admin::init();
+}

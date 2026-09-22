@@ -140,6 +140,61 @@ class RankXAI_Documents {
 	}
 
 	/**
+	 * What this site would serve at a document's address, and where it came from.
+	 *
+	 * ONE precedence, in one place, so the settings screen and the serving path
+	 * cannot disagree about which body is live:
+	 *
+	 *   1. a real file on disk — not ours to answer;
+	 *   2. a document RankX AI published — the account holder's own words;
+	 *   3. a document generated here from the site's content;
+	 *   4. nothing, and the URL stays available to whatever else would serve it.
+	 *
+	 * Stored beats generated because a document somebody wrote and approved is
+	 * a better answer than one assembled from post titles, and because a
+	 * generated document silently replacing a published one would overwrite a
+	 * decision with a default.
+	 *
+	 * @param string $slug Document slug.
+	 * @return array{content: string, source: string} Source is '', 'file', 'stored' or 'generated'.
+	 */
+	public static function effective( $slug ) {
+		$none = array(
+			'content' => '',
+			'source'  => '',
+		);
+		if ( null === self::option_name( $slug ) ) {
+			return $none;
+		}
+		if ( self::file_exists_on_disk( $slug ) ) {
+			return array(
+				'content' => '',
+				'source'  => 'file',
+			);
+		}
+
+		$stored = self::get( $slug );
+		if ( null !== $stored && '' !== $stored['content'] ) {
+			return array(
+				'content' => $stored['content'],
+				'source'  => 'stored',
+			);
+		}
+
+		if ( RankXAI_Generate::is_local( $slug ) ) {
+			$generated = RankXAI_Generate::generate( $slug );
+			if ( '' !== trim( $generated ) ) {
+				return array(
+					'content' => $generated,
+					'source'  => 'generated',
+				);
+			}
+		}
+
+		return $none;
+	}
+
+	/**
 	 * Is a real file already sitting at this path?
 	 *
 	 * On Apache the web server answers before PHP runs; this covers the setups
@@ -206,14 +261,11 @@ class RankXAI_Documents {
 		if ( null === $slug ) {
 			return;
 		}
-		if ( self::file_exists_on_disk( $slug ) ) {
-			return;
-		}
 
-		$doc = self::get( $slug );
-		if ( null === $doc || '' === $doc['content'] ) {
-			// Nothing stored: return rather than 404, so WordPress answers as it
-			// would without us and the URL stays available to whatever else
+		$doc = self::effective( $slug );
+		if ( '' === $doc['content'] ) {
+			// Nothing to serve: return rather than 404, so WordPress answers as
+			// it would without us and the URL stays available to whatever else
 			// would have served it.
 			return;
 		}
@@ -227,6 +279,19 @@ class RankXAI_Documents {
 		header( 'X-Content-Type-Options: nosniff' );
 		// So a reader can tell this virtual route from a real file.
 		header( 'X-RankXAI-Source: virtual-route' );
+
+		/*
+		 * WHICH body this is, as a SECOND header rather than a second meaning
+		 * for the one above. `virtual-route` says where the bytes came from and
+		 * is true of both; overloading it would make one header answer two
+		 * questions, and a reader checking it for the first would silently get
+		 * the second.
+		 *
+		 * It matters because the platform reads `/llms.txt` unauthenticated,
+		 * with no manifest and no credential, and would otherwise report a
+		 * document this plugin generated as somebody else's.
+		 */
+		header( 'X-RankXAI-Document: ' . ( 'generated' === $doc['source'] ? 'generated' : 'published' ) );
 		// No caching directive of our own — the site's cache plugin and host
 		// know better than we do.
 		header( 'X-Robots-Tag: noindex' );
