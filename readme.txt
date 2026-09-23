@@ -176,6 +176,7 @@ write, exactly as the editor does.
 * Markdown copies, `llms.txt` and `agents.md` now work with no RankX AI account.
 * New settings screen at Settings → RankX AI.
 * `llms.txt` and `agents.md` can be generated from the site's own content.
+* Nothing is generated while Settings → Reading is set to discourage search engines.
 
 = 0.0.1 =
 * First release.

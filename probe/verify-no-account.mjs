@@ -523,6 +523,25 @@ async function run() {
     ? ok('AI.TXT — still 404, because nothing generates it and nothing has published one')
     : bad(`AI.TXT — answered ${aiTxt.status}`)
 
+  // ---- "DISCOURAGE SEARCH ENGINES" WINS OVER THE SWITCH --------------------
+  //
+  // Options are copied with the database, so a staging clone of a site that
+  // switched generation on inherits the switch. The site's own Reading setting
+  // is what says it must not be advertised, and markdown copies already obey it.
+  const discouraged = wpEval(`<?php
+update_option( 'blog_public', '0' );
+$generated = RankXAI_Documents::effective( 'llms_txt' )['source'];
+update_option( 'blog_public', '1' );
+echo $generated;
+`)
+  discouraged === ''
+    ? ok('DISCOURAGED — a site set to discourage search engines generates nothing, whatever the switch says')
+    : bad(`DISCOURAGED — generated anyway (source "${discouraged}")`)
+  const restoredPublic = wpEval("<?php echo get_option( 'blog_public' );")
+  restoredPublic === '1'
+    ? ok('DISCOURAGED — and the Reading setting is put back')
+    : bad(`DISCOURAGED — blog_public left at "${restoredPublic}"`)
+
   // ---- LINKS FOLLOW THE TWIN SWITCH --------------------------------------
   //
   // The whole point of llms.txt is a list of documents a machine can read. With

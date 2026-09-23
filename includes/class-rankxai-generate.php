@@ -82,6 +82,14 @@ class RankXAI_Generate {
 		}
 		$on = isset( $stored[ $slug ] ) && true === $stored[ $slug ];
 
+		// A site that asked search engines to stay away gets no generated
+		// document, the same rule markdown copies follow. It matters most on a
+		// staging clone: options are copied with the database, so a switch
+		// thrown on production would otherwise advertise the clone to machines.
+		if ( self::site_discourages_indexing() ) {
+			$on = false;
+		}
+
 		/**
 		 * Filters whether a root document is generated locally.
 		 *
@@ -89,6 +97,15 @@ class RankXAI_Generate {
 		 * @param string $slug Document slug.
 		 */
 		return (bool) apply_filters( 'rankxai_generate_document', $on, $slug );
+	}
+
+	/**
+	 * Has the owner set Settings → Reading → "Discourage search engines"?
+	 *
+	 * @return bool
+	 */
+	public static function site_discourages_indexing() {
+		return '0' === (string) get_option( 'blog_public', '1' );
 	}
 
 	/**

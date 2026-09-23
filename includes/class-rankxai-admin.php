@@ -219,6 +219,11 @@ class RankXAI_Admin {
 		echo '<h2>' . esc_html__( 'Root documents', 'rankxai' ) . '</h2>';
 		echo '<p>' . esc_html__( 'Served from the root address of this site. Nothing is written to your server: WordPress answers when the address is requested. If another plugin already serves one of these, it keeps it.', 'rankxai' ) . '</p>';
 
+		// A ticked box that serves nothing reads as a broken plugin. Say why.
+		if ( RankXAI_Generate::site_discourages_indexing() ) {
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site is set to discourage search engines (Settings → Reading), so nothing is generated here and markdown copies are not served. Anything published from a RankX AI account is still served.', 'rankxai' ) . '</p></div>';
+		}
+
 		echo '<table class="form-table" role="presentation"><tbody>';
 
 		$supported = RankXAI_Generate::supported();
