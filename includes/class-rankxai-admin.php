@@ -25,6 +25,9 @@ class RankXAI_Admin {
 	/** The `admin_post` action this screen submits to. */
 	const ACTION = 'rankxai_save_settings';
 
+	/** The `admin_post` action that removes one of our own redirects. */
+	const ACTION_DELETE_REDIRECT = 'rankxai_delete_redirect';
+
 	/** Menu slug, and the `page` query argument. */
 	const PAGE = 'rankxai';
 
@@ -34,6 +37,7 @@ class RankXAI_Admin {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_post_' . self::ACTION, array( __CLASS__, 'handle_save' ) );
+		add_action( 'admin_post_' . self::ACTION_DELETE_REDIRECT, array( __CLASS__, 'handle_delete_redirect' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( RANKXAI_PLUGIN_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -122,6 +126,31 @@ class RankXAI_Admin {
 		exit;
 	}
 
+	/**
+	 * Remove one of this plugin's own redirects.
+	 *
+	 * The site owner can undo anything RankX AI added here without RankX AI
+	 * being reachable. Only our own store is touched: a redirect in Rank Math
+	 * or the Redirection plugin is removed in that plugin's own screen.
+	 */
+	public static function handle_delete_redirect() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to change these settings.', 'rankxai' ), '', array( 'response' => 403 ) );
+		}
+		check_admin_referer( self::ACTION_DELETE_REDIRECT );
+
+		$id = isset( $_POST['rankxai_redirect_id'] ) ? sanitize_key( wp_unslash( $_POST['rankxai_redirect_id'] ) ) : '';
+		if ( '' !== $id ) {
+			$result = RankXAI_Redirects::delete( 'own_store', $id );
+			if ( '' === $result['error'] ) {
+				RankXAI_Redirects::purge( $result['from'] );
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( 'rankxai-redirect-removed', '1', self::page_url() ) );
+		exit;
+	}
+
 	// -----------------------------------------------------------------------
 	// Rendering
 	// -----------------------------------------------------------------------
@@ -144,6 +173,10 @@ class RankXAI_Admin {
 		if ( isset( $_GET['rankxai-saved'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'rankxai' ) . '</p></div>';
 		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading a redirect marker, not acting on it.
+		if ( isset( $_GET['rankxai-redirect-removed'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Redirect removed.', 'rankxai' ) . '</p></div>';
+		}
 
 		echo '<p>' . esc_html__( 'Everything on this screen is local to this site. It works whether or not the site is connected to a RankX AI account.', 'rankxai' ) . '</p>';
 
@@ -157,9 +190,76 @@ class RankXAI_Admin {
 		submit_button();
 		echo '</form>';
 
+		// Outside the settings form: each row is its own form, and forms cannot nest.
+		self::render_redirects();
+
 		self::render_connection();
 
 		echo '</div>';
+	}
+
+	/**
+	 * This plugin's own redirects, each removable.
+	 *
+	 * Shown only when there are some, or when RankX AI would add them to
+	 * another plugin, so a site that uses neither sees nothing new.
+	 */
+	private static function render_redirects() {
+		$items     = RankXAI_Redirects::items()['items'];
+		$own       = array_values(
+			array_filter(
+				$items,
+				function ( $item ) {
+					return 'own_store' === $item['backend'];
+				}
+			)
+		);
+		$managers  = RankXAI_Redirects::managers();
+		$elsewhere = '';
+		if ( $managers['redirection']['active'] ) {
+			$elsewhere = __( 'the Redirection plugin', 'rankxai' );
+		} elseif ( $managers['rank_math']['ready'] ) {
+			$elsewhere = __( 'Rank Math', 'rankxai' );
+		}
+
+		if ( ! $own && '' === $elsewhere ) {
+			return;
+		}
+
+		echo '<h2>' . esc_html__( 'Redirects', 'rankxai' ) . '</h2>';
+		if ( '' !== $elsewhere ) {
+			echo '<p>' . esc_html(
+				sprintf(
+					/* translators: %s: the name of another plugin. */
+					__( 'Redirects RankX AI adds on this site go into %s, and are managed in its own screens.', 'rankxai' ),
+					$elsewhere
+				)
+			) . '</p>';
+		}
+		if ( ! $own ) {
+			return;
+		}
+
+		echo '<p>' . esc_html__( 'These redirects are kept by this plugin. Each one answers only when its old address would otherwise show "page not found". Hit counts are low when a page cache answers a visit without WordPress.', 'rankxai' ) . '</p>';
+		echo '<table class="widefat striped"><thead><tr>';
+		echo '<th>' . esc_html__( 'From', 'rankxai' ) . '</th>';
+		echo '<th>' . esc_html__( 'To', 'rankxai' ) . '</th>';
+		echo '<th>' . esc_html__( 'Hits', 'rankxai' ) . '</th>';
+		echo '<th></th></tr></thead><tbody>';
+		foreach ( $own as $item ) {
+			echo '<tr>';
+			echo '<td><code>' . esc_html( $item['from'] ) . '</code></td>';
+			echo '<td><code>' . esc_html( $item['to'] ) . '</code></td>';
+			echo '<td>' . esc_html( (string) $item['hits'] ) . '</td>';
+			echo '<td><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			echo '<input type="hidden" name="action" value="' . esc_attr( self::ACTION_DELETE_REDIRECT ) . '" />';
+			echo '<input type="hidden" name="rankxai_redirect_id" value="' . esc_attr( $item['id'] ) . '" />';
+			wp_nonce_field( self::ACTION_DELETE_REDIRECT );
+			submit_button( __( 'Remove', 'rankxai' ), 'delete small', 'submit', false );
+			echo '</form></td>';
+			echo '</tr>';
+		}
+		echo '</tbody></table>';
 	}
 
 	/**

@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,14 @@ service, and this plugin is the site-side half of it. Connected, the plugin also
   it costs — rather than a list of page titles. A published file always takes
   precedence over a generated one.
 * **Adds a short business summary to every markdown copy.**
+* **Manages redirects in the tool you already use.** If you run the Redirection
+  plugin or Rank Math's Redirections module, RankX AI adds redirects there, so
+  they appear in that plugin's list with its hit counts. If you run neither, this
+  plugin keeps a short list itself and answers only for addresses that would
+  otherwise show "page not found", so it can never hide a page that works. Those
+  redirects are listed under Settings → RankX AI, where you can remove any of
+  them. The plugin never switches another plugin's modules on or off, and keeps
+  no log of visitors.
 * **Tells RankX AI what this site actually stored.** When RankX AI updates a
   page, the plugin returns the saved content in the same request, so a change
   that WordPress altered on the way in is reported to you rather than assumed to
@@ -171,6 +179,11 @@ write, exactly as the editor does.
 * Privacy: https://rankxai.com/privacy
 
 == Changelog ==
+
+= 0.2.0 =
+* Redirects: added to Rank Math or kept by this plugin when a site has no redirect manager, only ever answering a missing page.
+* Page caches are cleared for an address when a redirect for it is added or removed.
+* Settings → RankX AI lists this plugin's own redirects, each removable.
 
 = 0.1.0 =
 * Markdown copies, `llms.txt` and `agents.md` now work with no RankX AI account.

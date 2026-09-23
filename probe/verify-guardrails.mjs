@@ -98,6 +98,7 @@ const MUST_SEE = [
   'includes/class-rankxai-schema.php',
   'includes/class-rankxai-admin.php',
   'includes/class-rankxai-generate.php',
+  'includes/class-rankxai-redirects.php',
 ]
 code.size > 5
   ? ok(`CONTROL — the walker found ${code.size} files`)
@@ -275,6 +276,23 @@ saveBody.includes('check_admin_referer(')
 saveBody.includes("current_user_can( 'manage_options' )")
   ? ok('and `handle_save` checks the capability itself, not only on the menu entry')
   : bad('`handle_save` does not check a capability of its own')
+
+// EVERY `admin_post_` handler, derived from the registrations rather than named
+// here. The checks above were written when `handle_save` was the only form, and
+// a second handler added later would have been examined by nothing.
+const ADMIN_POST_HANDLER = /add_action\(\s*'admin_post_'\s*\.\s*self::\w+\s*,\s*array\(\s*__CLASS__\s*,\s*'(\w+)'/g
+const handlerNames = [...adminSrc.matchAll(ADMIN_POST_HANDLER)].map((m) => m[1])
+handlerNames.length >= 2 && handlerNames.includes('handle_save') && handlerNames.includes('handle_delete_redirect')
+  ? ok(`CONTROL — derived ${handlerNames.length} admin_post handlers, including both known ones`)
+  : bad(`CONTROL — derived handlers ${JSON.stringify(handlerNames)}; the per-handler checks prove nothing`)
+for (const name of handlerNames) {
+  const start = adminSrc.indexOf(`function ${name}`)
+  const next = adminSrc.indexOf('function ', start + 10)
+  const body = start === -1 ? '' : adminSrc.slice(start, next === -1 ? adminSrc.length : next)
+  body.includes('check_admin_referer(') && body.includes("current_user_can( 'manage_options' )")
+    ? ok(`\`${name}\` verifies its nonce and checks the capability inside the handler`)
+    : bad(`\`${name}\` is missing its nonce check or its capability check`)
+}
 
 // The admin class is loaded ONLY in wp-admin, so a front-end request never
 // parses it. That guard is what makes `is_admin()` false under WP-CLI and in a

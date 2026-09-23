@@ -244,6 +244,214 @@ class RankXAI_REST {
 				),
 			)
 		);
+
+		// Redirects are site-wide, so `manage_options`, the same capability the
+		// Redirection plugin requires for its own routes.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/redirects',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'handle_redirects_get' ),
+					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( __CLASS__, 'handle_redirects_create' ),
+					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+				),
+			)
+		);
+
+		// The backend is constrained in the route pattern, so an unknown one
+		// never reaches the handler.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/redirects/(?P<backend>rank_math|own_store)/(?P<id>[a-z0-9]{1,32})',
+			array(
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => array( __CLASS__, 'handle_redirects_delete' ),
+				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/redirects/purge',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'handle_redirects_purge' ),
+				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/redirects/not-found',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'handle_redirects_not_found' ),
+				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+			)
+		);
+	}
+
+	/**
+	 * Every redirect manager on the site, and the redirects we can read.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_redirects_get( $request ) {
+		$from = $request->get_param( 'from' );
+		if ( null !== $from && '' !== $from ) {
+			$reason = RankXAI_Redirects::path_rejection( $from );
+			if ( '' !== $reason ) {
+				return new WP_Error( 'rankxai_redirect_bad_path', sprintf( 'from %s', $reason ), array( 'status' => 400 ) );
+			}
+		}
+		$listed = RankXAI_Redirects::items( is_string( $from ) ? $from : '' );
+
+		return new WP_REST_Response(
+			array(
+				'managers' => RankXAI_Redirects::managers(),
+				'store'    => array(
+					'count' => count( RankXAI_Redirects::stored() ),
+					'max'   => RankXAI_Redirects::MAX,
+				),
+				'items'    => $listed['items'],
+				'totals'   => $listed['totals'],
+				// Where the site lives. A subdirectory install changes what a
+				// path means to every redirect manager.
+				'homePath' => (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Create a redirect on the backend the platform chose.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_redirects_create( $request ) {
+		$backend = $request->get_param( 'backend' );
+		$from    = $request->get_param( 'from' );
+		$to      = $request->get_param( 'to' );
+		$code    = null === $request->get_param( 'code' ) ? 301 : $request->get_param( 'code' );
+
+		if ( ! in_array( $backend, array( 'rank_math', 'own_store' ), true ) ) {
+			return new WP_Error( 'rankxai_redirect_bad_backend', __( '`backend` must be rank_math or own_store.', 'rankxai' ), array( 'status' => 400 ) );
+		}
+		foreach ( array(
+			'from' => $from,
+			'to'   => $to,
+		) as $field => $value ) {
+			$reason = RankXAI_Redirects::path_rejection( $value );
+			if ( '' !== $reason ) {
+				return new WP_Error( 'rankxai_redirect_bad_path', sprintf( '%s %s', $field, $reason ), array( 'status' => 400 ) );
+			}
+		}
+		if ( ! in_array( $code, array( 301, 302 ), true ) ) {
+			return new WP_Error( 'rankxai_redirect_bad_code', __( '`code` must be 301 or 302.', 'rankxai' ), array( 'status' => 400 ) );
+		}
+
+		$result = RankXAI_Redirects::create( $backend, $from, $to, $code );
+		if ( '' !== $result['error'] ) {
+			$status = 'rejected' === $result['error'] || 'not_stored' === $result['error'] ? 422 : 409;
+			return new WP_Error(
+				'rankxai_redirect_' . $result['error'],
+				self::redirect_error_message( $result['error'] ),
+				array(
+					'status'   => $status,
+					'managers' => RankXAI_Redirects::managers(),
+				)
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'item'   => $result['item'],
+				'purged' => RankXAI_Redirects::purge( RankXAI_Redirects::normalise( $from ) ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Delete a redirect.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_redirects_delete( $request ) {
+		$backend = (string) $request['backend'];
+		$result  = RankXAI_Redirects::delete( $backend, (string) $request['id'] );
+		if ( '' !== $result['error'] ) {
+			return new WP_Error(
+				'rankxai_redirect_' . $result['error'],
+				self::redirect_error_message( $result['error'] ),
+				array( 'status' => 'not_found' === $result['error'] ? 404 : 409 )
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'backend'   => $backend,
+				'from'      => $result['from'],
+				// What is still there for that source, so the caller can check
+				// the row is gone rather than trusting this response.
+				'remaining' => '' === $result['from'] ? array() : RankXAI_Redirects::items( $result['from'] )['items'],
+				'purged'    => '' === $result['from'] ? array() : RankXAI_Redirects::purge( $result['from'] ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Purge one path from the page caches, for a redirect written elsewhere.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_redirects_purge( $request ) {
+		$path   = $request->get_param( 'path' );
+		$reason = RankXAI_Redirects::path_rejection( $path );
+		if ( '' !== $reason ) {
+			return new WP_Error( 'rankxai_redirect_bad_path', sprintf( 'path %s', $reason ), array( 'status' => 400 ) );
+		}
+		return new WP_REST_Response( array( 'purged' => RankXAI_Redirects::purge( RankXAI_Redirects::normalise( $path ) ) ), 200 );
+	}
+
+	/**
+	 * Visitor 404s from the site's own redirect manager, when it keeps a log.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public static function handle_redirects_not_found( $request ) {
+		$limit = (int) $request->get_param( 'limit' );
+		return new WP_REST_Response( RankXAI_Redirects::not_found( $limit > 0 ? $limit : 100 ), 200 );
+	}
+
+	/**
+	 * One sentence per refusal code.
+	 *
+	 * @param string $code Refusal code.
+	 * @return string
+	 */
+	private static function redirect_error_message( $code ) {
+		$messages = array(
+			'exists'      => __( 'That address already has a redirect in this manager.', 'rankxai' ),
+			'limit'       => __( 'This site already holds the most redirects this plugin will store.', 'rankxai' ),
+			'unavailable' => __( 'That redirect manager is not available on this site.', 'rankxai' ),
+			'rejected'    => __( 'The redirect manager refused the redirect.', 'rankxai' ),
+			'not_stored'  => __( 'The redirect was sent and could not be read back.', 'rankxai' ),
+			'not_found'   => __( 'No such redirect.', 'rankxai' ),
+		);
+		return isset( $messages[ $code ] ) ? $messages[ $code ] : $code;
 	}
 
 	/**
@@ -678,7 +886,7 @@ class RankXAI_REST {
 					'mayOwnHead'     => RankXAI_Detect::may_own_head(),
 					'writableFields' => self::writable_fields(),
 				),
-				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write' ),
+				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'redirects.read', 'redirects.write' ),
 				// Which root documents this contract serves, so the platform
 				// offers exactly what this install can publish rather than
 				// discovering a 404 after the customer pressed the button.

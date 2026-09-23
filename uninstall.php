@@ -3,8 +3,8 @@
  * Remove everything this plugin stored.
  *
  * Core deletes the plugin's files; this removes its data. Post meta (every key
- * prefixed `_rankxai_`), the root-document options and the markdown-twin
- * options and opt-out meta.
+ * prefixed `_rankxai_`), the root-document options, the markdown-twin
+ * options and opt-out meta, and this plugin's own redirects.
  *
  * Values mirrored into Yoast, Rank Math, SEOPress or The SEO Framework are left
  * alone. Once written they are that plugin's data, and deleting them would
@@ -61,6 +61,15 @@ function rankxai_uninstall_current_site() {
 				delete_option( $rankxai_option );
 			}
 		}
+	}
+
+	// Our own redirects and their hit counts. Redirects added to Rank Math are
+	// Rank Math's data once written, like mirrored SEO values, and stay.
+	$redirects = __DIR__ . '/includes/class-rankxai-redirects.php';
+	if ( file_exists( $redirects ) ) {
+		require_once $redirects;
+		delete_option( RankXAI_Redirects::OPTION );
+		delete_option( RankXAI_Redirects::OPTION_HITS );
 	}
 
 	// Which documents were generated locally. One option holding every slug, so
