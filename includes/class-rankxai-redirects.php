@@ -513,7 +513,11 @@ class RankXAI_Redirects {
 		if ( ! $stored ) {
 			return;
 		}
-		$uri  = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+		// Not `sanitize_text_field`: it strips percent-encoded octets, so an
+		// address with any non-ASCII character could never match. The value is
+		// only compared against stored paths, never output or stored.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- See above.
+		$uri  = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
 		$path = wp_parse_url( $uri, PHP_URL_PATH );
 		if ( ! is_string( $path ) || '' === $path ) {
 			return;

@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -179,6 +179,9 @@ write, exactly as the editor does.
 * Privacy: https://rankxai.com/privacy
 
 == Changelog ==
+
+= 0.2.1 =
+* Fixed: a redirect for an address with accented or other non-ASCII characters never answered.
 
 = 0.2.0 =
 * Redirects: added to Rank Math or kept by this plugin when a site has no redirect manager, only ever answering a missing page.

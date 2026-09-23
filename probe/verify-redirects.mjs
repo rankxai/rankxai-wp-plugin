@@ -133,6 +133,16 @@ async function run() {
     const l1b = await list(from)
     check(l1b.json?.items?.[0]?.hits === 2 && l1b.json.items[0].lastHit !== '', `hits are counted (${l1b.json?.items?.[0]?.hits})`)
 
+    // A non-ASCII address. The first build ran the request path through
+    // `sanitize_text_field`, which strips percent-encoded octets, so this was
+    // stored correctly and never matched.
+    const encodedFrom = `/caf%C3%A9-${MARK}`
+    const ce = await create({ backend: 'own_store', from: encodedFrom, to: '/sample-page/', code: 301 })
+    check(ce.status === 200, 'a percent-encoded source is stored')
+    const fe = await follow(encodedFrom)
+    check(fe.status === 301 && fe.by === 'RankX AI', `and it SERVES when requested encoded (${fe.status})`)
+    await remove('own_store', ce.json?.item?.id ?? 'x')
+
     const dup = await create({ backend: 'own_store', from, to: '/', code: 301 })
     check(dup.status === 409 && dup.json?.code === 'rankxai_redirect_exists', 'a second redirect for the same source is refused 409')
 
@@ -247,9 +257,18 @@ async function run() {
       `the Redirection plugin is reported (${withRed.json?.managers?.redirection?.version})`)
     wp('plugin', 'deactivate', 'redirection')
 
+    // Free AIOSEO has NO redirect manager and creates no redirect tables, so it
+    // must not be reported as one — a false positive would refuse a site that
+    // should get our own store.
+    wp('plugin', 'deactivate', 'seo-by-rank-math')
+    wp('plugin', 'activate', 'all-in-one-seo-pack')
+    const withAioseo = await list()
+    check(withAioseo.json?.managers?.aioseo?.active === false, 'free AIOSEO is not mistaken for a redirect manager')
+    wp('plugin', 'deactivate', 'all-in-one-seo-pack')
+
     // ── G  the settings screen ────────────────────────────────────────────
     console.log('\n== G  the settings screen ==')
-    wp('plugin', 'deactivate', 'seo-by-rank-math')
+    wpSoft('plugin', 'deactivate', 'seo-by-rank-math')
     const own = await create({ backend: 'own_store', from: `/${MARK}-screen`, to: '/sample-page/', code: 301 })
     const ownId = own.json?.item?.id ?? ''
     check(own.status === 200, 'CONTROL — a redirect exists for the screen to show')
