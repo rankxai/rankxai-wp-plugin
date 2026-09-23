@@ -3,7 +3,7 @@
  * Plugin Name:       RankX AI
  * Plugin URI:        https://github.com/rankxai/rankxai-wp-plugin
  * Description:       Publishes llms.txt, agents.md and markdown copies of your pages for AI assistants, and writes SEO metadata from your RankX AI account through whichever SEO plugin you use, or none.
- * Version:           0.2.1
+ * Version:           0.3.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            RankX AI
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'RANKXAI_VERSION', '0.2.1' );
+define( 'RANKXAI_VERSION', '0.3.0' );
 
 /**
  * REST contract version, separate from the plugin version.
@@ -40,6 +40,7 @@ require_once __DIR__ . '/includes/class-rankxai-markdown.php';
 require_once __DIR__ . '/includes/class-rankxai-twins.php';
 require_once __DIR__ . '/includes/class-rankxai-generate.php';
 require_once __DIR__ . '/includes/class-rankxai-redirects.php';
+require_once __DIR__ . '/includes/class-rankxai-crawlers.php';
 require_once __DIR__ . '/includes/class-rankxai-rest.php';
 
 RankXAI_REST::init();
@@ -49,6 +50,7 @@ RankXAI_Schema::init();
 RankXAI_Documents::init();
 RankXAI_Twins::init();
 RankXAI_Redirects::init();
+RankXAI_Crawlers::init();
 
 // The settings screen exists only in wp-admin, and `admin-post.php` — where its
 // form is handled — is part of it. Loading it on a front-end request would cost

@@ -117,10 +117,13 @@ class RankXAI_Admin {
 			$documents[ $slug ] = isset( $_POST['rankxai_generate'][ $slug ] );
 		}
 
+		$crawlers_on = isset( $_POST['rankxai_crawlers_enabled'] );
+
 		// A submission that chose no post type keeps what is stored rather than
 		// silently falling back to the default set — `null` is "unchanged".
 		RankXAI_Twins::save_settings( $twins_on, $post_types ? $post_types : null );
 		RankXAI_Generate::save_state( $documents );
+		RankXAI_Crawlers::set_enabled( $crawlers_on );
 
 		wp_safe_redirect( add_query_arg( 'rankxai-saved', '1', self::page_url() ) );
 		exit;
@@ -186,6 +189,7 @@ class RankXAI_Admin {
 
 		self::render_twins( $twins );
 		self::render_documents( $generated );
+		self::render_crawlers();
 
 		submit_button();
 		echo '</form>';
@@ -347,6 +351,82 @@ class RankXAI_Admin {
 			echo '</td></tr>';
 		}
 
+		echo '</tbody></table>';
+	}
+
+	/**
+	 * The AI crawler visits section.
+	 *
+	 * Says what is stored before anything else, because the switch is a
+	 * decision about this site's visitors' data, and says what cannot be seen,
+	 * because a number without that note reads as the whole truth.
+	 */
+	private static function render_crawlers() {
+		$on     = RankXAI_Crawlers::enabled();
+		$config = RankXAI_Crawlers::config_summary();
+		$caches = RankXAI_Crawlers::page_caches();
+
+		echo '<h2>' . esc_html__( 'AI crawler visits', 'rankxai' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Count which AI crawlers, such as GPTBot, ClaudeBot and PerplexityBot, fetch which addresses on this site, per day. Only the crawler\'s name, the address, the response status and a count are kept, for 35 days. No IP address, browser details or anything about human visitors is stored, and nothing is sent anywhere: a connected RankX AI account reads the counts from this site.', 'rankxai' ) . '</p>';
+
+		echo '<table class="form-table" role="presentation"><tbody>';
+		echo '<tr><th scope="row">' . esc_html__( 'Count visits', 'rankxai' ) . '</th><td>';
+		echo '<label><input type="checkbox" name="rankxai_crawlers_enabled" value="1" ' . checked( $on, true, false ) . ' /> ';
+		echo esc_html__( 'Count visits from AI crawlers', 'rankxai' ) . '</label>';
+		echo '<p class="description">' . esc_html__( 'Off by default. Each crawler visit adds one small database write.', 'rankxai' ) . '</p>';
+		echo '</td></tr>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'What is seen', 'rankxai' ) . '</th><td>';
+		if ( $caches ) {
+			echo '<p>' . esc_html(
+				sprintf(
+					/* translators: %s: names of page-cache plugins. */
+					__( 'This site runs %s, which answers repeat visits without WordPress running. Only the visits it does not answer are counted, so the real numbers are higher.', 'rankxai' ),
+					implode( ', ', $caches )
+				)
+			) . '</p>';
+		}
+		echo '<p class="description">' . esc_html__( 'Only visits that reach WordPress are counted. A visit your host or a firewall refuses before WordPress runs is not.', 'rankxai' ) . '</p>';
+		if ( $config['prefixes'] > 0 ) {
+			echo '<p class="description">' . esc_html__( 'Each visit is also checked against the address ranges the crawler\'s operator publishes, sent here by RankX AI.', 'rankxai' ) . '</p>';
+		} else {
+			echo '<p class="description">' . esc_html__( 'Crawlers are named from what they say they are. With a RankX AI account connected, each visit is also checked against the address ranges the crawler\'s operator publishes.', 'rankxai' ) . '</p>';
+		}
+		echo '</td></tr>';
+		echo '</tbody></table>';
+
+		if ( ! $on ) {
+			return;
+		}
+		$summary = RankXAI_Crawlers::summary( 7 );
+		if ( ! $summary ) {
+			echo '<p>' . esc_html__( 'No crawler visits counted in the last 7 days.', 'rankxai' ) . '</p>';
+			return;
+		}
+		echo '<p>' . esc_html__( 'The last 7 days:', 'rankxai' ) . '</p>';
+		echo '<table class="widefat striped" style="max-width:720px"><thead><tr>';
+		// Without published ranges nothing can be checked, and a column headed
+		// "from elsewhere" would imply every visit was an impostor.
+		$checked = $config['prefixes'] > 0;
+		echo '<th>' . esc_html__( 'Crawler', 'rankxai' ) . '</th>';
+		if ( $checked ) {
+			echo '<th>' . esc_html__( 'From its published addresses', 'rankxai' ) . '</th>';
+			echo '<th>' . esc_html__( 'From other addresses', 'rankxai' ) . '</th>';
+		} else {
+			echo '<th>' . esc_html__( 'Visits', 'rankxai' ) . '</th>';
+		}
+		echo '<th>' . esc_html__( 'Addresses', 'rankxai' ) . '</th>';
+		echo '</tr></thead><tbody>';
+		foreach ( $summary as $row ) {
+			echo '<tr><td><code>' . esc_html( $row['bot'] ) . '</code></td>';
+			if ( $checked ) {
+				echo '<td>' . esc_html( number_format_i18n( $row['in_range'] ) ) . '</td>';
+				echo '<td>' . esc_html( number_format_i18n( $row['other'] ) ) . '</td>';
+			} else {
+				echo '<td>' . esc_html( number_format_i18n( $row['in_range'] + $row['other'] ) ) . '</td>';
+			}
+			echo '<td>' . esc_html( number_format_i18n( $row['paths'] ) ) . '</td></tr>';
+		}
 		echo '</tbody></table>';
 	}
 

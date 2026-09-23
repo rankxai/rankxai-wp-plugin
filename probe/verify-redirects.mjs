@@ -215,7 +215,9 @@ async function run() {
       `module off → reason module_off (${rmOff.json?.managers?.rank_math?.reason})`)
     const rmOffCreate = await create({ backend: 'rank_math', from: `/${MARK}-rm`, to: '/sample-page/', code: 301 })
     check(rmOffCreate.status === 409 && rmOffCreate.json?.code === 'rankxai_redirect_unavailable', 'a write to Rank Math with its module off is refused 409')
-    const modulesAfterRefusal = JSON.parse(evalPhp('echo json_encode(get_option("rank_math_modules"));'))
+    // Rank Math's own `update_modules` can leave gaps in the keys, and PHP then
+    // encodes the list as an OBJECT — read the values either way.
+    const modulesAfterRefusal = Object.values(JSON.parse(evalPhp('echo json_encode(get_option("rank_math_modules"));')) ?? {})
     check(!modulesAfterRefusal.includes('redirections'), 'and the refusal did NOT switch the module on')
     check(evalPhp('echo count(get_option("rankxai_redirects", array()));') === '0', 'and nothing fell back into our own store')
 

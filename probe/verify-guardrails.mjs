@@ -99,6 +99,7 @@ const MUST_SEE = [
   'includes/class-rankxai-admin.php',
   'includes/class-rankxai-generate.php',
   'includes/class-rankxai-redirects.php',
+  'includes/class-rankxai-crawlers.php',
 ]
 code.size > 5
   ? ok(`CONTROL — the walker found ${code.size} files`)
@@ -319,6 +320,37 @@ const OPTIONS_PAGE = new RegExp("add_options_page\\([^]{0,200}?'manage_options'"
 OPTIONS_PAGE.test(adminSrc)
   ? ok('the settings page itself requires `manage_options`')
   : bad('the settings page does not require `manage_options`')
+
+// ── CRAWLER COUNTS STORE NO IP AND NO USER AGENT (DG80-4) ─────────────────
+//
+// The owner's answer to DG80-4 made the privacy disclosure one sentence, and
+// that sentence is only true while the table has nowhere to put either. So the
+// table's columns are read out of its own CREATE TABLE, and every file that
+// reads a request's address or agent is derived from the tree: the one class
+// allowed to look at them uses them and forgets them.
+const crawlerSrc = code.get('includes/class-rankxai-crawlers.php') ?? ''
+const CREATE_TABLE = new RegExp('CREATE TABLE \\{\\$table\\} \\(([^]*?)PRIMARY KEY')
+const createMatch = CREATE_TABLE.exec(crawlerSrc)
+const columns = createMatch
+  ? createMatch[1].split('\n').map((l) => l.trim().split(/\s+/)[0]).filter((c) => /^[a-z_]+$/.test(c))
+  : []
+columns.includes('path') && columns.includes('hits') && columns.includes('bot')
+  ? ok(`CONTROL — read the crawler table's columns: ${columns.join(', ')}`)
+  : bad('CONTROL — could not read the crawler table’s CREATE TABLE, so the column check proves nothing')
+const PERSONAL_COLUMN = /ip|addr|agent|^ua$|query|referer|host/
+const personal = columns.filter((c) => PERSONAL_COLUMN.test(c))
+personal.length === 0
+  ? ok('the crawler table has no column that could hold an IP address, a user agent or a query')
+  : bad(`the crawler table has a column for personal data: ${personal.join(', ')}`)
+
+const REQUEST_IDENTITY = /\$_SERVER\[\s*'(REMOTE_ADDR|HTTP_USER_AGENT|HTTP_CF_CONNECTING_IP|HTTP_X_FORWARDED_FOR)'\s*\]/
+const identityReaders = [...code].filter(([, src]) => REQUEST_IDENTITY.test(src)).map(([name]) => name)
+identityReaders.includes('includes/class-rankxai-crawlers.php')
+  ? ok('CONTROL — the crawler class is found reading the request address and agent')
+  : bad('CONTROL — the crawler class does not read the request address; the reader check proves nothing')
+identityReaders.length === 1
+  ? ok('no other file reads a visitor’s address or user agent')
+  : bad(`other files read a visitor’s address or agent: ${identityReaders.join(', ')}`)
 
 // ── THE LISTING'S OWN LIMITS ───────────────────────────────────────────────
 //

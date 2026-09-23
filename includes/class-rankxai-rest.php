@@ -295,6 +295,84 @@ class RankXAI_REST {
 				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
 			)
 		);
+
+		// Crawler counters are read, and the crawler list is updated, by the
+		// platform. There is deliberately no route that switches counting on:
+		// that is a choice for this site's administrator, on its own screen.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/crawlers',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'handle_crawlers_get' ),
+				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/crawlers/config',
+			array(
+				'methods'             => WP_REST_Server::EDITABLE,
+				'callback'            => array( __CLASS__, 'handle_crawlers_config' ),
+				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+			)
+		);
+	}
+
+	/**
+	 * Crawler counters from a day onwards, a page at a time.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_crawlers_get( $request ) {
+		$today = gmdate( 'Y-m-d' );
+		$floor = gmdate( 'Y-m-d', strtotime( $today . ' -' . ( RankXAI_Crawlers::RETENTION_DAYS - 1 ) . ' days' ) );
+
+		$since = $request->get_param( 'since' );
+		if ( null === $since || '' === $since ) {
+			$since = $floor;
+		} elseif ( ! is_string( $since ) || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $since ) ) {
+			return new WP_Error( 'rankxai_crawlers_bad_since', 'since must be a date, YYYY-MM-DD', array( 'status' => 400 ) );
+		}
+
+		$offset = $request->get_param( 'offset' );
+		$limit  = $request->get_param( 'limit' );
+		$offset = is_numeric( $offset ) ? max( 0, (int) $offset ) : 0;
+		$limit  = is_numeric( $limit ) ? min( 2000, max( 0, (int) $limit ) ) : 1000;
+
+		$page = RankXAI_Crawlers::rows( $since, $offset, $limit );
+
+		return new WP_REST_Response(
+			array(
+				'enabled'       => RankXAI_Crawlers::enabled(),
+				'retentionDays' => RankXAI_Crawlers::RETENTION_DAYS,
+				'maxRowsPerDay' => RankXAI_Crawlers::MAX_ROWS_PER_DAY,
+				'today'         => $today,
+				'since'         => $since,
+				'offset'        => $offset,
+				'total'         => $page['total'],
+				'rows'          => $page['rows'],
+				'config'        => RankXAI_Crawlers::config_summary(),
+				'pageCaches'    => RankXAI_Crawlers::page_caches(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Store the crawler list and the address ranges RankX AI publishes.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_crawlers_config( $request ) {
+		$saved = RankXAI_Crawlers::save_config( $request->get_json_params() );
+		if ( is_wp_error( $saved ) ) {
+			return $saved;
+		}
+		return new WP_REST_Response( $saved, 200 );
 	}
 
 	/**
@@ -886,7 +964,7 @@ class RankXAI_REST {
 					'mayOwnHead'     => RankXAI_Detect::may_own_head(),
 					'writableFields' => self::writable_fields(),
 				),
-				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'redirects.read', 'redirects.write' ),
+				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config' ),
 				// Which root documents this contract serves, so the platform
 				// offers exactly what this install can publish rather than
 				// discovering a 404 after the customer pressed the button.

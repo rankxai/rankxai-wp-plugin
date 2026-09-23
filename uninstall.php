@@ -4,7 +4,8 @@
  *
  * Core deletes the plugin's files; this removes its data. Post meta (every key
  * prefixed `_rankxai_`), the root-document options, the markdown-twin
- * options and opt-out meta, and this plugin's own redirects.
+ * options and opt-out meta, this plugin's own redirects, and the crawler
+ * counts table.
  *
  * Values mirrored into Yoast, Rank Math, SEOPress or The SEO Framework are left
  * alone. Once written they are that plugin's data, and deleting them would
@@ -70,6 +71,18 @@ function rankxai_uninstall_current_site() {
 		require_once $redirects;
 		delete_option( RankXAI_Redirects::OPTION );
 		delete_option( RankXAI_Redirects::OPTION_HITS );
+	}
+
+	// Crawler counts: the table and every option. Nothing here belongs to anyone else.
+	$crawlers = __DIR__ . '/includes/class-rankxai-crawlers.php';
+	if ( file_exists( $crawlers ) ) {
+		require_once $crawlers;
+		$rankxai_table = $wpdb->prefix . RankXAI_Crawlers::TABLE;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dropping this plugin's own table on uninstall; the name is not user input.
+		$wpdb->query( "DROP TABLE IF EXISTS {$rankxai_table}" );
+		foreach ( array( RankXAI_Crawlers::OPTION_ENABLED, RankXAI_Crawlers::OPTION_TOKENS, RankXAI_Crawlers::OPTION_RANGES, RankXAI_Crawlers::OPTION_PRUNED, RankXAI_Crawlers::OPTION_TABLE ) as $rankxai_option ) {
+			delete_option( $rankxai_option );
+		}
 	}
 
 	// Which documents were generated locally. One option holding every slug, so

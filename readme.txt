@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.1
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -28,6 +28,10 @@ Two halves, and the first needs no account anywhere.
   itself, so it changes when the page does. Assistants read your words instead of
   your theme's markup. Also off by default.
 * A page you have marked `noindex` is never listed and never gets a copy.
+* **Count which AI crawlers visit.** GPTBot, ClaudeBot, PerplexityBot and others,
+  per address and per day, with the status each was given. Off until you switch
+  it on. It keeps the crawler's name, the address, the status and a count — no IP
+  address, no browser details, nothing about human visitors — for 35 days.
 * If another plugin already serves one of these addresses, it keeps it.
 
 = Works better with a RankX AI account =
@@ -64,6 +68,10 @@ service, and this plugin is the site-side half of it. Connected, the plugin also
   redirects are listed under Settings → RankX AI, where you can remove any of
   them. The plugin never switches another plugin's modules on or off, and keeps
   no log of visitors.
+* **Checks each crawler visit against its operator's published addresses.**
+  RankX AI sends this site the address ranges that OpenAI, Anthropic, Perplexity,
+  Google, Microsoft, Apple and Common Crawl publish for their crawlers, and reads
+  the counts back to set them beside which assistants cite your pages.
 * **Tells RankX AI what this site actually stored.** When RankX AI updates a
   page, the plugin returns the saved content in the same request, so a change
   that WordPress altered on the way in is reported to you rather than assumed to
@@ -130,6 +138,17 @@ generated one.
 
 No. This version makes no outbound connections at all — see *External services*.
 
+= What does crawler counting store? =
+
+When you switch it on, each visit from a known AI crawler adds one to a counter
+for that day, crawler, address and response status. The visitor's IP address is
+used only to check it against the ranges the crawler's operator publishes, and
+is never stored. Browser details and query strings are never stored, and ordinary
+visitors are not counted at all. Counts older than 35 days are deleted, and
+uninstalling removes the table. Visits a page cache answers without running
+WordPress are not seen, so on a cached site the counts are lower than the real
+numbers.
+
 = What happens if I uninstall it? =
 
 Only the plugin's own stored values are removed. Anything it wrote into Yoast,
@@ -179,6 +198,9 @@ write, exactly as the editor does.
 * Privacy: https://rankxai.com/privacy
 
 == Changelog ==
+
+= 0.3.0 =
+* Optional AI crawler visit counts: which AI crawlers fetch which addresses, per day. Off by default. No IP addresses or browser details are stored.
 
 = 0.2.1 =
 * Fixed: a redirect for an address with accented or other non-ASCII characters never answered.
