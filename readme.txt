@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,7 +136,17 @@ generated one.
 
 = Does this send my content anywhere? =
 
-No. This version makes no outbound connections at all — see *External services*.
+No. The only request the plugin makes on its own is a check for a newer
+version of itself, and only in the copy downloaded from GitHub or from your
+RankX AI account — see *External services*.
+
+= How do I get updates? =
+
+The copy from WordPress.org updates like any other plugin. The copy downloaded
+from GitHub or from your RankX AI account shows updates on your Plugins screen
+too, and can be set to update automatically there, because it checks GitHub for
+new releases. Updating from 0.3.0 or earlier is one manual step, since those
+versions cannot check.
 
 = What does crawler counting store? =
 
@@ -171,12 +181,24 @@ address that is already answered, and for any real file on your server.
 
 == External services ==
 
-**This version of the plugin contacts no external service.**
+**The copy from WordPress.org contacts no external service.**
+
+The copy downloaded from GitHub or from your RankX AI account also checks
+github.com for a newer release, so WordPress can show you an update. It asks
+for one small file,
+`https://github.com/rankxai/rankxai-wp-plugin/releases/latest/download/rankxai-update.json`,
+at most every six hours, when WordPress checks for updates. The request carries
+no information about your site or its visitors, though GitHub sees your
+server's IP address, as it would for any download. When you update, WordPress
+downloads the new version from the same repository. GitHub's terms:
+https://docs.github.com/site-policy/github-terms/github-terms-of-service and
+privacy statement:
+https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement
 
 It registers REST endpoints that your RankX AI account calls *inbound*, over your
 site's own REST API, authenticated with a WordPress application password you
-create and can revoke at any time. The plugin itself initiates no outbound
-request, sends no analytics, sets no cookies, and transmits no visitor data.
+create and can revoke at any time. Apart from the update check above, the plugin
+initiates no outbound request, sends no analytics, sets no cookies, and transmits no visitor data.
 
 When the site is connected, RankX AI can read and write the SEO title,
 description, canonical URL, and Open Graph and Twitter titles and descriptions
@@ -198,6 +220,9 @@ write, exactly as the editor does.
 * Privacy: https://rankxai.com/privacy
 
 == Changelog ==
+
+= 0.4.0 =
+* Update notices: copies installed from GitHub or from a RankX AI download now show new versions on the Plugins screen and can update automatically.
 
 = 0.3.0 =
 * Optional AI crawler visit counts: which AI crawlers fetch which addresses, per day. Off by default. No IP addresses or browser details are stored.

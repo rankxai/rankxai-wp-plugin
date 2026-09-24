@@ -1,0 +1,62 @@
+name: Release check
+
+# Releases are published from a maintainer's machine with `node release.mjs`, so
+# they carry the maintainer's name. This workflow creates nothing: it reads a
+# published release back the way an installed site will, and fails loudly if a
+# site could not update from it.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to check (e.g. v0.4.0)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Can a site update from this release?
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Fetch the two assets through the addresses a site uses
+        run: |
+          set -euo pipefail
+          curl -fsSL -o rankxai-update.json "https://github.com/${REPO}/releases/download/${TAG}/rankxai-update.json"
+          curl -fsSL -o rankxai.zip "https://github.com/${REPO}/releases/download/${TAG}/rankxai.zip"
+          cat rankxai-update.json
+
+      - name: The manifest, the tag and the archive agree
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          test "$(jq -r .version rankxai-update.json)" = "$VERSION" || { echo "::error::manifest version is not $VERSION"; exit 1; }
+          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::$VERSION is not x.y.z; the updater ignores it"; exit 1; }
+          test "$(jq '.changelog | length' rankxai-update.json)" -gt 0 || { echo "::error::manifest has no changelog"; exit 1; }
+          unzip -Z1 rankxai.zip > entries.txt
+          grep -qx 'rankxai/rankxai.php' entries.txt || { echo "::error::the archive does not unpack into rankxai/"; exit 1; }
+          grep -qx 'rankxai/includes/class-rankxai-updater.php' entries.txt || { echo "::error::the updater is missing, so sites stop hearing about releases"; exit 1; }
+          if grep -qF '\' entries.txt; then echo "::error::backslashes in entry names"; exit 1; fi
+          unzip -p rankxai.zip rankxai/rankxai.php > rankxai.php
+          grep -Eq "^ \* Version: +${VERSION}$" rankxai.php || { echo "::error::plugin header is not $VERSION"; exit 1; }
+          grep -q "define( 'RANKXAI_VERSION', '${VERSION}' );" rankxai.php || { echo "::error::RANKXAI_VERSION is not $VERSION"; exit 1; }
+          grep -Eq '^ \* Update URI: +https://github.com/rankxai/rankxai-wp-plugin$' rankxai.php || { echo "::error::no Update URI; sites would never see a release"; exit 1; }
+          echo "Release ${TAG} is updatable."
+
+      - name: It is the release latest/ points at
+        if: github.event_name == 'release' && !github.event.release.prerelease
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5 6; do
+            LATEST=$(curl -fsSL "https://github.com/${REPO}/releases/latest/download/rankxai-update.json" | jq -r .version) || true
+            [ "$LATEST" = "${TAG#v}" ] && { echo "latest/ serves ${LATEST}"; exit 0; }
+            sleep 10
+          done
+          echo "::error::latest/ serves ${LATEST:-nothing}, not ${TAG#v}"
+          exit 1

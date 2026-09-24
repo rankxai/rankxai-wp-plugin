@@ -11,14 +11,30 @@
  * plugin folder, and honours `.gitattributes` export-ignore, so what ships is
  * exactly the release and nothing from the working tree.
  *
- * Usage: node build-zip.mjs [outfile]
+ * Two targets. `github` (the default) is what the in-product download and a
+ * GitHub release ship: it carries the `Update URI` header and the updater, so a
+ * site is told about new releases. `wporg` is the WordPress.org submission: the
+ * directory delivers its own updates and Plugin Check rejects both, so they are
+ * removed. The variant is built from a synthetic git tree, so it still goes
+ * through `git archive` and is still exactly a committed state.
+ *
+ * Usage: node build-zip.mjs [--target=github|wporg] [outfile]
  */
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
 
-const OUT = process.argv[2] ?? 'dist/rankxai.zip'
+const args = process.argv.slice(2)
+const TARGET = (args.find((a) => a.startsWith('--target=')) ?? '--target=github').slice('--target='.length)
+if (TARGET !== 'github' && TARGET !== 'wporg') {
+  console.error(`unknown target "${TARGET}"; use github or wporg`)
+  process.exit(1)
+}
+const OUT = args.find((a) => !a.startsWith('--')) ?? (TARGET === 'wporg' ? 'dist/rankxai-wporg.zip' : 'dist/rankxai.zip')
 const SLUG = 'rankxai'
+const UPDATER = 'includes/class-rankxai-updater.php'
+const UPDATE_URI_LINE = new RegExp('^ \\* Update URI:.*\\n', 'm')
 
 mkdirSync(dirname(OUT), { recursive: true })
 
@@ -34,8 +50,33 @@ if (dirty && !process.env.RANKXAI_ALLOW_DIRTY_BUILD) {
   process.exit(1)
 }
 
+/**
+ * The tree to archive. For `wporg`, HEAD's tree with the updater removed and the
+ * header line dropped, written through a throwaway index so the real one is
+ * untouched.
+ */
+function treeFor(target) {
+  if (target === 'github') return 'HEAD'
+  const index = join(tmpdir(), `rankxai-wporg-index-${process.pid}`)
+  const env = { ...process.env, GIT_INDEX_FILE: index }
+  try {
+    execFileSync('git', ['read-tree', 'HEAD'], { env })
+    execFileSync('git', ['update-index', '--force-remove', UPDATER], { env })
+    const main = execFileSync('git', ['show', `HEAD:${SLUG}.php`], { encoding: 'utf8' })
+    if (!UPDATE_URI_LINE.test(main)) throw new Error(`${SLUG}.php has no Update URI line to remove`)
+    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], {
+      input: main.replace(UPDATE_URI_LINE, ''),
+      encoding: 'utf8',
+    }).trim()
+    execFileSync('git', ['update-index', '--cacheinfo', `100644,${blob},${SLUG}.php`], { env })
+    return execFileSync('git', ['write-tree'], { env, encoding: 'utf8' }).trim()
+  } finally {
+    rmSync(index, { force: true })
+  }
+}
+
 // -o is avoided for the same Windows path reason; the archive comes back on stdout.
-const zip = execFileSync('git', ['archive', '--format=zip', `--prefix=${SLUG}/`, 'HEAD'], {
+const zip = execFileSync('git', ['archive', '--format=zip', `--prefix=${SLUG}/`, treeFor(TARGET)], {
   maxBuffer: 64 * 1024 * 1024,
 })
 writeFileSync(OUT, zip)
@@ -71,5 +112,16 @@ if (!names.includes(`${SLUG}/${SLUG}.php`)) {
   process.exit(1)
 }
 
-console.log(`${OUT} — ${names.length} entries, ${buf.length} bytes`)
+// The two targets differ in exactly two places, and each must be the right way round:
+// a GitHub build without them never updates, a WordPress.org build with them is rejected.
+const hasUpdater = names.includes(`${SLUG}/${UPDATER}`)
+const mainFile = execFileSync('unzip', ['-p', OUT, `${SLUG}/${SLUG}.php`], { encoding: 'utf8' })
+const hasHeader = UPDATE_URI_LINE.test(mainFile)
+const wanted = TARGET === 'github'
+if (hasUpdater !== wanted || hasHeader !== wanted) {
+  console.error(`${TARGET} build: updater ${hasUpdater ? 'present' : 'absent'}, Update URI ${hasHeader ? 'present' : 'absent'}; both should be ${wanted ? 'present' : 'absent'}`)
+  process.exit(1)
+}
+
+console.log(`${OUT} (${TARGET}) — ${names.length} entries, ${buf.length} bytes`)
 for (const n of names.filter((n) => !n.endsWith('/')).sort()) console.log(`  ${n}`)

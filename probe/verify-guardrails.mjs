@@ -100,6 +100,7 @@ const MUST_SEE = [
   'includes/class-rankxai-generate.php',
   'includes/class-rankxai-redirects.php',
   'includes/class-rankxai-crawlers.php',
+  'includes/class-rankxai-updater.php',
 ]
 code.size > 5
   ? ok(`CONTROL — the walker found ${code.size} files`)
@@ -150,15 +151,70 @@ const OUTBOUND = [
   'curl_init', 'curl_exec', 'curl_multi_init', 'fsockopen', 'stream_socket_client',
   'file_get_contents', 'fopen', 'readfile', 'get_headers', 'dns_get_record',
 ]
+// ONE deliberate exception since 0.4.0 (owner, 2026-09-24): the GitHub build's
+// updater asks github.com for the latest release. It is confined to one file,
+// one call and one fixed address, and the WordPress.org build removes the file.
+const UPDATER_FILE = 'includes/class-rankxai-updater.php'
 const outboundOffenders = []
+const updaterCalls = []
 for (const [name, src] of code) {
   for (const fn of OUTBOUND) {
-    if (new RegExp(`\\b${fn}\\s*\\(`).test(src)) outboundOffenders.push(`${name}: ${fn}`)
+    const hits = (src.match(new RegExp(`\\b${fn}\\s*\\(`, 'g')) ?? []).length
+    if (hits === 0) continue
+    if (name === UPDATER_FILE) updaterCalls.push(...Array(hits).fill(fn))
+    else outboundOffenders.push(`${name}: ${fn}`)
   }
 }
 outboundOffenders.length === 0
-  ? ok('nothing in the shipped tree can make an outbound request')
+  ? ok('nothing outside the updater can make an outbound request')
   : bad(`an outbound call appeared: ${outboundOffenders.join(', ')}`)
+updaterCalls.length === 1 && updaterCalls[0] === 'wp_safe_remote_get'
+  ? ok('the updater makes exactly one request, through wp_safe_remote_get')
+  : bad(`the updater makes ${JSON.stringify(updaterCalls)}; exactly one wp_safe_remote_get is allowed`)
+
+const updaterSrc = code.get(UPDATER_FILE) ?? ''
+const URL_LITERAL = new RegExp("'https?://[^']*'", 'g')
+// RAW source: the comment stripper reads the `//` in a URL literal as a comment
+// and drops the rest of the line, so the stripped text holds no addresses.
+const updaterRaw = code.has(UPDATER_FILE) ? readFileSync(join(ROOT, UPDATER_FILE), 'utf8') : ''
+const updaterUrls = updaterRaw.match(URL_LITERAL) ?? []
+updaterUrls.length > 0 && updaterUrls.every((u) => u.startsWith("'https://github.com/rankxai/rankxai-wp-plugin") || u === "'https://rankxai.com'")
+  ? ok(`every address in the updater is this plugin's own GitHub repository (${updaterUrls.length})`)
+  : bad(`the updater names an address outside the repository: ${updaterUrls.join(', ')}`)
+const FETCH_TARGET = new RegExp('wp_safe_remote_get\\(\\s*self::MANIFEST_URL')
+FETCH_TARGET.test(updaterSrc)
+  ? ok('and its one request goes to the fixed manifest constant')
+  : bad('the updater request is not addressed to self::MANIFEST_URL')
+
+// The download address is built from the checked version, never taken from the
+// manifest, so a tampered manifest cannot send a site elsewhere.
+const PACKAGE_ASSIGN = new RegExp("\\['package'\\]\\s*=\\s*self::package_url\\(")
+const MANIFEST_PACKAGE = new RegExp("\\$data\\[\\s*'(package|download_link|url)'\\s*\\]")
+PACKAGE_ASSIGN.test(updaterSrc)
+  ? ok('the package address is built by package_url()')
+  : bad('the package address is not built by package_url()')
+!MANIFEST_PACKAGE.test(updaterSrc)
+  ? ok('no address is read out of the manifest')
+  : bad('the updater reads an address out of the manifest')
+
+// Core's `update_plugins_{hostname}` filter is the supported door. Rewriting the
+// update transient, or deciding auto-updates for the site owner, is not ours.
+const UPDATE_HACKS = ['site_transient_update_plugins', 'auto_update_plugin', 'upgrader_source_selection', 'upgrader_pre_download']
+const hackOffenders = []
+for (const [name, src] of code) {
+  for (const hook of UPDATE_HACKS) if (src.includes(hook)) hackOffenders.push(`${name}: ${hook}`)
+}
+updaterSrc.includes("'update_plugins_github.com'")
+  ? ok('CONTROL — the updater hooks update_plugins_github.com')
+  : bad('CONTROL — the updater does not hook update_plugins_github.com; the checks above prove little')
+hackOffenders.length === 0
+  ? ok('nothing rewrites the update transient, the upgrader or the auto-update choice')
+  : bad(`an update hack appeared: ${hackOffenders.join(', ')}`)
+// Every plugin with a github.com Update URI fires that filter.
+const FOREIGN_PLUGIN_GUARD = new RegExp('function filter_update[^]{0,400}?plugin_basename\\(\\s*RANKXAI_PLUGIN_FILE\\s*\\)\\s*!==\\s*\\$plugin_file[^]{0,60}?return \\$update')
+FOREIGN_PLUGIN_GUARD.test(updaterSrc)
+  ? ok("the filter hands every other plugin's update back untouched")
+  : bad('filter_update does not return early for other plugins')
 
 // The platform owns every rule about what may be written, how content is
 // preserved and whether a write succeeded, because those change with a deploy
@@ -392,10 +448,14 @@ shortDescription.length > 0 && shortDescription.length <= 150
 // The other half of the outbound scan above. Two ways to fail: the code starts
 // calling out while the readme says it does not, or somebody removes the
 // sentence while it is still true and hands a reviewer a question to ask.
-const CLAIMS_NO_OUTBOUND = /contacts no external service/i
+const CLAIMS_NO_OUTBOUND = /copy\s+from\s+WordPress\.org\s+contacts\s+no\s+external\s+service/i
+const NAMES_UPDATE_CHECK = /checks\s+github\.com\s+for\s+a\s+newer\s+release/i
 CLAIMS_NO_OUTBOUND.test(readme)
-  ? ok('readme.txt states that the plugin contacts no external service, which the scan above proves')
-  : bad('readme.txt no longer carries the no-outbound claim that the code supports')
+  ? ok('readme.txt states that the WordPress.org copy contacts no external service, which the scan above proves')
+  : bad('readme.txt no longer carries the no-outbound claim for the WordPress.org copy')
+NAMES_UPDATE_CHECK.test(readme)
+  ? ok('readme.txt discloses the GitHub build’s update check')
+  : bad('readme.txt does not disclose the update check the updater makes')
 
 const tags = readmeHeader('Tags').split(',').map((t) => t.trim()).filter(Boolean)
 tags.length > 0 && tags.length <= 5

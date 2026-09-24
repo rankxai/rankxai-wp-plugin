@@ -5,7 +5,7 @@
  * Core deletes the plugin's files; this removes its data. Post meta (every key
  * prefixed `_rankxai_`), the root-document options, the markdown-twin
  * options and opt-out meta, this plugin's own redirects, and the crawler
- * counts table.
+ * counts table, and the cached update check.
  *
  * Values mirrored into Yoast, Rank Math, SEOPress or The SEO Framework are left
  * alone. Once written they are that plugin's data, and deleting them would
@@ -130,3 +130,8 @@ function rankxai_uninstall_everywhere() {
 }
 
 rankxai_uninstall_everywhere();
+
+// The cached update check. A site transient, so network-wide on multisite and
+// deleted once. The key is repeated here because the updater is absent from the
+// WordPress.org build.
+delete_site_transient( 'rankxai_release' );

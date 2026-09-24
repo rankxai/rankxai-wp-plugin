@@ -468,8 +468,8 @@ class RankXAI_Admin {
 	/**
 	 * What, if anything, RankX AI has sent this site.
 	 *
-	 * The plugin makes no outbound request, so it cannot ask whether an account
-	 * is connected. What it can state is a fact it holds locally: the most
+	 * The plugin never calls RankX AI (its only outbound request is the GitHub
+	 * build's update check), so it cannot ask whether an account is connected. What it can state is a fact it holds locally: the most
 	 * recent time something arrived. "Nothing yet" is said plainly rather than
 	 * dressed as a problem, because a site using only the local features is
 	 * working exactly as intended.

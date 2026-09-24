@@ -34,6 +34,11 @@ of it is ever untrue, that is itself the vulnerability:
   that returns no version and no site data.
 - **It grants no capability the connected account does not already have.**
 - **Every remote capability is inert** until a local administrator enables it, per capability.
+- **It makes one outbound request, and only in the GitHub build**: a check for
+  `rankxai-update.json` in this repository's latest release, carrying no site data. The
+  download it offers is built from the checked version number, never taken from that file, and
+  always comes from this repository's releases. The WordPress.org build makes no outbound
+  request at all.
 - **Every write is reversible** from the plugin's own screen, over SFTP, and on uninstall, without
   RankX AI being reachable.
 

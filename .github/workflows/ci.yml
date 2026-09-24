@@ -65,14 +65,17 @@ jobs:
             echo '::notice::No plugin header found yet — Plugin Check skipped. It self-enables with the first plugin file.'
           fi
 
-      # Check the archive, not the repository: .github, composer.json and the probe
-      # harness are all export-ignored, so only `git archive` output is what ships.
+      # Check the WordPress.org build: it is the one submitted to the directory, and
+      # the GitHub build's updater is exactly what Plugin Check is there to refuse.
+      # Both builds are made so a broken variant fails here rather than at release.
       - if: steps.detect.outputs.present == 'true'
-        name: Build the release archive
+        name: Build the release archives
         run: |
-          mkdir -p build/rankxai
-          git archive HEAD | tar -x -C build/rankxai
-          echo "--- what ships ---"
+          node build-zip.mjs
+          node build-zip.mjs --target=wporg
+          mkdir -p build
+          unzip -q dist/rankxai-wporg.zip -d build
+          echo "--- what ships to WordPress.org ---"
           find build/rankxai -type f | sort
 
       - if: steps.detect.outputs.present == 'true'

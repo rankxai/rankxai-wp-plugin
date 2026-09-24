@@ -18,3 +18,4 @@
 /probe/             export-ignore
 /build-zip.mjs      export-ignore
 /check.sh           export-ignore
+/release.mjs        export-ignore

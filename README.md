@@ -8,10 +8,12 @@ documents that AI assistants look for.
 The plugin generates nothing on its own. Everything it applies is produced and approved in a
 RankX AI account, which is a paid service. The plugin is free and GPLv2 or later.
 
-> ## Status: 0.0.1, not on WordPress.org yet
+> ## Status: not on WordPress.org yet
 >
 > The plugin runs on live sites, but it is not published on WordPress.org, so it installs from a
-> release ZIP rather than from the Plugins screen's search.
+> [release ZIP](https://github.com/rankxai/rankxai-wp-plugin/releases/latest) rather than from the
+> Plugins screen's search. From 0.4.0 an installed copy shows new releases on the Plugins screen
+> and can update automatically.
 
 ## What it does
 
@@ -59,6 +61,27 @@ matrix deliberately: WordPress.org will install on 7.4 hosts, where an 8.0 synta
 fatal error on activation rather than a warning.
 
 `npx wp-env start` boots PHP 7.4 for the same reason, with 8.3 in the tests environment.
+
+## Releasing
+
+Sites find updates through the `Update URI` header and `includes/class-rankxai-updater.php`, which
+read `rankxai-update.json` from the latest GitHub release and offer that release's `rankxai.zip`.
+
+1. Bump `Version:` and `RANKXAI_VERSION` in `rankxai.php` and `Stable tag:` in `readme.txt`, and add
+   a changelog entry for the version (it becomes the release notes and the "View details" text).
+2. Commit and push to `main`.
+3. `node release.mjs --dry-run`, then `node release.mjs`.
+
+The release is made locally, not by a workflow, so the tag and the release carry the maintainer's
+name. The script refuses a dirty or unpushed tree, a version mismatch, a missing changelog entry or
+a `Co-Authored-By` trailer, runs `check.sh`, uploads both assets together, and reads the result
+back from GitHub. The *Release check* workflow then checks the published release the way a site
+will. Never publish a release by hand without `rankxai-update.json`, or mark one as a pre-release
+expecting sites to see it: `latest/` skips pre-releases.
+
+`node build-zip.mjs --target=wporg` builds the WordPress.org submission, which has no updater and
+no `Update URI` (the directory delivers its own updates, and Plugin Check rejects both). CI's Plugin
+Check runs against that build.
 
 ## Reporting a security issue
 
