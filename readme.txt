@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.4.0
+Stable tag: 0.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -220,6 +220,10 @@ write, exactly as the editor does.
 * Privacy: https://rankxai.com/privacy
 
 == Changelog ==
+
+= 0.4.1 =
+* Structured data managed per schema through your SEO plugin: Rank Math's own schema rows where Rank Math supports the type, otherwise added to your SEO plugin's graph so each page prints one graph. Works with Rank Math, Yoast SEO, All in One SEO, SEOPress, The SEO Framework and Slim SEO, or with no SEO plugin.
+* Schema published from RankX AI's AI-readiness check now joins your SEO plugin's graph instead of printing a second one.
 
 = 0.4.0 =
 * Update notices: copies installed from GitHub or from a RankX AI download now show new versions on the Plugins screen and can update automatically.

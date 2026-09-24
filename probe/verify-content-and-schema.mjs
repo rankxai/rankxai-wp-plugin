@@ -95,17 +95,59 @@ async function page(url) {
   return { status: res.status, html: res.ok ? await res.text() : '' }
 }
 
-/** Every `application/ld+json` payload on a page, in document order. */
+/**
+ * Every `application/ld+json` payload on a page, in document order. Any
+ * attributes: since 0.5.0 our own script carries a class.
+ */
 function ldJsonBlocks(html) {
-  return [...html.matchAll(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/g)].map((m) => m[1])
+  return [...html.matchAll(/<script\b[^>]*type="application\/ld\+json"[^>]*>\s*([\s\S]*?)\s*<\/script>/g)].map((m) => m[1])
 }
 
+/**
+ * Does this script carry the document we stored? Since 0.5.0 a stored document
+ * is printed as nodes inside ONE graph, so the comparison is per node: every
+ * node of the stored document, less its `@context`, must appear deep-equal.
+ */
 function parsesTo(block, expectedJson) {
   try {
-    return JSON.stringify(JSON.parse(block)) === JSON.stringify(JSON.parse(expectedJson))
+    const nodesOf = (doc) => {
+      const list = Array.isArray(doc?.['@graph']) ? doc['@graph'] : Array.isArray(doc) ? doc : [doc]
+      return list.map((n) => {
+        const rest = { ...n }
+        delete rest['@context']
+        return JSON.stringify(rest)
+      })
+    }
+    const have = new Set(nodesOf(JSON.parse(block)))
+    return nodesOf(JSON.parse(expectedJson)).every((n) => have.has(n))
   } catch {
     return false
   }
+}
+
+/**
+ * SEO plugins off for the schema sections, and back on after.
+ *
+ * With one active, a stored document joins THAT plugin's graph and passes
+ * through its sanitising (Rank Math runs wp_kses_post_deep over its graph).
+ * That is correct and not what these sections measure: they measure OUR
+ * script's escaping. probe/verify-schema-providers.mjs measures the plugins.
+ */
+const SEO_PLUGINS = ['wordpress-seo', 'seo-by-rank-math', 'wp-seopress', 'all-in-one-seo-pack', 'autodescription', 'slim-seo']
+let seoRestore = []
+async function cliRun(...args) {
+  const { execFileSync } = await import('node:child_process')
+  return execFileSync('docker', ['exec', '-u', '33', cliContainer(), 'wp', ...args], { encoding: 'utf8', stdio: 'pipe' })
+}
+async function seoPluginsOff() {
+  seoRestore = (await cliRun('plugin', 'list', '--status=active', '--field=name')).split(/\r?\n/).filter((n) => SEO_PLUGINS.includes(n))
+  // A warning under WP_DEBUG exits non-zero; the plugin list is the answer.
+  if (seoRestore.length) await cliRun('plugin', 'deactivate', ...seoRestore, '--quiet').catch(() => '')
+}
+async function seoPluginsBack() {
+  if (!seoRestore.length) return
+  await cliRun('plugin', 'activate', ...seoRestore, '--quiet').catch(() => '')
+  seoRestore = []
 }
 
 async function wpOption(name) {
@@ -405,6 +447,7 @@ async function run() {
     ? ok('REFUSE — a post that does not exist → 404, the same answer wp/v2 gives')
     : bad(`REFUSE — a missing post → ${missing.status}; 403 would blame the account for a stale page id`)
 
+  await seoPluginsOff()
   console.log('\n== D/E. roles, and the measurement the schema route exists for ==')
   const username = `probe-author-${Date.now()}`
   const authorUser = await json('/wp/v2/users', {
@@ -579,6 +622,7 @@ async function run() {
     ? ok('SCHEMA — the page no longer carries our marker')
     : bad('SCHEMA — the marker is still on the page after a delete')
 
+  await seoPluginsBack()
   await parityArm()
 
   console.log('\n== G. the never-cache filter reaches the new routes ==')
@@ -709,6 +753,7 @@ run()
   .catch((e) => {
     bad(`RUN — threw: ${e && e.message ? e.message : e}`)
   })
+  .then(seoPluginsBack)
   .then(cleanup)
   .catch((e) => {
     bad(`CLEANUP — threw: ${e && e.message ? e.message : e}`)

@@ -96,6 +96,7 @@ const MUST_SEE = [
   'includes/class-rankxai-rest.php',
   'includes/class-rankxai-content.php',
   'includes/class-rankxai-schema.php',
+  'includes/class-rankxai-schema-set.php',
   'includes/class-rankxai-admin.php',
   'includes/class-rankxai-generate.php',
   'includes/class-rankxai-redirects.php',
@@ -275,7 +276,7 @@ callbacks === methodEntries
 // `update_metadata` unslashes every value, so an unslashed write strips every
 // backslash and answers HTTP 200. Mutation-proved on a real WordPress — a body
 // containing `C:\Users\test` came back `C:Userstest`.
-for (const file of ['includes/class-rankxai-content.php', 'includes/class-rankxai-schema.php']) {
+for (const file of ['includes/class-rankxai-content.php', 'includes/class-rankxai-schema.php', 'includes/class-rankxai-schema-set.php']) {
   const src = code.get(file) ?? ''
   const writes = (src.match(/wp_update_post\(|update_post_meta\(/g) ?? []).length
   const slashes = (src.match(/wp_slash\(/g) ?? []).length

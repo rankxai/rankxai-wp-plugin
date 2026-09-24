@@ -191,6 +191,58 @@ class RankXAI_REST {
 			)
 		);
 
+		// Per-post schema, item by item, across every store a schema can live in
+		// (Rank Math's own rows, our set, the older single document). The same
+		// `can_write_post` gate as `/schema`, for the same reason: a claim about ONE
+		// page, made by whoever may edit that page.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/schema-set/(?P<id>\d+)',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'handle_schema_set_get' ),
+					'permission_callback' => array( __CLASS__, 'can_write_post' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( __CLASS__, 'handle_schema_set_write' ),
+					'permission_callback' => array( __CLASS__, 'can_write_post' ),
+					'args'                => array(
+						'op' => array(
+							'required' => true,
+							'type'     => 'string',
+							'enum'     => array( 'upsert', 'delete' ),
+						),
+					),
+				),
+			)
+		);
+
+		// Site-level facts about the SEO plugins, for a caller that has not
+		// chosen a page yet. The same `can_read` gate as `/manifest`.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/schema-providers',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'handle_schema_providers' ),
+				'permission_callback' => array( __CLASS__, 'can_read' ),
+			)
+		);
+
+		// Read-only: what a store would hold for a schema, so a preview shows the
+		// provider's own sanitising rather than a guess at it.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/schema-set/(?P<id>\d+)/normalise',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'handle_schema_set_normalise' ),
+				'permission_callback' => array( __CLASS__, 'can_write_post' ),
+			)
+		);
+
 		// The slug is constrained IN THE ROUTE PATTERN to the three we serve, so
 		// an unknown one is a 404 from WordPress's own router and never reaches a
 		// handler. That is one layer; `RankXAI_Documents` re-checks against its
@@ -735,6 +787,123 @@ class RankXAI_REST {
 	}
 
 	/**
+	 * Which SEO plugins run on this site, and what each does with structured data.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public static function handle_schema_providers() {
+		$providers = array();
+		foreach ( RankXAI_Schema_Providers::slugs() as $slug ) {
+			$providers[] = RankXAI_Schema_Providers::describe( $slug );
+		}
+		return new WP_REST_Response(
+			array(
+				'providers'     => $providers,
+				'active'        => RankXAI_Schema_Providers::active(),
+				'unknownActive' => RankXAI_Schema_Providers::unknown_active(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Every schema stored for a post, and every fact about the site's SEO
+	 * plugins the platform needs to decide what to do with one.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_schema_set_get( $request ) {
+		$post_id = (int) $request['id'];
+		if ( ! get_post( $post_id ) ) {
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
+		}
+		return new WP_REST_Response( RankXAI_Schema_Set::state( $post_id ), 200 );
+	}
+
+	/**
+	 * What a store would hold for a schema, without writing it.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_schema_set_normalise( $request ) {
+		$post_id = (int) $request['id'];
+		if ( ! get_post( $post_id ) ) {
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
+		}
+		$result = RankXAI_Schema_Set::normalise(
+			(string) $request->get_param( 'store' ),
+			$request->get_param( 'schema' ),
+			(string) $request->get_param( 'target' ),
+			$post_id
+		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return new WP_REST_Response( array( 'normalised' => $result ), 200 );
+	}
+
+	/**
+	 * Add, replace or remove one schema, then report what is stored.
+	 *
+	 * The response carries the state AFTER the write. Comparing it against what
+	 * was sent is the caller's job.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_schema_set_write( $request ) {
+		$post_id = (int) $request['id'];
+		if ( ! get_post( $post_id ) ) {
+			return new WP_Error( 'rankxai_not_found', __( 'No such post.', 'rankxai' ), array( 'status' => 404 ) );
+		}
+		$expected = $request->get_param( 'expectedSchemaVersion' );
+		if ( ! is_string( $expected ) || '' === $expected ) {
+			return new WP_Error( 'rankxai_version_required', __( '`expectedSchemaVersion` is required: read the post’s schema first.', 'rankxai' ), array( 'status' => 400 ) );
+		}
+		$target = (string) $request->get_param( 'target' );
+
+		if ( 'delete' === $request->get_param( 'op' ) ) {
+			$result = RankXAI_Schema_Set::remove( $post_id, $target, $expected );
+		} else {
+			$provider = (string) $request->get_param( 'provider' );
+			if ( '' !== $provider && ! in_array( $provider, RankXAI_Schema_Providers::slugs(), true ) ) {
+				return new WP_Error( 'rankxai_unknown_provider', __( 'Unknown SEO plugin.', 'rankxai' ), array( 'status' => 400 ) );
+			}
+			$result = RankXAI_Schema_Set::upsert(
+				$post_id,
+				(string) $request->get_param( 'store' ),
+				$request->get_param( 'schema' ),
+				$target,
+				$expected,
+				$provider
+			);
+		}
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		// A meta write does not touch the post, so no page cache notices it.
+		$purged = array();
+		$post   = get_post( $post_id );
+		if ( $post && is_post_publicly_viewable( $post ) ) {
+			$path = wp_parse_url( (string) get_permalink( $post ), PHP_URL_PATH );
+			clean_post_cache( $post_id );
+			$purged = RankXAI_Redirects::purge( is_string( $path ) && '' !== $path ? $path : '/' );
+		}
+
+		return new WP_REST_Response(
+			array(
+				'written' => $result,
+				'purged'  => $purged,
+				'state'   => RankXAI_Schema_Set::state( $post_id ),
+			),
+			200
+		);
+	}
+
+	/**
 	 * One shape for all three schema verbs.
 	 *
 	 * @param int $post_id Post ID.
@@ -964,7 +1133,7 @@ class RankXAI_REST {
 					'mayOwnHead'     => RankXAI_Detect::may_own_head(),
 					'writableFields' => self::writable_fields(),
 				),
-				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config' ),
+				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config' ),
 				// Which root documents this contract serves, so the platform
 				// offers exactly what this install can publish rather than
 				// discovering a 404 after the customer pressed the button.

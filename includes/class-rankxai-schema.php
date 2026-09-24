@@ -40,11 +40,11 @@ class RankXAI_Schema {
 	const MAX_BYTES = 262144;
 
 	/**
-	 * Hook head output.
+	 * Nothing to hook: `RankXAI_Schema_Output` prints this document together
+	 * with the rest of the post's schema, inside the SEO plugin's graph when
+	 * there is one, so a page never carries two graphs.
 	 */
-	public static function init() {
-		add_action( 'wp_head', array( __CLASS__, 'print_graph' ), 20 );
-	}
+	public static function init() {}
 
 	/**
 	 * The stored graph, or null.
@@ -118,37 +118,6 @@ class RankXAI_Schema {
 	public static function delete( $post_id ) {
 		delete_post_meta( $post_id, self::META_GRAPH );
 		delete_post_meta( $post_id, self::META_UPDATED );
-	}
-
-	/**
-	 * Print the graph for the current singular view.
-	 *
-	 * Nothing is printed when no graph is stored, so the capability is inert
-	 * until the platform uses it. A password-protected post prints nothing —
-	 * a graph in the head would publish what the password withholds.
-	 */
-	public static function print_graph() {
-		if ( is_admin() || ! is_singular() ) {
-			return;
-		}
-		$post_id = get_queried_object_id();
-		if ( ! $post_id ) {
-			return;
-		}
-		if ( post_password_required( $post_id ) ) {
-			return;
-		}
-		$stored = self::get( $post_id );
-		if ( null === $stored ) {
-			return;
-		}
-
-		echo "\n<!-- RankX AI structured data -->\n";
-		echo '<script type="application/ld+json">' . "\n";
-		// `esc_html` would double-encode the JSON into something no parser
-		// accepts; `escape_for_script` is the correct escaping for this context.
-		echo self::escape_for_script( $stored['content'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped by `escape_for_script`, the correct escaping for a JSON-LD script element.
-		echo "\n" . '</script>' . "\n";
 	}
 
 	/**
