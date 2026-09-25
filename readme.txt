@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.4.2
+Stable tag: 0.4.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -220,6 +220,9 @@ write, exactly as the editor does.
 * Privacy: https://rankxai.com/privacy
 
 == Changelog ==
+
+= 0.4.3 =
+* The RankX AI icon now shows beside the plugin on the Dashboard → Updates screen.
 
 = 0.4.2 =
 * Fix: WordPress 7.1.2 and other patch releases no longer show "not tested with your version of WordPress" for this plugin.

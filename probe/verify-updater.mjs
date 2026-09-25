@@ -116,6 +116,11 @@ async function run() {
     const tv = json(`return array( 'site' => get_bloginfo( 'version' ), 'tested' => RankXAI_Updater::tested_for_site( '7.1' ), 'newer' => RankXAI_Updater::tested_for_site( '0.9' ), 'core_ok' => version_compare( get_bloginfo( 'version' ), RankXAI_Updater::tested_for_site( '7.1' ), '<=' ) );`)
     check(tv.core_ok === true, `"Tested up to 7.1" covers this ${tv.site} site (reported ${tv.tested})`, `site ${tv.site} would read as untested against ${tv.tested}`)
     check(tv.newer === '0.9', 'an older branch keeps its value, so the warning still shows', `older branch reported as ${tv.newer}`)
+    const icon2x = offer.response?.icons?.['2x'] ?? ''
+    check(icon2x.endsWith('/rankxai/assets/icon-256x256.png') && (offer.response?.icons?.['1x'] ?? '').endsWith('/rankxai/assets/icon-128x128.png'), 'the Updates screen gets the brand icon, from the installed copy', `icons ${JSON.stringify(offer.response?.icons)}`)
+    const iconPath = icon2x.slice(icon2x.indexOf('/wp-content/'))
+    const iconRes = await fetch(`http://localhost:8888${iconPath}`).catch(() => null)
+    check(iconRes?.ok && (iconRes.headers.get('content-type') ?? '').startsWith('image/png'), 'and the icon file is served', `icon fetch ${iconRes?.status} ${iconRes?.headers.get('content-type')}`)
     check(offer.response?.requires_php === '7.4' && offer.response?.tested, 'requirements travel with the offer', `requires_php ${offer.response?.requires_php}, tested ${offer.response?.tested}`)
     const listed = wp(['plugin', 'list', '--name=rankxai', '--fields=update,update_version', '--format=json'])
     check(/"update":"available"/.test(listed) && listed.includes(VERSION), `wp plugin list shows "available" ${VERSION}`, `plugin list: ${listed}`)

@@ -77,6 +77,7 @@ class RankXAI_Updater {
 			'requires'     => $release['requires'],
 			'requires_php' => $release['requires_php'],
 			'tested'       => self::tested_for_site( $release['tested'] ),
+			'icons'        => self::icons(),
 		);
 
 		// Only a copy in `rankxai/` can take the package: the archive unpacks there,
@@ -221,6 +222,19 @@ class RankXAI_Updater {
 			return $data[ $key ];
 		}
 		return '';
+	}
+
+	/**
+	 * The plugin's icon for the Updates screen, served from this copy of the plugin
+	 * so the screen asks no other site for it.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function icons() {
+		return array(
+			'1x' => plugins_url( 'assets/icon-128x128.png', RANKXAI_PLUGIN_FILE ),
+			'2x' => plugins_url( 'assets/icon-256x256.png', RANKXAI_PLUGIN_FILE ),
+		);
 	}
 
 	/**

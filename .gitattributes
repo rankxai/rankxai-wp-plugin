@@ -4,6 +4,7 @@
 # so without this a Windows clone gets CRLF, PHPCS fails locally on files that are
 # correct in the repository, and the person who cloned it "fixes" the wrong thing.
 * text=auto eol=lf
+*.png binary
 
 # Never shipped in the WordPress.org release, and never counted in a language stat.
 /.github/            export-ignore
