@@ -44,6 +44,102 @@ class RankXAI_Updater {
 	public static function init() {
 		add_filter( 'update_plugins_github.com', array( __CLASS__, 'filter_update' ), 10, 3 );
 		add_filter( 'plugins_api', array( __CLASS__, 'filter_plugin_information' ), 10, 3 );
+		add_filter( 'plugin_row_meta', array( __CLASS__, 'row_meta' ), 10, 2 );
+		add_action( 'admin_post_' . self::CHECK_ACTION, array( __CLASS__, 'handle_check' ) );
+		add_action( 'admin_notices', array( __CLASS__, 'check_notice' ) );
+		add_action( 'network_admin_notices', array( __CLASS__, 'check_notice' ) );
+	}
+
+	/** The admin-post action behind the "Check for updates" link. */
+	const CHECK_ACTION = 'rankxai_check_updates';
+
+	/** Query argument carrying the result back to the Plugins screen. */
+	const CHECK_RESULT_ARG = 'rankxai-update-check';
+
+	/**
+	 * Add "Check for updates" to this plugin's row on the Plugins screen.
+	 *
+	 * @param string[] $links Row meta links.
+	 * @param string   $file  Plugin path relative to the plugins directory.
+	 * @return string[]
+	 */
+	public static function row_meta( $links, $file ) {
+		if ( plugin_basename( RANKXAI_PLUGIN_FILE ) !== $file || ! current_user_can( 'update_plugins' ) ) {
+			return $links;
+		}
+		$url     = wp_nonce_url( admin_url( 'admin-post.php?action=' . self::CHECK_ACTION ), self::CHECK_ACTION );
+		$links[] = '<a href="' . esc_url( $url ) . '">' . esc_html__( 'Check for updates', 'rankxai' ) . '</a>';
+		return $links;
+	}
+
+	/**
+	 * Forget both cached answers and ask again.
+	 *
+	 * @return string One of 'available', 'current' or 'failed'.
+	 */
+	public static function run_check() {
+		delete_site_transient( self::CACHE_KEY );
+		delete_site_transient( 'update_plugins' );
+		wp_update_plugins();
+
+		$release = self::latest_release();
+		if ( null === $release ) {
+			return 'failed';
+		}
+		return version_compare( $release['version'], RANKXAI_VERSION, '>' ) ? 'available' : 'current';
+	}
+
+	/**
+	 * Handle the link: check, then return to the page it was clicked on.
+	 */
+	public static function handle_check() {
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			wp_die( esc_html__( 'You are not allowed to update plugins.', 'rankxai' ), 403 );
+		}
+		check_admin_referer( self::CHECK_ACTION );
+
+		$result = self::run_check();
+		$back   = wp_get_referer();
+		if ( ! $back ) {
+			$back = self_admin_url( 'plugins.php' );
+		}
+		wp_safe_redirect( add_query_arg( self::CHECK_RESULT_ARG, $result, remove_query_arg( self::CHECK_RESULT_ARG, $back ) ) );
+		exit;
+	}
+
+	/**
+	 * Say what the check found, once, on the page the link returned to.
+	 */
+	public static function check_notice() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only: it only picks a message.
+		$result = isset( $_GET[ self::CHECK_RESULT_ARG ] ) ? sanitize_key( wp_unslash( $_GET[ self::CHECK_RESULT_ARG ] ) ) : '';
+		if ( '' === $result || ! current_user_can( 'update_plugins' ) ) {
+			return;
+		}
+
+		$release = self::latest_release();
+		if ( 'available' === $result && null !== $release ) {
+			$type    = 'warning';
+			$message = sprintf(
+				/* translators: %s: version number. */
+				__( 'RankX AI %s is available. Update it from this screen or from Dashboard → Updates.', 'rankxai' ),
+				$release['version']
+			);
+		} elseif ( 'current' === $result ) {
+			$type    = 'success';
+			$message = sprintf(
+				/* translators: %s: version number. */
+				__( 'RankX AI is up to date (version %s).', 'rankxai' ),
+				RANKXAI_VERSION
+			);
+		} elseif ( 'failed' === $result ) {
+			$type    = 'error';
+			$message = __( 'Could not reach GitHub to check for RankX AI updates. Try again in a few minutes.', 'rankxai' );
+		} else {
+			return;
+		}
+
+		printf( '<div class="notice notice-%1$s is-dismissible"><p>%2$s</p></div>', esc_attr( $type ), esc_html( $message ) );
 	}
 
 	/**

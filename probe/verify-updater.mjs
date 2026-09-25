@@ -131,6 +131,27 @@ async function run() {
       // ── 2. Cached: a second check does not ask again ───────────────────────
       const again = checkUpdates({ keepCache: true })
       check(again.hits === 0 && again.response?.new_version === VERSION, 'a second check within six hours is answered from cache', `second check made ${again.hits} request(s)`)
+
+      // ── 2b. "Check for updates" throws the cached answer away ──────────────
+      const forced = json(`
+        delete_option( 'rankxai_probe_updater_hits' );
+        set_site_transient( 'rankxai_release', array( 'release' => array( 'version' => '0.0.1', 'requires' => '', 'requires_php' => '', 'tested' => '', 'released' => '', 'changelog' => array() ) ), HOUR_IN_SECONDS );
+        $result = RankXAI_Updater::run_check();
+        $cached = get_site_transient( 'rankxai_release' );
+        wp_set_current_user( 1 );
+        $admin_links = RankXAI_Updater::row_meta( array(), plugin_basename( RANKXAI_PLUGIN_FILE ) );
+        $other_links = RankXAI_Updater::row_meta( array(), 'hello.php' );
+        $_GET['rankxai-update-check'] = 'available';
+        ob_start(); RankXAI_Updater::check_notice(); $notice = ob_get_clean();
+        wp_set_current_user( 0 );
+        $anon_links = RankXAI_Updater::row_meta( array(), plugin_basename( RANKXAI_PLUGIN_FILE ) );
+        return array( 'result' => $result, 'cached' => $cached['release']['version'] ?? null, 'hits' => (int) get_option( 'rankxai_probe_updater_hits', 0 ),
+          'admin' => implode( ' ', $admin_links ), 'other' => count( $other_links ), 'anon' => count( $anon_links ), 'notice' => $notice );
+      `)
+      check(forced.result === 'available' && forced.cached === VERSION && forced.hits >= 1, `"Check for updates" replaces a stale cached answer and finds ${VERSION}`, `result ${forced.result}, cached ${forced.cached}, requests ${forced.hits}`)
+      check(forced.admin.includes('Check for updates') && forced.admin.includes('action=rankxai_check_updates') && forced.admin.includes('_wpnonce='), 'an administrator sees a nonce-protected "Check for updates" link on the RankX AI row', `links: ${forced.admin}`)
+      check(forced.other === 0 && forced.anon === 0, 'the link is on no other plugin’s row and not shown to someone who cannot update plugins', `other row ${forced.other}, no-capability ${forced.anon}`)
+      check(forced.notice.includes(`RankX AI ${VERSION} is available`), 'the page it returns to says what was found', `notice: ${forced.notice}`)
     }
 
     // ── 3. View details ───────────────────────────────────────────────────────
@@ -249,7 +270,7 @@ await run().catch((e) => { console.log(`  FAIL  threw: ${e.message}`); fail++ })
 
 const source = readFileSync(new URL(import.meta.url), 'utf8')
 const written = (source.match(/^\s+check\(/gm) ?? []).length
-const expected = LIVE ? written - 11 : written
+const expected = LIVE ? written - 15 : written
 if (fail === 0) {
   checksRun >= expected
     ? (console.log(`  PASS  CONTROL — ${checksRun} assertions ran`), pass++)
