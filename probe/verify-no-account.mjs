@@ -104,7 +104,10 @@ function wpEval(php) {
  * Because the class is loaded here and not by the plugin, THE GUARD ITSELF is
  * asserted separately, in `verify-guardrails.mjs`.
  */
-const ADMIN_PRELUDE = "require_once dirname( RANKXAI_PLUGIN_FILE ) . '/includes/class-rankxai-admin.php';"
+// Every file the plugin loads in wp-admin (rankxai.php's is_admin() block): since
+// 0.5.0 the menu is built from the UI kit and the page classes too.
+const ADMIN_FILES = ['admin', 'ui', 'overview', 'pages', 'crawler-page', 'checks-page', 'view-as-ai']
+const ADMIN_PRELUDE = ADMIN_FILES.map((f) => `require_once dirname( RANKXAI_PLUGIN_FILE ) . '/includes/class-rankxai-${f}.php';`).join(' ')
 
 /**
  * Every option this feature stores, gone — in ONE round trip.
