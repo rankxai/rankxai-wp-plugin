@@ -231,6 +231,26 @@ class RankXAI_REST {
 			)
 		);
 
+		// Gap fills are site-wide head output, so `manage_options`, as the documents
+		// and twins routes. The platform switches a feature on only after reading
+		// the rendered pages and finding nothing prints it.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/fill',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'handle_fill_get' ),
+					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::EDITABLE,
+					'callback'            => array( __CLASS__, 'handle_fill_put' ),
+					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+				),
+			)
+		);
+
 		// Read-only: what a store would hold for a schema, so a preview shows the
 		// provider's own sanitising rather than a guess at it.
 		register_rest_route(
@@ -787,6 +807,57 @@ class RankXAI_REST {
 	}
 
 	/**
+	 * The fill switches, and what would stop them printing right now.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public static function handle_fill_get() {
+		return new WP_REST_Response(
+			array(
+				'features'       => RankXAI_Fill::switches(),
+				'supported'      => RankXAI_Fill::features(),
+				'blockedBy'      => RankXAI_Fill::blocked_by(),
+				'seoLikePlugins' => RankXAI_Detect::seo_like_plugins(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Replace the fill switches. Every feature named must be one this plugin
+	 * fills; the whole request is refused otherwise.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_fill_put( $request ) {
+		$features = $request->get_param( 'features' );
+		if ( ! is_array( $features ) ) {
+			return new WP_Error( 'rankxai_fill_bad_features', __( '`features` must be an object of feature => true/false.', 'rankxai' ), array( 'status' => 400 ) );
+		}
+		$unknown = array_diff( array_keys( $features ), RankXAI_Fill::features() );
+		if ( $unknown ) {
+			return new WP_Error(
+				'rankxai_fill_unknown_feature',
+				sprintf(
+					/* translators: %s: comma-separated feature names. */
+					__( 'Unknown feature(s): %s', 'rankxai' ),
+					implode( ', ', $unknown )
+				),
+				array( 'status' => 400 )
+			);
+		}
+		foreach ( $features as $value ) {
+			if ( ! is_bool( $value ) ) {
+				return new WP_Error( 'rankxai_fill_bad_features', __( 'Each feature must be true or false.', 'rankxai' ), array( 'status' => 400 ) );
+			}
+		}
+		// Features not named keep their current value.
+		RankXAI_Fill::save( array_merge( RankXAI_Fill::switches(), $features ) );
+		return self::handle_fill_get();
+	}
+
+	/**
 	 * Which SEO plugins run on this site, and what each does with structured data.
 	 *
 	 * @return WP_REST_Response
@@ -801,6 +872,7 @@ class RankXAI_REST {
 				'providers'     => $providers,
 				'active'        => RankXAI_Schema_Providers::active(),
 				'unknownActive' => RankXAI_Schema_Providers::unknown_active(),
+				'seoLike'       => RankXAI_Detect::seo_like_plugins(),
 			),
 			200
 		);
@@ -1133,7 +1205,7 @@ class RankXAI_REST {
 					'mayOwnHead'     => RankXAI_Detect::may_own_head(),
 					'writableFields' => self::writable_fields(),
 				),
-				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config' ),
+				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'seo.fill', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config' ),
 				// Which root documents this contract serves, so the platform
 				// offers exactly what this install can publish rather than
 				// discovering a 404 after the customer pressed the button.

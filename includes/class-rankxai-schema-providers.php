@@ -29,7 +29,7 @@ class RankXAI_Schema_Providers {
 	 * @return string[]
 	 */
 	public static function slugs() {
-		return array( 'rankmath', 'yoast', 'aioseo', 'seopress', 'tsf', 'slimseo' );
+		return array( 'rankmath', 'yoast', 'aioseo', 'seopress', 'tsf', 'slimseo', 'siteseo', 'surerank' );
 	}
 
 	/**
@@ -45,6 +45,8 @@ class RankXAI_Schema_Providers {
 			'seopress' => 'SEOPress',
 			'tsf'      => 'The SEO Framework',
 			'slimseo'  => 'Slim SEO',
+			'siteseo'  => 'SiteSEO',
+			'surerank' => 'SureRank',
 		);
 	}
 
@@ -68,6 +70,10 @@ class RankXAI_Schema_Providers {
 				return defined( 'THE_SEO_FRAMEWORK_VERSION' );
 			case 'slimseo':
 				return defined( 'SLIM_SEO_VER' );
+			case 'siteseo':
+				return defined( 'SITESEO_VERSION' );
+			case 'surerank':
+				return defined( 'SURERANK_VERSION' );
 		}
 		return false;
 	}
@@ -120,6 +126,8 @@ class RankXAI_Schema_Providers {
 			'seopress' => 'SEOPRESS_VERSION',
 			'tsf'      => 'THE_SEO_FRAMEWORK_VERSION',
 			'slimseo'  => 'SLIM_SEO_VER',
+			'siteseo'  => 'SITESEO_VERSION',
+			'surerank' => 'SURERANK_VERSION',
 		);
 		if ( isset( $constants[ $slug ] ) && defined( $constants[ $slug ] ) ) {
 			return (string) constant( $constants[ $slug ] );
@@ -156,6 +164,14 @@ class RankXAI_Schema_Providers {
 				$present = defined( 'SLIM_SEO_PRO_VER' );
 				$version = $present ? (string) constant( 'SLIM_SEO_PRO_VER' ) : '';
 				break;
+			case 'siteseo':
+				$present = defined( 'SITESEO_PRO_VERSION' );
+				$version = $present ? (string) constant( 'SITESEO_PRO_VERSION' ) : '';
+				break;
+			case 'surerank':
+				$present = defined( 'SURERANK_PRO_VERSION' );
+				$version = $present ? (string) constant( 'SURERANK_PRO_VERSION' ) : '';
+				break;
 		}
 		return array(
 			'present' => $present,
@@ -180,6 +196,11 @@ class RankXAI_Schema_Providers {
 			'seopress' => array( '', 'wp_head' ),
 			'tsf'      => array( 'the_seo_framework_schema_graph_data', 'wp_head' ),
 			'slimseo'  => array( 'slim_seo_schema_graph', 'wp_footer' ),
+			// SiteSEO prints one node, not a graph; SureRank prints a graph with no
+			// filter on it (its `surerank_set_schema` feeds a property the print path
+			// never reads). Neither can be joined, so ours prints beside theirs.
+			'siteseo'  => array( '', 'wp_head' ),
+			'surerank' => array( '', 'wp_head' ),
 		);
 		if ( ! isset( $map[ $slug ] ) ) {
 			return array(

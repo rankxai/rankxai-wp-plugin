@@ -25,6 +25,7 @@ class RankXAI_SEO {
 	 */
 	public static function init() {
 		add_action( 'wp', array( __CLASS__, 'register_output_filters' ) );
+		add_filter( 'surerank_set_meta', array( __CLASS__, 'filter_surerank_meta' ), 20 );
 	}
 
 	/**
@@ -63,6 +64,9 @@ class RankXAI_SEO {
 		if ( 'aioseo' === $target ) {
 			return self::aioseo_read( $post_id );
 		}
+		if ( 'surerank' === $target ) {
+			return self::surerank_read( $post_id );
+		}
 		$map = RankXAI_SEO_Registry::storage();
 		if ( ! isset( $map[ $target ] ) ) {
 			return array();
@@ -99,7 +103,8 @@ class RankXAI_SEO {
 			if ( '' === $value ) {
 				delete_post_meta( $post_id, $key );
 			} else {
-				update_post_meta( $post_id, $key, $value );
+				// `update_metadata` unslashes, so an unslashed value loses every backslash.
+				update_post_meta( $post_id, $key, wp_slash( $value ) );
 			}
 			$written[] = $field;
 		}
@@ -213,6 +218,10 @@ class RankXAI_SEO {
 			self::aioseo_write( $post_id, $values );
 			return;
 		}
+		if ( 'surerank' === $target ) {
+			self::surerank_write( $post_id, $values );
+			return;
+		}
 		$map = RankXAI_SEO_Registry::storage();
 		if ( ! isset( $map[ $target ] ) ) {
 			return;
@@ -225,9 +234,98 @@ class RankXAI_SEO {
 			if ( '' === $value ) {
 				delete_post_meta( $post_id, $meta_key );
 			} else {
-				update_post_meta( $post_id, $meta_key, $value );
+				update_post_meta( $post_id, $meta_key, wp_slash( $value ) );
 			}
 		}
+	}
+
+	/**
+	 * Where each field lives in SureRank's grouped arrays (SureRank 1.10.1,
+	 * inc/functions/defaults.php).
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	private static function surerank_map() {
+		return array(
+			'title'               => array( 'surerank_settings_general', 'page_title' ),
+			'description'         => array( 'surerank_settings_general', 'page_description' ),
+			'canonical'           => array( 'surerank_settings_general', 'canonical_url' ),
+			'og_title'            => array( 'surerank_settings_social', 'facebook_title' ),
+			'og_description'      => array( 'surerank_settings_social', 'facebook_description' ),
+			'twitter_title'       => array( 'surerank_settings_social', 'twitter_title' ),
+			'twitter_description' => array( 'surerank_settings_social', 'twitter_description' ),
+		);
+	}
+
+	/**
+	 * Rewrite each touched SureRank group whole, keeping every key we do not own.
+	 *
+	 * @param int                   $post_id Post ID.
+	 * @param array<string, string> $values  Field => value.
+	 * @return void
+	 */
+	private static function surerank_write( $post_id, $values ) {
+		$groups = array();
+		foreach ( self::surerank_map() as $field => $where ) {
+			if ( ! array_key_exists( $field, $values ) ) {
+				continue;
+			}
+			list( $meta_key, $key ) = $where;
+			if ( ! isset( $groups[ $meta_key ] ) ) {
+				$current             = get_post_meta( $post_id, $meta_key, true );
+				$groups[ $meta_key ] = is_array( $current ) ? $current : array();
+			}
+			$groups[ $meta_key ][ $key ] = self::sanitise_field( $field, $values[ $field ] );
+		}
+		foreach ( $groups as $meta_key => $group ) {
+			// `update_metadata` unslashes, recursively.
+			update_post_meta( $post_id, $meta_key, wp_slash( $group ) );
+		}
+	}
+
+	/**
+	 * What SureRank holds for a post.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return array<string, string>
+	 */
+	private static function surerank_read( $post_id ) {
+		$out   = array();
+		$cache = array();
+		foreach ( self::surerank_map() as $field => $where ) {
+			list( $meta_key, $key ) = $where;
+			if ( ! isset( $cache[ $meta_key ] ) ) {
+				$group              = get_post_meta( $post_id, $meta_key, true );
+				$cache[ $meta_key ] = is_array( $group ) ? $group : array();
+			}
+			if ( isset( $cache[ $meta_key ][ $key ] ) && '' !== (string) $cache[ $meta_key ][ $key ] ) {
+				$out[ $field ] = (string) $cache[ $meta_key ][ $key ];
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * SureRank's own override point, `surerank_set_meta`: our stored values win.
+	 *
+	 * Registered at load rather than on `wp`, because SureRank builds this array
+	 * on `wp` at priority 1, before our other output filters are added.
+	 *
+	 * @param mixed $meta SureRank's meta for the current request.
+	 * @return mixed
+	 */
+	public static function filter_surerank_meta( $meta ) {
+		if ( ! is_array( $meta ) || is_admin() || ! is_singular() || 'surerank' !== RankXAI_Detect::target_plugin() ) {
+			return $meta;
+		}
+		$post_id = get_queried_object_id();
+		$own     = $post_id ? self::get_own( $post_id ) : array();
+		foreach ( self::surerank_map() as $field => $where ) {
+			if ( isset( $own[ $field ] ) ) {
+				$meta[ $where[1] ] = $own[ $field ];
+			}
+		}
+		return $meta;
 	}
 
 	/**

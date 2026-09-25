@@ -43,6 +43,8 @@ class RankXAI_SEO_Registry {
 			'aioseo'   => array( 'AIOSEO_VERSION' ),
 			'seopress' => array( 'SEOPRESS_VERSION' ),
 			'tsf'      => array( 'THE_SEO_FRAMEWORK_VERSION' ),
+			'siteseo'  => array( 'SITESEO_VERSION' ),
+			'surerank' => array( 'SURERANK_VERSION' ),
 		);
 	}
 
@@ -89,6 +91,18 @@ class RankXAI_SEO_Registry {
 				'description' => '_genesis_description',
 				'canonical'   => '_genesis_canonical_uri',
 			),
+			// SiteSEO 1.4.2: plain strings in post meta, none registered for REST
+			// (main/metaboxes/settings.php). It has no output filters, so storage
+			// is the whole integration.
+			'siteseo'  => array(
+				'title'               => '_siteseo_titles_title',
+				'description'         => '_siteseo_titles_desc',
+				'canonical'           => '_siteseo_robots_canonical',
+				'og_title'            => '_siteseo_social_fb_title',
+				'og_description'      => '_siteseo_social_fb_desc',
+				'twitter_title'       => '_siteseo_social_twitter_title',
+				'twitter_description' => '_siteseo_social_twitter_desc',
+			),
 		);
 	}
 
@@ -104,7 +118,11 @@ class RankXAI_SEO_Registry {
 	 */
 	public static function model_storage() {
 		return array(
-			'aioseo' => array( 'title', 'description', 'canonical', 'og_title', 'og_description', 'twitter_title', 'twitter_description' ),
+			'aioseo'   => array( 'title', 'description', 'canonical', 'og_title', 'og_description', 'twitter_title', 'twitter_description' ),
+			// SureRank keeps post SEO in grouped ARRAYS (`surerank_settings_general`,
+			// `surerank_settings_social`), so a field is written by rewriting its
+			// whole group, never as a key of its own.
+			'surerank' => array( 'title', 'description', 'canonical', 'og_title', 'og_description', 'twitter_title', 'twitter_description' ),
 		);
 	}
 
@@ -150,6 +168,10 @@ class RankXAI_SEO_Registry {
 				'description' => 'aioseo_description',
 				'canonical'   => 'aioseo_canonical_url',
 			),
+			// SiteSEO takes the title through core's filter at priority 15.
+			'siteseo'  => array(
+				'title' => 'pre_get_document_title',
+			),
 			'tsf'      => array(
 				'title'       => 'the_seo_framework_title_from_generation',
 				'description' => 'the_seo_framework_custom_field_description',
@@ -191,6 +213,18 @@ class RankXAI_SEO_Registry {
 				'key'   => '_genesis_noindex',
 				'match' => 'equals',
 				'value' => '1',
+			),
+			// SiteSEO: 'yes' when on, deleted when off.
+			array(
+				'key'   => '_siteseo_robots_index',
+				'match' => 'equals',
+				'value' => 'yes',
+			),
+			// SureRank.
+			array(
+				'key'   => 'surerank_settings_post_no_index',
+				'match' => 'equals',
+				'value' => 'yes',
 			),
 			// All in One SEO, current and legacy keys.
 			array(

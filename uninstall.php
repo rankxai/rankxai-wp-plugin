@@ -64,6 +64,15 @@ function rankxai_uninstall_current_site() {
 		}
 	}
 
+	// Gap-fill switches. The rewrite rules a sitemap fill caused are core's and
+	// are rebuilt by WordPress on the next flush.
+	$rankxai_fill = __DIR__ . '/includes/class-rankxai-fill.php';
+	if ( file_exists( $rankxai_fill ) ) {
+		require_once $rankxai_fill;
+		delete_option( RankXAI_Fill::OPTION );
+		delete_option( RankXAI_Fill::OPTION_FLUSH );
+	}
+
 	// Our own redirects and their hit counts. Redirects added to Rank Math are
 	// Rank Math's data once written, like mirrored SEO values, and stay.
 	$redirects = __DIR__ . '/includes/class-rankxai-redirects.php';

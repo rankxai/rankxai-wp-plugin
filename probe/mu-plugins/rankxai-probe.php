@@ -150,3 +150,25 @@ add_action('init', function () {
 	echo "# RankX AI virtual llms.txt\nserved-by: plugin init hook\n";
 	exit;
 }, 0);
+
+// verify-fill.mjs: exercises the `rankxai_fill_{feature}` opt-out door the way a
+// third-party SEO plugin would use it.
+add_filter(
+	'rankxai_fill_open_graph',
+	static function ( $on ) {
+		return get_option( 'rankxai_probe_fill_off' ) ? false : $on;
+	}
+);
+
+// verify-seo-coverage-connector.ts: stands in for an SEO plugin RankX AI does
+// not know, printing its own meta description — the duplicate the fill loop
+// must notice and back out of.
+add_action(
+	'wp_head',
+	static function () {
+		if ( get_option( 'rankxai_probe_print_desc' ) ) {
+			echo '<meta name="description" content="printed by an unknown plugin" />' . "\n";
+		}
+	},
+	2
+);

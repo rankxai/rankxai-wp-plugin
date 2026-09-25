@@ -44,6 +44,38 @@ class RankXAI_Detect {
 	}
 
 	/**
+	 * Active plugins that look like SEO plugins, by name — including every one
+	 * this plugin has no integration for.
+	 *
+	 * A report, not a decision: the platform reads it so a site running an SEO
+	 * plugin we do not know is not mistaken for a site running none.
+	 *
+	 * @return array<int, array{file: string, name: string, version: string}>
+	 */
+	public static function seo_like_plugins() {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		$active = (array) get_option( 'active_plugins', array() );
+		$all    = get_plugins();
+		$out    = array();
+		foreach ( $active as $file ) {
+			if ( ! isset( $all[ $file ] ) || 0 === strpos( $file, dirname( plugin_basename( RANKXAI_PLUGIN_FILE ) ) . '/' ) ) {
+				continue;
+			}
+			$name = (string) $all[ $file ]['Name'];
+			if ( preg_match( '/seo|schema|surerank|sitemap|open ?graph|structured data|rich snippet/i', $file . ' ' . $name ) ) {
+				$out[] = array(
+					'file'    => (string) $file,
+					'name'    => $name,
+					'version' => (string) $all[ $file ]['Version'],
+				);
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * One of: 'none', a plugin slug, or 'multiple'.
 	 *
 	 * @return string

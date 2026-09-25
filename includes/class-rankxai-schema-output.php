@@ -112,6 +112,11 @@ class RankXAI_Schema_Output {
 			return;
 		}
 		$nodes = RankXAI_Schema_Set::nodes_to_print( $post_id );
+		// A breadcrumb fill joins the same one graph as everything else.
+		$crumb = RankXAI_Fill::breadcrumb_node();
+		if ( $crumb ) {
+			$nodes[] = $crumb;
+		}
 		if ( ! $nodes ) {
 			return;
 		}

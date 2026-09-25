@@ -40,7 +40,7 @@ Two halves, and the first needs no account anywhere.
 service, and this plugin is the site-side half of it. Connected, the plugin also:
 
 * **Writes SEO metadata through every major SEO plugin.** Yoast, Rank Math,
-  SEOPress, All in One SEO and The SEO Framework. Values are written into that
+  SEOPress, All in One SEO, The SEO Framework, SiteSEO and SureRank. Values are written into that
   plugin's own fields, so they stay visible and editable in the screens you
   already use.
 * **Writes SEO metadata with no SEO plugin at all.** If you do not run one,
@@ -222,7 +222,10 @@ write, exactly as the editor does.
 == Changelog ==
 
 = 0.4.1 =
-* Structured data managed per schema through your SEO plugin: Rank Math's own schema rows where Rank Math supports the type, otherwise added to your SEO plugin's graph so each page prints one graph. Works with Rank Math, Yoast SEO, All in One SEO, SEOPress, The SEO Framework and Slim SEO, or with no SEO plugin.
+* Structured data managed per schema through your SEO plugin: Rank Math's own schema rows where Rank Math supports the type, otherwise added to your SEO plugin's graph so each page prints one graph. Works with Rank Math, Yoast SEO, All in One SEO, SEOPress, The SEO Framework, Slim SEO, SiteSEO and SureRank, or with no SEO plugin.
+* SEO metadata through SiteSEO and SureRank.
+* Gap filling on sites with no SEO plugin: meta description, Open Graph, Twitter card, the core XML sitemap and breadcrumbs, each switched on only where nothing else prints it, and never while an SEO plugin is active.
+* Fix: an SEO title or description containing a backslash lost it when written into Yoast, Rank Math, SEOPress, The SEO Framework, SiteSEO or the plugin's own fields.
 * Schema published from RankX AI's AI-readiness check now joins your SEO plugin's graph instead of printing a second one.
 
 = 0.4.0 =

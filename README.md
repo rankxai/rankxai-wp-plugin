@@ -19,10 +19,11 @@ RankX AI account, which is a paid service. The plugin is free and GPLv2 or later
 
 | | |
 |---|---|
-| **SEO metadata** | title, description, canonical, Open Graph and Twitter — through Yoast, Rank Math, SEOPress, All in One SEO or The SEO Framework, or printed by the plugin itself on a site with none |
+| **SEO metadata** | title, description, canonical, Open Graph and Twitter — through Yoast, Rank Math, SEOPress, All in One SEO, The SEO Framework, SiteSEO or SureRank, or printed by the plugin itself on a site with none |
 | **Root documents** | `llms.txt`, `agents.md` and `ai.txt`, served from a virtual route rather than a file on disk, and never taken from a plugin that already serves one |
 | **Markdown copies** | off by default: `/page.md`, `/page/index.md`, `/page/?format=md` and `Accept: text/markdown`, plus `sitemap-md.xml` and a `rel="alternate"` link on every page that has one |
-| **Structured data** | per-page JSON-LD managed item by item through whichever SEO plugin the site runs: Rank Math's own schema store where Rank Math has a template for the type, otherwise added to the SEO plugin's graph (Rank Math, Yoast, All in One SEO, The SEO Framework, Slim SEO; beside SEOPress's scripts) so each page prints one graph, or printed by the plugin itself on a site with none. Held in post meta, where WordPress's content sanitiser cannot reach it — the page body is never touched |
+| **Gap filling** | on a site with no SEO plugin, prints the meta description, Open Graph and Twitter tags, the core XML sitemap and breadcrumb structured data that nothing else prints — each only when the platform switches it on, and never while any SEO plugin is active. An administrator can refuse any one with the `rankxai_fill_{feature}` filter |
+| **Structured data** | per-page JSON-LD managed item by item through whichever SEO plugin the site runs: Rank Math's own schema store where Rank Math has a template for the type, otherwise added to the SEO plugin's graph (Rank Math, Yoast, All in One SEO, The SEO Framework, Slim SEO; beside SEOPress's, SiteSEO's and SureRank's scripts) so each page prints one graph, or printed by the plugin itself on a site with none. Held in post meta, where WordPress's content sanitiser cannot reach it — the page body is never touched |
 | **Verified content writes** | the saved bytes come back in the write's own response, with the newest revision id and whether the writing account holds `unfiltered_html` |
 
 Everything above is switched on and fed from a RankX AI account. The plugin exposes the

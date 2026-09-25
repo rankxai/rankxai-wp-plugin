@@ -84,7 +84,7 @@ async function page(url, cookie = '') {
 // ---------------------------------------------------------------------------
 
 const MARK = `schema-probe-${Date.now()}`
-const ALL = ['wordpress-seo', 'seo-by-rank-math', 'wp-seopress', 'all-in-one-seo-pack', 'autodescription', 'slim-seo']
+const ALL = ['wordpress-seo', 'seo-by-rank-math', 'wp-seopress', 'all-in-one-seo-pack', 'autodescription', 'slim-seo', 'siteseo', 'surerank']
 const SLUG = {
   'seo-by-rank-math': 'rankmath',
   'wordpress-seo': 'yoast',
@@ -92,6 +92,8 @@ const SLUG = {
   'wp-seopress': 'seopress',
   autodescription: 'tsf',
   'slim-seo': 'slimseo',
+  siteseo: 'siteseo',
+  surerank: 'surerank',
 }
 const created = []
 let appPasswordUuid = ''
@@ -173,7 +175,7 @@ async function scenario(plugin) {
     const facts = before.providers.find((p) => p.slug === expectSlug)
     check(facts && facts.active && facts.version !== '', `reports ${expectSlug} version ${facts?.version}`)
   }
-  const expectKind = !plugin ? 'standalone' : plugin === 'wp-seopress' ? 'separate_script' : 'inject'
+  const expectKind = !plugin ? 'standalone' : ['wp-seopress', 'siteseo', 'surerank'].includes(plugin) ? 'separate_script' : 'inject'
   check(before.printPlan.kind === expectKind, `print plan is ${expectKind}`, JSON.stringify(before.printPlan))
 
   // Inject / standalone: our store.
@@ -301,6 +303,26 @@ async function rankMathModuleOff(pub, url) {
   }
 }
 
+/** SEO metadata written through /seo lands in the plugin's own storage and on the page. */
+async function seoMirror(plugin) {
+  console.log(`
+== ${plugin}: SEO metadata into its own storage ==`)
+  activateOnly([plugin])
+  const pub = createPage('publish')
+  const desc = `Probe description ${MARK} with a C:${BS}path`
+  const r = await api(`/rankxai/v1/seo/${pub}`, { method: 'POST', body: JSON.stringify({ fields: { description: desc, og_title: `OG ${MARK}` } }) })
+  check(r.status === 200 && r.json?.targetPlugin === SLUG[plugin], `targets ${SLUG[plugin]}`, JSON.stringify(r.json).slice(0, 200))
+  check(r.json?.pluginStored?.description === desc, 'the description is in the plugin’s own storage, backslash intact', JSON.stringify(r.json?.pluginStored))
+  check(r.json?.pluginStored?.og_title === `OG ${MARK}`, 'and the Open Graph title')
+  if (plugin === 'surerank') {
+    const raw = wp('post', 'meta', 'get', String(pub), 'surerank_settings_general', '--format=json')
+    check(raw && JSON.parse(raw).page_description === desc, 'SureRank’s general group holds it as an array key')
+  }
+  const { html } = await page(wp('post', 'url', String(pub)))
+  const descs = (html.match(/<meta[^>]+name=["']description["'][^>]*>/gi) || [])
+  check(descs.length === 1 && descs[0].includes(`Probe description ${MARK}`), `the page prints our description once (${descs.length})`, descs.join(' | '))
+}
+
 async function legacyAndSwitch() {
   console.log('\n== the older single document, and a site that installs an SEO plugin later ==')
   activateOnly([])
@@ -380,9 +402,10 @@ async function main() {
 
   try {
     await scenario(null)
-    for (const plugin of ['seo-by-rank-math', 'wordpress-seo', 'all-in-one-seo-pack', 'wp-seopress', 'autodescription', 'slim-seo']) {
+    for (const plugin of ['seo-by-rank-math', 'wordpress-seo', 'all-in-one-seo-pack', 'wp-seopress', 'autodescription', 'slim-seo', 'siteseo', 'surerank']) {
       await scenario(plugin)
     }
+    for (const plugin of ['siteseo', 'surerank', 'wordpress-seo', 'all-in-one-seo-pack']) await seoMirror(plugin)
     await legacyAndSwitch()
     await multiple()
     await shapes()
