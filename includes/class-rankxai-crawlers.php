@@ -109,6 +109,70 @@ class RankXAI_Crawlers {
 	}
 
 	/**
+	 * Name, purpose and group for each default crawler, used when RankX AI has
+	 * not pushed its own. Matches the platform's registry, which the probe
+	 * asserts against a snapshot of it.
+	 *
+	 * @return array<string, array{label: string, purpose: string, group: string}>
+	 */
+	public static function default_meta() {
+		return array(
+			'gptbot'             => self::meta_entry( 'ChatGPT training', 'training', 'ai' ),
+			'oai-searchbot'      => self::meta_entry( 'ChatGPT search', 'search', 'ai' ),
+			'chatgpt-user'       => self::meta_entry( 'ChatGPT, fetching for a user', 'user', 'ai' ),
+			'claudebot'          => self::meta_entry( 'Claude training', 'training', 'ai' ),
+			'claude-user'        => self::meta_entry( 'Claude, fetching for a user', 'user', 'ai' ),
+			'claude-searchbot'   => self::meta_entry( 'Claude search', 'search', 'ai' ),
+			'perplexitybot'      => self::meta_entry( 'Perplexity search', 'search', 'ai' ),
+			'perplexity-user'    => self::meta_entry( 'Perplexity, fetching for a user', 'user', 'ai' ),
+			'googlebot'          => self::meta_entry( 'Google Search', 'search', 'search_engine' ),
+			'bingbot'            => self::meta_entry( 'Bing (and Copilot)', 'search', 'search_engine' ),
+			'applebot'           => self::meta_entry( 'Apple (Siri and Spotlight)', 'search', 'search_engine' ),
+			'ccbot'              => self::meta_entry( 'Common Crawl', 'training', 'ai' ),
+			'meta-externalagent' => self::meta_entry( 'Meta AI training', 'training', 'ai' ),
+			'bytespider'         => self::meta_entry( 'ByteDance (TikTok) training', 'training', 'ai' ),
+			'amazonbot'          => self::meta_entry( 'Amazon (Alexa)', 'search', 'ai' ),
+			'duckassistbot'      => self::meta_entry( 'DuckDuckGo DuckAssist', 'user', 'ai' ),
+			'mistralai-user'     => self::meta_entry( 'Mistral Le Chat, fetching for a user', 'user', 'ai' ),
+		);
+	}
+
+	/**
+	 * One meta entry.
+	 *
+	 * @param string $label   Name a customer recognises.
+	 * @param string $purpose training, search or user.
+	 * @param string $group   ai or search_engine.
+	 * @return array{label: string, purpose: string, group: string}
+	 */
+	private static function meta_entry( $label, $purpose, $group ) {
+		return array(
+			'label'   => $label,
+			'purpose' => $purpose,
+			'group'   => $group,
+		);
+	}
+
+	/**
+	 * Name, purpose and group for a crawler id: RankX AI's, then the default,
+	 * then the id itself with no purpose, so an unknown crawler is still shown.
+	 *
+	 * @param string $id Crawler id.
+	 * @return array{label: string, purpose: string, group: string}
+	 */
+	public static function meta( $id ) {
+		$stored = get_option( self::OPTION_TOKENS );
+		if ( is_array( $stored ) && isset( $stored['meta'][ $id ] ) && is_array( $stored['meta'][ $id ] ) ) {
+			return $stored['meta'][ $id ];
+		}
+		$defaults = self::default_meta();
+		if ( isset( $defaults[ $id ] ) ) {
+			return $defaults[ $id ];
+		}
+		return self::meta_entry( $id, '', 'ai' );
+	}
+
+	/**
 	 * Is counting switched on?
 	 *
 	 * @return bool
@@ -572,6 +636,146 @@ class RankXAI_Crawlers {
 		return $out;
 	}
 
+	/**
+	 * Is a path shaped like a probe for software, rather than a page?
+	 *
+	 * A crawler asking for /wp-login.php or /.env is not a missing page anyone
+	 * should redirect, and a user agent that says it is ClaudeBot while probing
+	 * for files is a common disguise.
+	 *
+	 * @param string $path Path.
+	 * @return bool
+	 */
+	public static function is_probe_path( $path ) {
+		return (bool) preg_match( '#(\.php\b|/wp-login|/wp-admin|/xmlrpc|/\.env|/\.git|/cgi-bin|\.(sql|bak|zip|tar|gz|ini|log)$)#i', (string) $path );
+	}
+
+	/**
+	 * The first UTC day a report covers: the window, or when counting started if later.
+	 *
+	 * @param int $days Window length, including today.
+	 * @return string Y-m-d.
+	 */
+	public static function window_start( $days ) {
+		$since = gmdate( 'Y-m-d', time() - ( max( 1, (int) $days ) - 1 ) * DAY_IN_SECONDS );
+		$at    = self::enabled_at();
+		if ( '' !== $at ) {
+			$started = gmdate( 'Y-m-d', (int) strtotime( $at ) );
+			if ( $started > $since ) {
+				return $started;
+			}
+		}
+		return $since;
+	}
+
+	/**
+	 * Everything the AI crawlers page shows, from counts already stored.
+	 *
+	 * @param int $days Window length, including today.
+	 * @return array{since: string, bots: array, errors: array, daily: array<string, int>}
+	 */
+	public static function report( $days ) {
+		global $wpdb;
+		$out = array(
+			'since'  => self::window_start( $days ),
+			'bots'   => array(),
+			'errors' => array(),
+			'daily'  => array(),
+		);
+		if ( ! self::table_exists() ) {
+			return $out;
+		}
+		$table = esc_sql( self::table() );
+		$since = $out['since'];
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- This plugin's own table; the name is the site prefix and a constant, escaped above.
+		$totals = $wpdb->get_results( $wpdb->prepare( "SELECT bot, SUM(hits) AS hits, SUM(CASE WHEN in_range = 1 THEN hits ELSE 0 END) AS in_range, SUM(CASE WHEN status >= 400 THEN hits ELSE 0 END) AS errors, COUNT(DISTINCT path_hash) AS paths, MAX(last_seen) AS last_seen FROM {$table} WHERE day >= %s GROUP BY bot ORDER BY SUM(hits) DESC", $since ), ARRAY_A );
+		foreach ( (array) $totals as $r ) {
+			$out['bots'][ (string) $r['bot'] ] = array(
+				'hits'     => (int) $r['hits'],
+				'inRange'  => (int) $r['in_range'],
+				'errors'   => (int) $r['errors'],
+				'paths'    => (int) $r['paths'],
+				'lastSeen' => (string) $r['last_seen'],
+				'top'      => array(),
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
+		$top = $wpdb->get_results( $wpdb->prepare( "SELECT bot, path, SUM(hits) AS hits FROM {$table} WHERE day >= %s AND status < 400 AND path <> %s GROUP BY bot, path_hash, path ORDER BY hits DESC LIMIT 2000", $since, self::OTHER ), ARRAY_A );
+		foreach ( (array) $top as $r ) {
+			$bot = (string) $r['bot'];
+			if ( isset( $out['bots'][ $bot ] ) && count( $out['bots'][ $bot ]['top'] ) < 5 ) {
+				$out['bots'][ $bot ]['top'][] = array(
+					'path' => (string) $r['path'],
+					'hits' => (int) $r['hits'],
+				);
+			}
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
+		$errors = $wpdb->get_results( $wpdb->prepare( "SELECT path, status, bot, SUM(hits) AS hits, MAX(in_range) AS in_range, COUNT(DISTINCT day) AS days, MAX(day) AS last_day FROM {$table} WHERE day >= %s AND status >= 400 AND path <> %s GROUP BY path_hash, path, status, bot ORDER BY hits DESC LIMIT 500", $since, self::OTHER ), ARRAY_A );
+		foreach ( (array) $errors as $r ) {
+			$key = (string) $r['path'] . '|' . (int) $r['status'];
+			if ( ! isset( $out['errors'][ $key ] ) ) {
+				$out['errors'][ $key ] = array(
+					'path'    => (string) $r['path'],
+					'status'  => (int) $r['status'],
+					'hits'    => 0,
+					'bots'    => array(),
+					'inRange' => false,
+					'days'    => 0,
+					'lastDay' => '',
+				);
+			}
+			$row            = &$out['errors'][ $key ];
+			$row['hits']   += (int) $r['hits'];
+			$row['bots'][]  = (string) $r['bot'];
+			$row['inRange'] = $row['inRange'] || 1 === (int) $r['in_range'];
+			$row['days']    = max( $row['days'], (int) $r['days'] );
+			$row['lastDay'] = max( $row['lastDay'], (string) $r['last_day'] );
+			unset( $row );
+		}
+		$out['errors'] = array_values( $out['errors'] );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
+		$daily = $wpdb->get_results( $wpdb->prepare( "SELECT day, SUM(hits) AS hits FROM {$table} WHERE day >= %s GROUP BY day ORDER BY day", $since ), ARRAY_A );
+		foreach ( (array) $daily as $r ) {
+			$out['daily'][ (string) $r['day'] ] = (int) $r['hits'];
+		}
+		return $out;
+	}
+
+	/**
+	 * Error answers AI crawlers received that are worth a site owner's time.
+	 *
+	 * From a visit inside the operator's published ranges, or from unverified
+	 * visits on at least two different days, so one spoofed request cannot
+	 * raise a count on the Dashboard. Probe-shaped paths are left out.
+	 *
+	 * @param int $days Window length, including today.
+	 * @return array<int, array{path: string, status: int, hits: int}>
+	 */
+	public static function credible_errors( $days = 7 ) {
+		if ( ! self::enabled() ) {
+			return array();
+		}
+		$out = array();
+		foreach ( self::report( $days )['errors'] as $row ) {
+			if ( self::is_probe_path( $row['path'] ) ) {
+				continue;
+			}
+			if ( $row['inRange'] || $row['days'] >= 2 ) {
+				$out[] = array(
+					'path'   => $row['path'],
+					'status' => $row['status'],
+					'hits'   => $row['hits'],
+				);
+			}
+		}
+		return $out;
+	}
+
 	// -----------------------------------------------------------------------
 	// Configuration pushed by RankX AI
 	// -----------------------------------------------------------------------
@@ -640,6 +844,7 @@ class RankXAI_Crawlers {
 
 		$bots     = array();
 		$ranges   = array();
+		$meta     = array();
 		$prefixes = 0;
 		foreach ( $input['bots'] as $bot ) {
 			$id = is_array( $bot ) && isset( $bot['id'] ) ? $bot['id'] : '';
@@ -669,6 +874,22 @@ class RankXAI_Crawlers {
 				$ranges[ $id ] = array_values( $list );
 			}
 			$prefixes += count( $list );
+
+			// Config shape 2 (0.5.0+): a name, purpose and group per crawler. All
+			// three or none, each checked, so a half-labelled crawler is refused.
+			$labelled = isset( $bot['label'] ) || isset( $bot['purpose'] ) || isset( $bot['group'] );
+			if ( $labelled ) {
+				$label   = isset( $bot['label'] ) ? $bot['label'] : null;
+				$purpose = isset( $bot['purpose'] ) ? $bot['purpose'] : null;
+				$group   = isset( $bot['group'] ) ? $bot['group'] : null;
+				if ( ! is_string( $label ) || '' === $label || strlen( $label ) > 60 || preg_match( '/[\x00-\x1F\x7F<>]/', $label ) ) {
+					return self::config_error( sprintf( '%s: label must be 1 to 60 printable characters', $id ) );
+				}
+				if ( ! in_array( $purpose, array( 'training', 'search', 'user' ), true ) || ! in_array( $group, array( 'ai', 'search_engine' ), true ) ) {
+					return self::config_error( sprintf( '%s: purpose must be training, search or user and group ai or search_engine', $id ) );
+				}
+				$meta[ $id ] = self::meta_entry( $label, $purpose, $group );
+			}
 		}
 
 		$proxies = isset( $input['proxies'] ) ? $input['proxies'] : array();
@@ -690,6 +911,7 @@ class RankXAI_Crawlers {
 				'version' => $version,
 				'updated' => gmdate( 'c' ),
 				'bots'    => $bots,
+				'meta'    => $meta,
 			),
 			true
 		);

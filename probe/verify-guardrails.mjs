@@ -104,6 +104,10 @@ const MUST_SEE = [
   'includes/class-rankxai-updater.php',
   'includes/class-rankxai-ui.php',
   'includes/class-rankxai-pages.php',
+  'includes/class-rankxai-scan.php',
+  'includes/class-rankxai-loopback.php',
+  'includes/class-rankxai-view-as-ai.php',
+  'includes/class-rankxai-summary.php',
 ]
 code.size > 5
   ? ok(`CONTROL — the walker found ${code.size} files`)
@@ -158,19 +162,35 @@ const OUTBOUND = [
 // updater asks github.com for the latest release. It is confined to one file,
 // one call and one fixed address, and the WordPress.org build removes the file.
 const UPDATER_FILE = 'includes/class-rankxai-updater.php'
+// A SECOND exception since 0.5.0 (plan 82 D82-2): requests from this site to
+// ITSELF, to read its robots.txt and confirm a missing page. Not outbound in the
+// guideline's sense, and held to the same shape: one file, one call, and a host
+// check that refuses any address that is not this site's own.
+const LOOPBACK_FILE = 'includes/class-rankxai-loopback.php'
 const outboundOffenders = []
 const updaterCalls = []
+const loopbackCalls = []
 for (const [name, src] of code) {
   for (const fn of OUTBOUND) {
     const hits = (src.match(new RegExp(`\\b${fn}\\s*\\(`, 'g')) ?? []).length
     if (hits === 0) continue
     if (name === UPDATER_FILE) updaterCalls.push(...Array(hits).fill(fn))
+    else if (name === LOOPBACK_FILE) loopbackCalls.push(...Array(hits).fill(fn))
     else outboundOffenders.push(`${name}: ${fn}`)
   }
 }
 outboundOffenders.length === 0
-  ? ok('nothing outside the updater can make an outbound request')
+  ? ok('nothing outside the updater and the loopback class can make a request')
   : bad(`an outbound call appeared: ${outboundOffenders.join(', ')}`)
+loopbackCalls.length === 1 && loopbackCalls[0] === 'wp_safe_remote_request'
+  ? ok('the loopback class makes exactly one request, through wp_safe_remote_request')
+  : bad(`the loopback class makes ${JSON.stringify(loopbackCalls)}; exactly one wp_safe_remote_request is allowed`)
+const loopSrc = code.get(LOOPBACK_FILE) ?? ''
+const HOST_GUARD = new RegExp("home_url\\(\\s*'/'\\s*\\)\\s*,\\s*PHP_URL_HOST[^]{0,400}?strtolower\\(\\s*\\$home\\s*\\)\\s*!==\\s*strtolower\\(\\s*\\$host\\s*\\)[^]{0,200}?return")
+const GUARD_BEFORE_CALL = loopSrc.indexOf('PHP_URL_HOST') > -1 && loopSrc.indexOf('PHP_URL_HOST') < loopSrc.indexOf('wp_safe_remote_request(')
+HOST_GUARD.test(loopSrc) && GUARD_BEFORE_CALL
+  ? ok('and it refuses, before the call, any address whose host is not this site')
+  : bad('the loopback class does not refuse a foreign host before it makes the request')
 updaterCalls.length === 1 && updaterCalls[0] === 'wp_safe_remote_get'
   ? ok('the updater makes exactly one request, through wp_safe_remote_get')
   : bad(`the updater makes ${JSON.stringify(updaterCalls)}; exactly one wp_safe_remote_get is allowed`)

@@ -39,6 +39,9 @@ class RankXAI_Admin {
 	/** Start a site check. */
 	const ACTION_SCAN = 'rankxai_scan_now';
 
+	/** Read robots.txt again. */
+	const ACTION_ROBOTS = 'rankxai_robots_refresh';
+
 	/** Top-level menu slug. It was the Settings page's slug before, so old links still resolve. */
 	const PAGE = 'rankxai';
 
@@ -78,6 +81,9 @@ class RankXAI_Admin {
 		add_action( 'admin_post_' . self::ACTION_DELETE_REDIRECT, array( __CLASS__, 'handle_delete_redirect' ) );
 		add_action( 'admin_post_' . self::ACTION_CRAWLERS, array( __CLASS__, 'handle_crawlers' ) );
 		add_action( 'admin_post_' . self::ACTION_CLEAR_COUNTS, array( __CLASS__, 'handle_clear_counts' ) );
+		add_action( 'admin_post_' . self::ACTION_ROBOTS, array( __CLASS__, 'handle_robots' ) );
+		add_action( 'admin_post_' . self::ACTION_ADD_REDIRECT, array( __CLASS__, 'handle_add_redirect' ) );
+		add_action( 'admin_post_' . self::ACTION_SCAN, array( __CLASS__, 'handle_scan' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( RANKXAI_PLUGIN_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -124,6 +130,14 @@ class RankXAI_Admin {
 			if ( $hook ) {
 				self::$hooks[] = $hook;
 			}
+		}
+
+		// View as AI has no menu entry: it is opened from a post's row actions,
+		// by anyone who may edit posts. The screen checks the post itself.
+		$view = add_submenu_page( '', __( 'View as AI', 'rankxai' ), __( 'View as AI', 'rankxai' ), 'edit_posts', self::PAGE_VIEW, array( 'RankXAI_View_As_AI', 'render' ) );
+		if ( $view ) {
+			self::$hooks[] = $view;
+			add_action( 'load-' . $view, array( 'RankXAI_View_As_AI', 'guard' ) );
 		}
 	}
 
@@ -291,6 +305,72 @@ class RankXAI_Admin {
 		exit;
 	}
 
+	/**
+	 * Read robots.txt again now, rather than waiting for the cached reading to age.
+	 */
+	public static function handle_robots() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to change these settings.', 'rankxai' ), '', array( 'response' => 403 ) );
+		}
+		check_admin_referer( self::ACTION_ROBOTS );
+
+		RankXAI_Robots::reading( true );
+
+		wp_safe_redirect( self::page_url( self::PAGE_CRAWLERS ) . '#rankxai-robots' );
+		exit;
+	}
+
+	/**
+	 * Start a site check. Nothing runs here: the check runs in WP-Cron, a
+	 * batch at a time, so an administrator's request never loops back.
+	 */
+	public static function handle_scan() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to change these settings.', 'rankxai' ), '', array( 'response' => 403 ) );
+		}
+		check_admin_referer( self::ACTION_SCAN );
+
+		RankXAI_Scan::start();
+		// Start it now rather than on the next visit, unless the site owner has
+		// switched WP-Cron off, in which case their own scheduler runs it.
+		if ( ! ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) ) {
+			spawn_cron();
+		}
+
+		wp_safe_redirect( add_query_arg( 'rankxai-scan-started', '1', self::page_url( self::PAGE_CHECKS ) ) );
+		exit;
+	}
+
+	/**
+	 * Ask for a redirect from a missing address to a published page.
+	 *
+	 * Nothing is written here: RankXAI_Redirect_Requests refuses what it can at
+	 * once and confirms the rest in WP-Cron before writing.
+	 */
+	public static function handle_add_redirect() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to change these settings.', 'rankxai' ), '', array( 'response' => 403 ) );
+		}
+		check_admin_referer( self::ACTION_ADD_REDIRECT );
+
+		// Paths are compared and shape-checked, never printed unescaped;
+		// sanitize_text_field would strip percent-encoded octets.
+		$from   = isset( $_POST['rankxai_from'] ) ? trim( (string) wp_unslash( $_POST['rankxai_from'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- See above.
+		$to     = isset( $_POST['rankxai_to'] ) ? trim( (string) wp_unslash( $_POST['rankxai_to'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- See above.
+		$source = isset( $_POST['rankxai_source'] ) && 'checks' === sanitize_key( wp_unslash( $_POST['rankxai_source'] ) ) ? 'checks' : 'crawlers';
+
+		// A destination typed as a full address on this site becomes its path.
+		if ( 0 === strpos( $to, home_url() ) ) {
+			$to = (string) wp_parse_url( $to, PHP_URL_PATH );
+		}
+		$result = RankXAI_Redirect_Requests::request( $from, $to, $source );
+
+		$page = 'checks' === $source ? self::PAGE_CHECKS : self::PAGE_CRAWLERS;
+		set_transient( 'rankxai_redirect_notice_' . get_current_user_id(), $result, MINUTE_IN_SECONDS );
+		wp_safe_redirect( self::page_url( $page ) );
+		exit;
+	}
+
 	// -----------------------------------------------------------------------
 	// Shared facts
 	// -----------------------------------------------------------------------
@@ -319,6 +399,9 @@ class RankXAI_Admin {
 		$config = RankXAI_Crawlers::config_summary();
 		if ( '' !== $config['updated'] ) {
 			$stamps[] = $config['updated'];
+		}
+		foreach ( RankXAI_Summary::all() as $summary ) {
+			$stamps[] = (string) $summary['receivedAt'];
 		}
 
 		if ( ! $stamps ) {

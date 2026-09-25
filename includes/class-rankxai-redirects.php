@@ -434,6 +434,98 @@ class RankXAI_Redirects {
 	}
 
 	/**
+	 * Can this plugin write to the Redirection plugin through its own PHP API,
+	 * and read the result back?
+	 *
+	 * The platform writes to Redirection over Redirection's REST API. The
+	 * plugin's own "Add redirect" button has no credential to call that with, so
+	 * it uses the same model classes Redirection's REST controller calls.
+	 *
+	 * @return bool
+	 */
+	public static function redirection_ready() {
+		return defined( 'REDIRECTION_VERSION' )
+			&& class_exists( 'Red_Item' )
+			&& method_exists( 'Red_Item', 'create' )
+			&& method_exists( 'Red_Item', 'get_for_matched_url' )
+			&& 0 !== self::redirection_group();
+	}
+
+	/**
+	 * The first enabled group of Redirection's WordPress module, or 0.
+	 *
+	 * @return int
+	 */
+	private static function redirection_group() {
+		global $wpdb;
+		$table = esc_sql( $wpdb->prefix . 'redirection_groups' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Reading the Redirection plugin's own group table, which it exposes no PHP lookup for; the name is the site prefix and a constant, escaped above.
+		$id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE module_id = %d AND status = %s ORDER BY id LIMIT 1", 1, 'enabled' ) );
+		return (int) $id;
+	}
+
+	/**
+	 * Create a redirect in the Redirection plugin, and read it back.
+	 *
+	 * @param string $from Source path, already checked.
+	 * @param string $to   Target path, already checked.
+	 * @param int    $code 301 or 302.
+	 * @return array{item: array<string, mixed>|null, error: string}
+	 */
+	public static function create_in_redirection( $from, $to, $code ) {
+		if ( ! self::redirection_ready() ) {
+			return array(
+				'item'  => null,
+				'error' => 'unavailable',
+			);
+		}
+		$from = self::normalise( $from );
+		foreach ( \Red_Item::get_for_matched_url( $from ) as $existing ) {
+			if ( is_object( $existing ) && method_exists( $existing, 'get_url' ) && self::normalise( (string) $existing->get_url() ) === $from ) {
+				return array(
+					'item'  => null,
+					'error' => 'exists',
+				);
+			}
+		}
+		$created = \Red_Item::create(
+			array(
+				'url'         => $from,
+				'action_type' => 'url',
+				'match_type'  => 'url',
+				'action_code' => 302 === (int) $code ? 302 : 301,
+				'action_data' => array( 'url' => $to ),
+				'group_id'    => self::redirection_group(),
+				'regex'       => false,
+			)
+		);
+		if ( is_wp_error( $created ) ) {
+			return array(
+				'item'  => null,
+				'error' => 'rejected',
+			);
+		}
+		// Read back from Redirection's own lookup, never from what was sent.
+		foreach ( \Red_Item::get_for_matched_url( $from ) as $item ) {
+			if ( is_object( $item ) && method_exists( $item, 'get_url' ) && self::normalise( (string) $item->get_url() ) === $from ) {
+				return array(
+					'item'  => array(
+						'id'      => (string) $item->get_id(),
+						'backend' => 'redirection',
+						'from'    => $from,
+						'to'      => $to,
+					),
+					'error' => '',
+				);
+			}
+		}
+		return array(
+			'item'  => null,
+			'error' => 'not_stored',
+		);
+	}
+
+	/**
 	 * Delete a redirect by backend and id.
 	 *
 	 * @param string $backend 'rank_math' or 'own_store'.

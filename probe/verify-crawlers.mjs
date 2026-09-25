@@ -110,8 +110,16 @@ async function adminPost(cookie, fields) {
   return { status: res.status, location: res.headers.get('location') }
 }
 // Since 0.5.0 (plan 82) counting has its own switch on the AI crawlers page.
+// Another plugin's activation (Rank Math, SEOPress) can send the NEXT admin request to
+// its setup wizard once. Ask again if the answer was not our page.
 async function screen(jar) {
-  return (await http(`${BASE}/wp-admin/admin.php?page=rankxai-crawlers`, { headers: { Cookie: jar } })).text()
+  for (let i = 0; i < 3; i++) {
+    const res = await http(`${BASE}/wp-admin/admin.php?page=rankxai-crawlers`, { headers: { Cookie: jar }, redirect: 'manual' })
+    const body = await res.text()
+    if (res.status === 200 && body.includes('rankxai-page')) return body
+    console.log(`  (the crawlers page answered ${res.status} ${res.headers.get('location') ?? ''}; asking again)`)
+  }
+  return ''
 }
 
 const CRAWLER_OPTIONS = ['rankxai_crawlers_enabled', 'rankxai_crawler_tokens', 'rankxai_crawler_ranges', 'rankxai_crawlers_pruned', 'rankxai_crawlers_table', 'rankxai_crawlers_enabled_at']
@@ -146,7 +154,7 @@ async function run() {
     console.log('\n== B  the switch ==')
     const jar = await login('admin', 'password')
     const s0 = await screen(jar)
-    check(s0.includes('Crawler counting') && s0.includes('name="rankxai_crawlers_enabled" value="1"'), 'the AI crawlers page has the section and the switch-on button')
+    check(s0.includes('Switch counting on') && s0.includes('name="rankxai_crawlers_enabled" value="1"'), 'the AI crawlers page offers the switch-on button (in the hero while nothing is stored)')
     check(!s0.includes('Switch counting off'), 'and counting is shown as off')
     const nonce = SAVE_NONCE.exec(s0)?.[1] ?? ''
     check(nonce.length > 0, 'CONTROL — the switch form carries a nonce')
@@ -316,7 +324,7 @@ async function run() {
     const s1 = await screen(jar)
     check(s1.includes('No IP address, browser details or anything about human visitors is stored'), 'the disclosure sentence is on the screen')
     check(s1.includes('This site runs LiteSpeed Cache') && s1.includes('the real numbers are higher'), 'a page cache is named, with what it means for the count')
-    check(s1.includes('From its published addresses') && s1.includes('<code>probebot</code>'), 'the 7-day summary lists the crawlers')
+    check(s1.includes('from its published addresses') && s1.includes('<code>probebot</code>'), 'the 7-day summary lists the crawlers')
     const cachesApi = (await readCounts('&limit=0')).json?.pageCaches ?? []
     check(cachesApi.includes('LiteSpeed Cache'), `and the API reports it too (${JSON.stringify(cachesApi)})`)
     wpSoft('option', 'delete', 'rankxai_probe_fake_litespeed')

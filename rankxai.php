@@ -3,7 +3,7 @@
  * Plugin Name:       RankX AI
  * Plugin URI:        https://github.com/rankxai/rankxai-wp-plugin
  * Description:       Publishes llms.txt, agents.md and markdown copies of your pages for AI assistants, and writes SEO metadata from your RankX AI account through whichever SEO plugin you use, or none.
- * Version:           0.4.4
+ * Version:           0.5.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            RankX AI
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'RANKXAI_VERSION', '0.4.4' );
+define( 'RANKXAI_VERSION', '0.5.0' );
 
 /**
  * REST contract version, separate from the plugin version.
@@ -46,6 +46,12 @@ require_once __DIR__ . '/includes/class-rankxai-twins.php';
 require_once __DIR__ . '/includes/class-rankxai-generate.php';
 require_once __DIR__ . '/includes/class-rankxai-redirects.php';
 require_once __DIR__ . '/includes/class-rankxai-crawlers.php';
+require_once __DIR__ . '/includes/class-rankxai-loopback.php';
+require_once __DIR__ . '/includes/class-rankxai-robots.php';
+require_once __DIR__ . '/includes/class-rankxai-redirect-requests.php';
+require_once __DIR__ . '/includes/class-rankxai-site-health.php';
+require_once __DIR__ . '/includes/class-rankxai-scan.php';
+require_once __DIR__ . '/includes/class-rankxai-summary.php';
 require_once __DIR__ . '/includes/class-rankxai-rest.php';
 
 RankXAI_REST::init();
@@ -58,6 +64,9 @@ RankXAI_Documents::init();
 RankXAI_Twins::init();
 RankXAI_Redirects::init();
 RankXAI_Crawlers::init();
+RankXAI_Redirect_Requests::init();
+RankXAI_Site_Health::init();
+RankXAI_Scan::init();
 
 // Present only in the GitHub build. The WordPress.org build removes this file and
 // the `Update URI` header, because the directory delivers its own updates.
@@ -76,5 +85,7 @@ if ( is_admin() ) {
 	require_once __DIR__ . '/includes/class-rankxai-pages.php';
 	require_once __DIR__ . '/includes/class-rankxai-crawler-page.php';
 	require_once __DIR__ . '/includes/class-rankxai-checks-page.php';
+	require_once __DIR__ . '/includes/class-rankxai-view-as-ai.php';
 	RankXAI_Admin::init();
+	RankXAI_View_As_AI::init();
 }

@@ -39,6 +39,20 @@ class RankXAI_Pages {
 		}
 	}
 
+	/**
+	 * The outcome of an "Add redirect" request, shown once.
+	 */
+	private static function redirect_notice() {
+		$key    = 'rankxai_redirect_notice_' . get_current_user_id();
+		$notice = get_transient( $key );
+		if ( ! is_array( $notice ) || empty( $notice['message'] ) ) {
+			return;
+		}
+		delete_transient( $key );
+		$class = 'refused' === $notice['state'] ? 'notice-warning' : 'notice-info';
+		echo '<div class="notice ' . esc_attr( $class ) . ' is-dismissible"><p>' . esc_html( $notice['message'] ) . '</p></div>';
+	}
+
 	// -----------------------------------------------------------------------
 	// Overview
 	// -----------------------------------------------------------------------
@@ -78,7 +92,15 @@ class RankXAI_Pages {
 				)
 			);
 			echo '<div class="rankxai-card__state">' . wp_kses_post( $card['state'] ) . '</div>';
-			echo '<p>' . esc_html( $card['text'] ) . '</p>';
+			if ( '' !== $card['text'] ) {
+				echo '<p>' . esc_html( $card['text'] ) . '</p>';
+			}
+			if ( ! empty( $card['rows'] ) ) {
+				RankXAI_UI::rows( $card['rows'] );
+			}
+			if ( ! empty( $card['note'] ) ) {
+				RankXAI_UI::note( $card['note'] );
+			}
 			if ( '' !== $card['action'] ) {
 				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built by RankXAI_UI helpers, which escape every value they print.
 				echo '<div class="rankxai-actions">' . $card['action'] . '</div>';
@@ -104,7 +126,7 @@ class RankXAI_Pages {
 		RankXAI_UI::open_page( __( 'AI crawlers', 'rankxai' ), __( 'Which AI crawlers read this site, and whether robots.txt lets them in.', 'rankxai' ), RankXAI_Admin::PAGE_CRAWLERS );
 		self::flash( 'rankxai-saved', __( 'Saved.', 'rankxai' ) );
 		self::flash( 'rankxai-cleared', __( 'Crawler counts cleared.', 'rankxai' ) );
-		self::flash( 'rankxai-redirect-added', __( 'Redirect added.', 'rankxai' ) );
+		self::redirect_notice();
 
 		RankXAI_Crawler_Page::render();
 
@@ -124,7 +146,7 @@ class RankXAI_Pages {
 		}
 		RankXAI_UI::open_page( __( 'Site checks', 'rankxai' ), __( 'Broken and redirected links, pages nothing links to, and images with no text description.', 'rankxai' ), RankXAI_Admin::PAGE_CHECKS );
 		self::flash( 'rankxai-scan-started', __( 'Site check started. It runs in the background a few pages at a time.', 'rankxai' ) );
-		self::flash( 'rankxai-redirect-added', __( 'Redirect added.', 'rankxai' ) );
+		self::redirect_notice();
 
 		RankXAI_Checks_Page::render();
 

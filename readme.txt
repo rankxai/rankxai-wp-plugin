@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.4.4
+Stable tag: 0.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -39,6 +39,19 @@ own **RankX AI** menu in wp-admin.
   it on. It keeps the crawler's name, the address, the status and a count — no IP
   address, no browser details, nothing about human visitors — for 35 days.
 * If another plugin already serves one of these addresses, it keeps it.
+* **See whether AI crawlers can get in.** The AI crawlers page reads your
+  robots.txt the way each crawler does and says, per assistant, whether it may
+  read the site and which line decided it, with the exact change to make if you
+  want a different answer. Two Site Health tests report the same.
+* **Find broken internal links, pages nothing links to, and images with no
+  text description.** Site checks reads your pages in the background, in small
+  batches, the way a visitor sees them. It checks links within your own site
+  only, never other people's. "Add redirect" fixes a broken address after
+  checking it is really missing.
+* **View as AI.** Under any post or page, see the Markdown an assistant is
+  given, whether the page is marked noindex, whether robots.txt lets each
+  assistant read it, and whether the words you wrote are in the HTML the server
+  sends (words added by JavaScript are missed by many AI crawlers).
 
 = Works better with a RankX AI account =
 
@@ -78,6 +91,12 @@ service, and this plugin is the site-side half of it. Connected, the plugin also
   RankX AI sends this site the address ranges that OpenAI, Anthropic, Perplexity,
   Google, Microsoft, Apple and Common Crawl publish for their crawlers, and reads
   the counts back to set them beside which assistants cite your pages.
+* **Turns site checks into tasks.** Broken links, pages nothing links to and
+  images with no alt attribute become tasks in RankX AI, and close themselves when
+  the next check no longer finds them.
+* **Shows your AI visibility on the Overview.** How often each assistant named
+  the business in the last 30 days, pages AI crawlers read but never cite, and
+  your open tasks, dated, and labelled when out of date.
 * **Tells RankX AI what this site actually stored.** When RankX AI updates a
   page, the plugin returns the saved content in the same request, so a change
   that WordPress altered on the way in is reported to you rather than assumed to
@@ -143,9 +162,16 @@ generated one.
 
 = Does this send my content anywhere? =
 
-No. The only request the plugin makes on its own is a check for a newer
+No. The only request the plugin makes to another server is a check for a newer
 version of itself, and only in the copy downloaded from GitHub or from your
 RankX AI account — see *External services*.
+
+To check links, robots.txt and "View as AI", it asks **your own site** for a
+page, the way a visitor would. Those requests go to this site's own address and
+nowhere else, carry the user agent `RankXAI-SiteCheck`, and add a
+`rankxai_check` parameter so a page cache answers with the current page. A
+request that may answer "not found" is made from WordPress's scheduled tasks, a
+few at a time, never in a burst.
 
 = How do I get updates? =
 
@@ -205,7 +231,8 @@ https://docs.github.com/site-policy/privacy-policies/github-general-privacy-stat
 It registers REST endpoints that your RankX AI account calls *inbound*, over your
 site's own REST API, authenticated with a WordPress application password you
 create and can revoke at any time. Apart from the update check above, the plugin
-initiates no outbound request, sends no analytics, sets no cookies, and transmits no visitor data.
+makes no request to any other server (it asks only its own site for pages, to
+check links and robots.txt), sends no analytics, sets no cookies, and transmits no visitor data.
 
 When the site is connected, RankX AI can read and write the SEO title,
 description, canonical URL, and Open Graph and Twitter titles and descriptions
@@ -215,7 +242,9 @@ shown in that page's head; store the contents of `llms.txt`, `agents.md`
 and `ai.txt`; switch markdown copies on or off and store the short business
 summary that appears on them; and read a summary of the site's configuration
 (WordPress and PHP version, whether it is a multisite, and which SEO plugin is
-active). It reads and writes nothing else.
+active); read the findings of the last site check (link paths, page titles and
+counts); and store the summary shown on the Overview. It reads and writes
+nothing else.
 
 Every one of those requires a WordPress account with permission to do it
 already: a content update is refused unless the connected account may edit that
@@ -243,6 +272,14 @@ write, exactly as the editor does.
   the plugin.
 
 == Changelog ==
+
+= 0.5.0 =
+* Its own RankX AI menu, with Overview, AI crawlers, Site checks and Settings pages. The old Settings → RankX AI address redirects.
+* AI crawlers: visits grouped by what each crawler is for, the errors they hit with "Add redirect" beside each, and a robots.txt check per assistant with the fix.
+* Site checks: broken and redirected internal links, pages nothing links to, and images with no alt attribute, read in the background.
+* View as AI under every post and page.
+* Site Health tests for robots.txt and for errors AI crawlers keep hitting.
+* With an account: site checks become tasks, and the Overview shows your AI visibility.
 
 = 0.4.4 =
 * A "Check for updates" link on the Plugins screen asks GitHub straight away instead of waiting for WordPress's next scheduled check.

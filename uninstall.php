@@ -94,6 +94,29 @@ function rankxai_uninstall_current_site() {
 		}
 	}
 
+	// Redirect requests made from the plugin's own pages, the summaries RankX AI
+	// pushed to the Overview, and the cached
+	// robots.txt reading. The redirects themselves belong to the manager they
+	// were written into and stay, as above.
+	delete_option( 'rankxai_redirect_requests' );
+	delete_option( 'rankxai_summaries' );
+	delete_transient( 'rankxai_robots_reading' );
+
+	// Site checks: the link table, the scan's state and its schedule.
+	$rankxai_scan = __DIR__ . '/includes/class-rankxai-scan.php';
+	if ( file_exists( $rankxai_scan ) ) {
+		require_once $rankxai_scan;
+		$rankxai_links = esc_sql( $wpdb->prefix . RankXAI_Scan::TABLE );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Dropping this plugin's own table on uninstall; the name is the site prefix and a constant, escaped above.
+		$wpdb->query( "DROP TABLE IF EXISTS {$rankxai_links}" );
+		foreach ( array( RankXAI_Scan::OPTION_STATE, RankXAI_Scan::OPTION_TABLE, RankXAI_Scan::OPTION_IMAGES ) as $rankxai_option ) {
+			delete_option( $rankxai_option );
+		}
+		wp_clear_scheduled_hook( RankXAI_Scan::HOOK );
+		wp_clear_scheduled_hook( RankXAI_Scan::HOOK_WEEKLY );
+	}
+	wp_clear_scheduled_hook( 'rankxai_confirm_redirect' );
+
 	// Which documents were generated locally. One option holding every slug, so
 	// unlike the catalogue above there is nothing to derive.
 	$generate = __DIR__ . '/includes/class-rankxai-generate.php';

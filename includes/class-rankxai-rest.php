@@ -390,6 +390,167 @@ class RankXAI_REST {
 				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
 			)
 		);
+
+		// Plan 82 4b/4c. The site check's findings are read by the platform, and the
+		// Overview summary is pushed by it. Site-wide, so `manage_options`.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/checks',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'handle_checks' ),
+				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/summary',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'handle_summary_get' ),
+					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::EDITABLE,
+					'callback'            => array( __CLASS__, 'handle_summary_put' ),
+					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+				),
+			)
+		);
+
+		// Called by core's Site Health screen for the asynchronous robots test.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			RankXAI_Site_Health::ROBOTS_ROUTE,
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( 'RankXAI_Site_Health', 'handle_robots_rest' ),
+				'permission_callback' => array( __CLASS__, 'can_view_site_health' ),
+			)
+		);
+	}
+
+	/**
+	 * Can this request run a Site Health test? Core's own capability for it.
+	 *
+	 * @return bool
+	 */
+	public static function can_view_site_health() {
+		return current_user_can( 'view_site_health_checks' );
+	}
+
+	/**
+	 * The last site check's findings. Lists are capped; `totals` are the true counts.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public static function handle_checks() {
+		$f      = RankXAI_Scan::findings();
+		$pages  = function ( $items, $limit ) {
+			$out = array();
+			foreach ( array_slice( $items, 0, $limit ) as $item ) {
+				$out[] = array(
+					'id'     => (int) $item['id'],
+					'title'  => wp_strip_all_tags( (string) $item['title'] ),
+					'path'   => (string) $item['path'],
+					'visits' => isset( $item['visits'] ) ? (int) $item['visits'] : 0,
+				);
+			}
+			return $out;
+		};
+		$source = function ( $ids ) {
+			$out = array();
+			foreach ( array_slice( $ids, 0, 10 ) as $id ) {
+				$path  = (string) wp_parse_url( (string) get_permalink( $id ), PHP_URL_PATH );
+				$out[] = array(
+					'id'    => (int) $id,
+					'title' => wp_strip_all_tags( get_the_title( $id ) ),
+					'path'  => '' === $path ? '/' : $path,
+				);
+			}
+			return $out;
+		};
+		$links  = function ( $items ) use ( $source ) {
+			$out = array();
+			foreach ( array_slice( $items, 0, 200 ) as $item ) {
+				$out[] = array(
+					'path'    => (string) $item['path'],
+					'status'  => (int) $item['status'],
+					'final'   => (string) $item['final'],
+					'sources' => $source( $item['sources'] ),
+				);
+			}
+			return $out;
+		};
+		$alt    = array();
+		foreach ( array_slice( $f['missingAlt'], 0, 100 ) as $item ) {
+			$path  = (string) wp_parse_url( (string) get_permalink( $item['id'] ), PHP_URL_PATH );
+			$alt[] = array(
+				'id'      => (int) $item['id'],
+				'title'   => wp_strip_all_tags( (string) $item['title'] ),
+				'path'    => '' === $path ? '/' : $path,
+				'missing' => (int) $item['missing'],
+			);
+		}
+		return new WP_REST_Response(
+			array(
+				'scan'          => array(
+					'status'        => $f['status'],
+					'started'       => $f['started'],
+					'finished'      => $f['finished'],
+					'scanned'       => $f['scanned'],
+					'total'         => $f['total'],
+					'capped'        => $f['capped'],
+					'links'         => $f['links'],
+					'couldNotCheck' => $f['couldNotCheck'],
+				),
+				'broken'        => $links( $f['broken'] ),
+				'redirects'     => $links( $f['redirects'] ),
+				'orphans'       => $pages( $f['orphans'], 100 ),
+				'weak'          => $pages( $f['weak'], 100 ),
+				'unlinkedPosts' => $pages( $f['unlinkedPosts'], 100 ),
+				'images'        => array(
+					'missingAlt'   => $alt,
+					'emptyAlt'     => $f['emptyAlt'],
+					'libraryEmpty' => $f['libraryNoAlt']['empty'],
+					'libraryTotal' => $f['libraryNoAlt']['total'],
+				),
+				'totals'        => array(
+					'broken'        => count( $f['broken'] ),
+					'redirects'     => count( $f['redirects'] ),
+					'orphans'       => count( $f['orphans'] ),
+					'weak'          => count( $f['weak'] ),
+					'unlinkedPosts' => count( $f['unlinkedPosts'] ),
+					'missingAlt'    => count( $f['missingAlt'] ),
+				),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Every stored Overview summary.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public static function handle_summary_get() {
+		return new WP_REST_Response( array( 'summaries' => array_values( RankXAI_Summary::all() ) ), 200 );
+	}
+
+	/**
+	 * Store the Overview summary RankX AI pushes for one connection.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_summary_put( $request ) {
+		$saved = RankXAI_Summary::save( $request->get_json_params(), (string) $request->get_body() );
+		if ( is_wp_error( $saved ) ) {
+			return $saved;
+		}
+		return new WP_REST_Response( $saved, 200 );
 	}
 
 	/**
@@ -428,6 +589,10 @@ class RankXAI_REST {
 				'rows'          => $page['rows'],
 				'config'        => RankXAI_Crawlers::config_summary(),
 				'pageCaches'    => RankXAI_Crawlers::page_caches(),
+				// The crawler-config shape this plugin reads: 2 adds a name, a
+				// purpose and a group per crawler (0.5.0+).
+				'configShape'   => 2,
+				'countingSince' => RankXAI_Crawlers::enabled_at(),
 			),
 			200
 		);
@@ -1205,7 +1370,7 @@ class RankXAI_REST {
 					'mayOwnHead'     => RankXAI_Detect::may_own_head(),
 					'writableFields' => self::writable_fields(),
 				),
-				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'seo.fill', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config' ),
+				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'seo.fill', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config', 'crawlers.config.v2', 'checks.read', 'summary.write' ),
 				// Which root documents this contract serves, so the platform
 				// offers exactly what this install can publish rather than
 				// discovering a 404 after the customer pressed the button.

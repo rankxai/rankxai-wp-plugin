@@ -728,6 +728,53 @@ class RankXAI_Twins {
 				return true;
 			}
 		}
+		return self::noindexed_by_default( $post_id );
+	}
+
+	/**
+	 * Noindex that no post meta records: a post left on its SEO plugin's
+	 * default for its type, where that default is noindex.
+	 *
+	 * SureRank falls back to a global list of noindexed types when the post's
+	 * own value is empty. All in One SEO keeps post SEO in its own table, and
+	 * a post on "use the default" follows its type's setting.
+	 *
+	 * @param int $post_id Post id.
+	 * @return bool
+	 */
+	private static function noindexed_by_default( $post_id ) {
+		$type = get_post_type( $post_id );
+		if ( ! $type ) {
+			return false;
+		}
+		if ( defined( 'SURERANK_VERSION' ) ) {
+			$own = get_post_meta( $post_id, 'surerank_settings_post_no_index', true );
+			if ( '' === $own || null === $own ) {
+				$global = get_option( 'surerank_settings', array() );
+				if ( is_array( $global ) && isset( $global['no_index'] ) && is_array( $global['no_index'] ) && in_array( $type, $global['no_index'], true ) ) {
+					return true;
+				}
+			}
+		}
+		if ( defined( 'AIOSEO_VERSION' ) && function_exists( 'aioseo' ) ) {
+			try {
+				$meta = aioseo()->meta->metaData->getMetaData( get_post( $post_id ) );
+				if ( ! empty( $meta ) && empty( $meta->robots_default ) ) {
+					return ! empty( $meta->robots_noindex );
+				}
+				// The type's setting, from the option AIOSEO stores it in. Its
+				// options object answers differently across versions (5.0.2
+				// returns a non-object for a type it reports it has).
+				$stored = json_decode( (string) get_option( 'aioseo_options_dynamic', '' ), true );
+				$robots = isset( $stored['searchAppearance']['postTypes'][ $type ]['advanced']['robotsMeta'] ) ? $stored['searchAppearance']['postTypes'][ $type ]['advanced']['robotsMeta'] : null;
+				if ( is_array( $robots ) ) {
+					return empty( $robots['default'] ) && ! empty( $robots['noindex'] );
+				}
+			} catch ( \Throwable $e ) {
+				// An AIOSEO this code does not recognise: fall back to what post meta said.
+				return false;
+			}
+		}
 		return false;
 	}
 

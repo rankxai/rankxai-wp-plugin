@@ -610,3 +610,17 @@
 		font-size: 26px;
 	}
 }
+
+.rankxai-table code {
+	overflow-wrap: anywhere;
+	word-break: break-all;
+}
+
+.rankxai-table td:first-child {
+	max-width: 360px;
+}
+
+.rankxai-redirect-form {
+	flex-wrap: wrap;
+	gap: 6px;
+}
