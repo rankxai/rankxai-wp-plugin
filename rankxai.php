@@ -3,7 +3,7 @@
  * Plugin Name:       RankX AI
  * Plugin URI:        https://github.com/rankxai/rankxai-wp-plugin
  * Description:       Publishes llms.txt, agents.md and markdown copies of your pages for AI assistants, and writes SEO metadata from your RankX AI account through whichever SEO plugin you use, or none.
- * Version:           0.4.1
+ * Version:           0.4.2
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            RankX AI
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'RANKXAI_VERSION', '0.4.1' );
+define( 'RANKXAI_VERSION', '0.4.2' );
 
 /**
  * REST contract version, separate from the plugin version.

@@ -71,11 +71,24 @@ run('node', ['build-zip.mjs', '--target=wporg'], { stdio: 'inherit' })
 step('check.sh')
 run('bash', ['check.sh'], { stdio: 'inherit' })
 
+// "Tested up to: 7.1" means the whole 7.1 branch, but WordPress compares a site's
+// full version with it, so 7.1.2 reads as untested. Copies that predate the
+// updater's own fix read this value raw, so it carries the branch's latest patch.
+const testedBranch = header(readme, 'Tested up to')
+let tested = testedBranch
+try {
+  const offers = (await (await fetch('https://api.wordpress.org/core/version-check/1.7/')).json()).offers ?? []
+  const patches = offers.map((o) => o.current).filter((v) => v === testedBranch || String(v).startsWith(`${testedBranch}.`))
+  tested = patches.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0] ?? testedBranch
+} catch {
+  console.warn(`  could not read WordPress releases; manifest says tested ${testedBranch}`)
+}
+
 const manifest = {
   version,
   requires: header(main, 'Requires at least'),
   requires_php: header(main, 'Requires PHP'),
-  tested: header(readme, 'Tested up to'),
+  tested,
   released: new Date().toISOString().slice(0, 10),
   changelog,
 }

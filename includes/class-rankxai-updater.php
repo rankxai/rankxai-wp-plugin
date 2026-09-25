@@ -76,7 +76,7 @@ class RankXAI_Updater {
 			'url'          => self::UPDATE_URI . '/releases/tag/v' . $release['version'],
 			'requires'     => $release['requires'],
 			'requires_php' => $release['requires_php'],
-			'tested'       => $release['tested'],
+			'tested'       => self::tested_for_site( $release['tested'] ),
 		);
 
 		// Only a copy in `rankxai/` can take the package: the archive unpacks there,
@@ -119,7 +119,7 @@ class RankXAI_Updater {
 			'homepage'      => self::UPDATE_URI,
 			'requires'      => $release['requires'],
 			'requires_php'  => $release['requires_php'],
-			'tested'        => $release['tested'],
+			'tested'        => self::tested_for_site( $release['tested'] ),
 			'last_updated'  => $release['released'],
 			'download_link' => self::installed_in_expected_folder() ? self::package_url( $release['version'] ) : '',
 			'sections'      => array(
@@ -221,6 +221,29 @@ class RankXAI_Updater {
 			return $data[ $key ];
 		}
 		return '';
+	}
+
+	/**
+	 * "Tested up to 7.1" covers every 7.1.x release, as it does for directory plugins.
+	 *
+	 * WordPress compares the site's full version with this value, so a bare 7.1 marks
+	 * a 7.1.2 site as untested. Inside the tested branch the site's own version is
+	 * returned; a newer branch keeps the release's value, and the warning.
+	 *
+	 * @param string $tested Tested-up-to from the manifest.
+	 * @return string
+	 */
+	public static function tested_for_site( $tested ) {
+		if ( '' === $tested ) {
+			return $tested;
+		}
+		$site        = (string) preg_replace( '/[^0-9.].*$/', '', (string) get_bloginfo( 'version' ) );
+		$branch      = implode( '.', array_slice( explode( '.', $tested ), 0, 2 ) );
+		$site_branch = implode( '.', array_slice( explode( '.', $site ), 0, 2 ) );
+		if ( '' !== $site && version_compare( $site_branch, $branch, '<=' ) && version_compare( $site, $tested, '>' ) ) {
+			return $site;
+		}
+		return $tested;
 	}
 
 	/**
