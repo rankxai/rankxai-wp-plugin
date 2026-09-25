@@ -276,7 +276,7 @@ async function run() {
     check(own.status === 200, 'CONTROL — a redirect exists for the screen to show')
 
     const jar = await login('admin', 'password')
-    const screen = await (await http(`${BASE}/wp-admin/options-general.php?page=rankxai`, { headers: { Cookie: jar } })).text()
+    const screen = await (await http(`${BASE}/wp-admin/admin.php?page=rankxai-settings`, { headers: { Cookie: jar } })).text()
     check(screen.includes(`/${MARK}-screen`), 'the settings screen lists our redirect')
     const NONCE_RE = new RegExp('name="rankxai_redirect_id" value="' + ownId + '"[^]*?name="_wpnonce" value="([a-f0-9]+)"')
     const nonce = NONCE_RE.exec(screen)?.[1] ?? ''

@@ -1,0 +1,612 @@
+/*
+ * RankX AI admin pages. Loaded only on the plugin's own screens, and every rule
+ * is scoped under .rankxai-app so nothing reaches the rest of wp-admin.
+ *
+ * The colour tokens are copied from the RankX AI app's app/globals.css :root on
+ * 2026-09-25, so these pages match the app. Colours are used only through these
+ * tokens; a guardrail fails on any raw colour outside this block.
+ *
+ * Geist is bundled (SIL Open Font License 1.1, assets/fonts/Geist-OFL.txt,
+ * https://github.com/vercel/geist-font) rather than loaded from a font CDN, so
+ * no administrator's address is handed to a third party.
+ */
+
+@font-face {
+	font-family: "RankX Geist";
+	src: url("fonts/Geist-Variable.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+/* -- tokens (copied from app/globals.css :root, 2026-09-25) -- */
+.rankxai-app {
+	--rx-background: oklch(0.985 0.0015 264);
+	--rx-foreground: oklch(0.16 0.006 264);
+	--rx-card: oklch(1 0 0);
+	--rx-primary: oklch(0.205 0 0);
+	--rx-primary-foreground: oklch(0.985 0 0);
+	--rx-muted: oklch(0.965 0.003 264);
+	--rx-muted-foreground: oklch(0.556 0.008 264);
+	--rx-border: oklch(0.922 0.004 264);
+	--rx-ring: oklch(0.708 0.008 264);
+	--rx-destructive: oklch(0.577 0.245 27.325);
+	--rx-success: oklch(0.527 0.154 150.069);
+	--rx-warning: oklch(0.688 0.199 75.95);
+	--rx-warning-ink: oklch(0.47 0.12 70);
+	--rx-info: oklch(0.548 0.212 264);
+	--rx-viz-own: oklch(0.596 0.145 162.48);
+	--rx-viz-2: oklch(0.600 0.140 210);
+	--rx-chart-1: oklch(0.646 0.222 41.116);
+	--rx-chart-2: oklch(0.6 0.118 184.704);
+	--rx-chart-3: oklch(0.398 0.07 227.392);
+	--rx-chart-4: oklch(0.828 0.189 84.429);
+	--rx-chart-5: oklch(0.769 0.188 70.08);
+	--rx-chart-6: oklch(0.55 0.2 286);
+	--rx-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.06);
+	--rx-shadow-md: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 4px 12px -2px rgb(0 0 0 / 0.08);
+	--rx-radius: 0.5rem;
+	--rx-font: "RankX Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+/* -- end tokens -- */
+
+.rankxai-app {
+	color: var(--rx-foreground);
+	font-family: var(--rx-font);
+	font-size: 14px;
+	line-height: 1.5;
+	max-width: 1180px;
+	margin-inline-end: 20px;
+}
+
+.rankxai-app *,
+.rankxai-app *::before,
+.rankxai-app *::after {
+	box-sizing: border-box;
+}
+
+.rankxai-app a {
+	color: var(--rx-foreground);
+}
+
+.rankxai-app a:focus,
+.rankxai-app button:focus,
+.rankxai-app input:focus,
+.rankxai-app select:focus {
+	box-shadow: 0 0 0 2px var(--rx-card), 0 0 0 4px var(--rx-ring);
+	outline: none;
+}
+
+.rankxai-app code {
+	background: var(--rx-muted);
+	border-radius: 4px;
+	font-size: 12px;
+	padding: 1px 5px;
+}
+
+/* -- header and tabs -- */
+.rankxai-header {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	justify-content: space-between;
+	padding-block: 12px 4px;
+}
+
+.rankxai-header__brand {
+	align-items: center;
+	display: flex;
+	gap: 12px;
+}
+
+.rankxai-app .rankxai-header__title {
+	font-size: 22px;
+	font-weight: 700;
+	line-height: 1.2;
+	margin: 0;
+	padding: 0;
+}
+
+.rankxai-header__subtitle {
+	color: var(--rx-muted-foreground);
+	margin: 2px 0 0;
+}
+
+.rankxai-mark {
+	color: var(--rx-foreground);
+	flex-shrink: 0;
+}
+
+.rankxai-app .wp-header-end {
+	margin: 0;
+	visibility: hidden;
+}
+
+.rankxai-tabs {
+	border-block-end: 1px solid var(--rx-border);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-block: 12px 20px;
+}
+
+.rankxai-app .rankxai-tab {
+	border-block-end: 2px solid transparent;
+	color: var(--rx-muted-foreground);
+	font-weight: 500;
+	margin-block-end: -1px;
+	padding: 8px 12px;
+	text-decoration: none;
+}
+
+.rankxai-app .rankxai-tab:hover {
+	color: var(--rx-foreground);
+}
+
+.rankxai-app .rankxai-tab.is-current {
+	border-block-end-color: var(--rx-foreground);
+	color: var(--rx-foreground);
+}
+
+/* -- layout -- */
+.rankxai-page {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	padding-block-end: 40px;
+}
+
+.rankxai-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.rankxai-grid {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: 1fr;
+}
+
+@media (min-width: 960px) {
+	.rankxai-grid--two {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.rankxai-grid--three {
+		grid-template-columns: repeat(3, 1fr);
+	}
+
+	.rankxai-grid--wide {
+		grid-template-columns: 7fr 3fr;
+	}
+}
+
+/* -- cards -- */
+.rankxai-card {
+	background: var(--rx-card);
+	border: 1px solid var(--rx-border);
+	border-radius: calc(var(--rx-radius) + 4px);
+	box-shadow: var(--rx-shadow-sm);
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.rankxai-card--hero {
+	box-shadow: var(--rx-shadow-md);
+}
+
+.rankxai-card__head {
+	align-items: flex-start;
+	display: flex;
+	gap: 12px;
+	justify-content: space-between;
+	padding: 18px 20px 0;
+}
+
+.rankxai-app .rankxai-card__title {
+	font-size: 14px;
+	font-weight: 600;
+	margin: 0;
+	padding: 0;
+}
+
+.rankxai-card--hero .rankxai-card__title {
+	font-size: 16px;
+}
+
+.rankxai-card__subtitle {
+	color: var(--rx-muted-foreground);
+	font-size: 13px;
+	margin: 2px 0 0;
+}
+
+.rankxai-app .rankxai-card__link {
+	color: var(--rx-muted-foreground);
+	flex-shrink: 0;
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.rankxai-card__body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 14px;
+	padding: 14px 20px 18px;
+}
+
+.rankxai-card__body > p {
+	margin: 0;
+}
+
+/* -- stat tiles -- */
+.rankxai-stat {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.rankxai-stat__label {
+	color: var(--rx-muted-foreground);
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.rankxai-stat__value {
+	font-size: 30px;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	line-height: 1.15;
+}
+
+.rankxai-stat__insight {
+	color: var(--rx-muted-foreground);
+	font-size: 13px;
+	margin: 0;
+}
+
+.rankxai-stat--danger .rankxai-stat__value {
+	color: var(--rx-destructive);
+}
+
+.rankxai-stat--success .rankxai-stat__value {
+	color: var(--rx-success);
+}
+
+/* -- chips and pills -- */
+.rankxai-chip {
+	background: var(--rx-muted);
+	border-radius: 999px;
+	color: var(--rx-muted-foreground);
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 1.6;
+	padding: 1px 8px;
+	white-space: nowrap;
+}
+
+.rankxai-chip--success {
+	background: color-mix(in oklch, var(--rx-success) 12%, transparent);
+	color: var(--rx-success);
+}
+
+.rankxai-chip--warning {
+	background: color-mix(in oklch, var(--rx-warning) 16%, transparent);
+	color: var(--rx-warning-ink);
+}
+
+.rankxai-chip--danger {
+	background: color-mix(in oklch, var(--rx-destructive) 12%, transparent);
+	color: var(--rx-destructive);
+}
+
+.rankxai-chip--info {
+	background: color-mix(in oklch, var(--rx-info) 10%, transparent);
+	color: var(--rx-info);
+}
+
+.rankxai-pill {
+	align-items: center;
+	background: var(--rx-card);
+	border: 1px solid var(--rx-border);
+	border-radius: 999px;
+	color: var(--rx-muted-foreground);
+	display: inline-flex;
+	font-size: 12px;
+	font-weight: 500;
+	gap: 6px;
+	padding: 4px 10px;
+}
+
+.rankxai-pill--success {
+	color: var(--rx-foreground);
+}
+
+.rankxai-dot {
+	background: var(--rx-success);
+	border-radius: 999px;
+	display: inline-block;
+	height: 7px;
+	width: 7px;
+}
+
+/* -- analysis box -- */
+.rankxai-analysis {
+	align-items: flex-start;
+	background: color-mix(in oklch, var(--rx-primary) 5%, transparent);
+	border-radius: var(--rx-radius);
+	display: flex;
+	gap: 10px;
+	padding: 12px 14px;
+}
+
+.rankxai-analysis p {
+	margin: 0;
+}
+
+.rankxai-analysis__icon {
+	color: var(--rx-muted-foreground);
+	line-height: 1.5;
+}
+
+/* -- empty state -- */
+.rankxai-empty {
+	border: 1px dashed var(--rx-border);
+	border-radius: var(--rx-radius);
+	padding: 16px;
+}
+
+.rankxai-app .rankxai-empty__title {
+	font-weight: 600;
+	margin: 0;
+}
+
+.rankxai-empty__body {
+	color: var(--rx-muted-foreground);
+	margin: 4px 0 0;
+}
+
+.rankxai-empty__action {
+	margin-block-start: 12px;
+}
+
+/* -- buttons -- */
+.rankxai-app .rankxai-button {
+	align-items: center;
+	border: 1px solid var(--rx-border);
+	border-radius: var(--rx-radius);
+	cursor: pointer;
+	display: inline-flex;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	gap: 6px;
+	line-height: 1.4;
+	min-height: 32px;
+	padding: 6px 12px;
+	text-decoration: none;
+	transition: background-color 0.15s, opacity 0.15s;
+}
+
+.rankxai-app .rankxai-button--primary {
+	background: var(--rx-primary);
+	border-color: var(--rx-primary);
+	color: var(--rx-primary-foreground);
+}
+
+.rankxai-app .rankxai-button--primary:hover {
+	opacity: 0.9;
+}
+
+.rankxai-app .rankxai-button--outline {
+	background: var(--rx-card);
+	color: var(--rx-foreground);
+}
+
+.rankxai-app .rankxai-button--outline:hover {
+	background: var(--rx-muted);
+}
+
+.rankxai-app .rankxai-button--danger {
+	background: var(--rx-card);
+	color: var(--rx-destructive);
+}
+
+.rankxai-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.rankxai-inline-form {
+	display: inline-flex;
+	margin: 0;
+}
+
+/* -- progress -- */
+.rankxai-progress__track {
+	background: var(--rx-muted);
+	border-radius: 999px;
+	height: 8px;
+	overflow: hidden;
+}
+
+.rankxai-progress__fill {
+	background: var(--rx-primary);
+	height: 100%;
+}
+
+.rankxai-progress__label {
+	color: var(--rx-muted-foreground);
+	font-size: 13px;
+	margin: 6px 0 0;
+}
+
+.rankxai-sparkline {
+	color: var(--rx-viz-2);
+}
+
+/* -- tables and rows -- */
+.rankxai-table-wrap {
+	overflow-x: auto;
+}
+
+.rankxai-table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+.rankxai-table th {
+	border-block-end: 1px solid var(--rx-border);
+	color: var(--rx-muted-foreground);
+	font-size: 12px;
+	font-weight: 500;
+	padding: 8px 10px;
+	text-align: start;
+}
+
+.rankxai-table td {
+	border-block-end: 1px solid var(--rx-border);
+	padding: 10px;
+	vertical-align: top;
+}
+
+.rankxai-table tr:last-child td {
+	border-block-end: 0;
+}
+
+.rankxai-table .is-num {
+	font-variant-numeric: tabular-nums;
+	text-align: end;
+	white-space: nowrap;
+}
+
+.rankxai-rows {
+	border-block: 1px solid var(--rx-border);
+	margin: 0;
+	padding: 0;
+}
+
+.rankxai-rows li {
+	align-items: center;
+	border-block-end: 1px solid var(--rx-border);
+	display: flex;
+	gap: 12px;
+	justify-content: space-between;
+	margin: 0;
+	padding: 10px 0;
+}
+
+.rankxai-rows li:last-child {
+	border-block-end: 0;
+}
+
+.rankxai-rows__main {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.rankxai-rows__label {
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+
+.rankxai-rows__meta {
+	color: var(--rx-muted-foreground);
+	font-size: 12px;
+}
+
+.rankxai-note {
+	color: var(--rx-muted-foreground);
+	font-size: 12px;
+	margin: 0;
+}
+
+.rankxai-muted {
+	color: var(--rx-muted-foreground);
+}
+
+/* -- settings forms -- */
+.rankxai-field {
+	border-block-end: 1px solid var(--rx-border);
+	display: grid;
+	gap: 8px;
+	padding-block: 12px;
+}
+
+.rankxai-field:first-child {
+	padding-block-start: 0;
+}
+
+.rankxai-field:last-child {
+	border-block-end: 0;
+	padding-block-end: 0;
+}
+
+@media (min-width: 782px) {
+	.rankxai-field {
+		gap: 20px;
+		grid-template-columns: 220px 1fr;
+	}
+}
+
+.rankxai-field__label {
+	font-weight: 600;
+}
+
+.rankxai-field__hint {
+	color: var(--rx-muted-foreground);
+	font-size: 13px;
+	margin: 4px 0 0;
+}
+
+.rankxai-check {
+	align-items: flex-start;
+	display: flex;
+	gap: 8px;
+	margin-block-end: 6px;
+}
+
+.rankxai-check input {
+	margin-block-start: 2px;
+}
+
+.rankxai-app .rankxai-input {
+	border: 1px solid var(--rx-border);
+	border-radius: var(--rx-radius);
+	font-family: inherit;
+	min-height: 32px;
+	padding: 4px 10px;
+}
+
+.rankxai-app details summary {
+	cursor: pointer;
+	font-weight: 500;
+}
+
+.rankxai-pre {
+	background: var(--rx-muted);
+	border-radius: var(--rx-radius);
+	font-size: 12px;
+	max-height: 480px;
+	overflow: auto;
+	padding: 12px 14px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+@media (max-width: 782px) {
+	.rankxai-app {
+		margin-inline-end: 10px;
+	}
+
+	.rankxai-stat__value {
+		font-size: 26px;
+	}
+}

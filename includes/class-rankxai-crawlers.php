@@ -2,7 +2,7 @@
 /**
  * AI crawler visits: which crawlers fetch which addresses, per day.
  *
- * Off until a site administrator switches it on at Settings → RankX AI. When
+ * Off until a site administrator switches it on at RankX AI → AI crawlers. When
  * on, a front-end request whose user agent names a known crawler adds one to a
  * daily counter for (crawler, address, status). Nothing else is kept: no IP
  * address, no user agent string, no query string. RankX AI reads the counters
@@ -47,6 +47,9 @@ class RankXAI_Crawlers {
 
 	/** The table version that exists on this site. */
 	const OPTION_TABLE = 'rankxai_crawlers_table';
+
+	/** When counting last started: switched on, or counts cleared while on. */
+	const OPTION_ENABLED_AT = 'rankxai_crawlers_enabled_at';
 
 	/** Days of counters kept. */
 	const RETENTION_DAYS = 35;
@@ -122,8 +125,39 @@ class RankXAI_Crawlers {
 	public static function set_enabled( $on ) {
 		if ( $on ) {
 			self::ensure_table();
+			// A window of "no visits seen" starts here, not 30 days ago.
+			if ( ! self::enabled() ) {
+				update_option( self::OPTION_ENABLED_AT, gmdate( 'c' ), false );
+			}
 		}
 		update_option( self::OPTION_ENABLED, $on ? 1 : 0, true );
+	}
+
+	/**
+	 * When the counts on this site begin, or '' when counting has never run.
+	 *
+	 * @return string ISO 8601, UTC.
+	 */
+	public static function enabled_at() {
+		$at = get_option( self::OPTION_ENABLED_AT, '' );
+		return is_string( $at ) ? $at : '';
+	}
+
+	/**
+	 * Delete every count. The window of what has been seen starts again now.
+	 */
+	public static function clear() {
+		global $wpdb;
+		if ( self::table_exists() ) {
+			$table = esc_sql( self::table() );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- This plugin's own table; the name is the site prefix and a constant, escaped above.
+			$wpdb->query( "DELETE FROM {$table}" );
+		}
+		if ( self::enabled() ) {
+			update_option( self::OPTION_ENABLED_AT, gmdate( 'c' ), false );
+		} else {
+			delete_option( self::OPTION_ENABLED_AT );
+		}
 	}
 
 	/**
@@ -147,8 +181,9 @@ class RankXAI_Crawlers {
 		global $wpdb;
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-		$table   = self::table();
+		$table   = esc_sql( self::table() );
 		$charset = $wpdb->get_charset_collate();
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- The table name is the site prefix and a constant, escaped above; dbDelta takes no placeholders.
 		dbDelta(
 			"CREATE TABLE {$table} (
   day date NOT NULL,
@@ -387,7 +422,7 @@ class RankXAI_Crawlers {
 	 */
 	public static function count( $day, $bot, $in_range, $status, $path ) {
 		global $wpdb;
-		$table = self::table();
+		$table = esc_sql( self::table() );
 		$now   = gmdate( 'Y-m-d H:i:s' );
 		$flag  = $in_range ? 1 : 0;
 
@@ -395,10 +430,10 @@ class RankXAI_Crawlers {
 		$inserted = self::upsert( $day, $bot, $flag, $status, $path, $now );
 
 		if ( 1 === $inserted && self::OTHER !== $path ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- This plugin's own table; the name is not user input.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- This plugin's own table; the name is not user input.
 			$rows = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE day = %s", $day ) );
 			if ( $rows > self::MAX_ROWS_PER_DAY ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- As above.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
 				$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE day = %s AND bot = %s AND in_range = %d AND status = %d AND path_hash = %s", $day, $bot, $flag, $status, md5( $path ) ) );
 				self::upsert( $day, $bot, $flag, $status, self::OTHER, $now );
 			}
@@ -421,11 +456,11 @@ class RankXAI_Crawlers {
 	 */
 	private static function upsert( $day, $bot, $flag, $status, $path, $now ) {
 		global $wpdb;
-		$table = self::table();
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- This plugin's own table; one atomic counter update.
+		$table = esc_sql( self::table() );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- This plugin's own table; one atomic counter update.
 		$result = $wpdb->query(
 			$wpdb->prepare(
-				"INSERT INTO {$table} (day, bot, in_range, status, path_hash, path, hits, last_seen) VALUES (%s, %s, %d, %d, %s, %s, 1, %s) ON DUPLICATE KEY UPDATE hits = hits + 1, last_seen = VALUES(last_seen)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- As above.
+				"INSERT INTO {$table} (day, bot, in_range, status, path_hash, path, hits, last_seen) VALUES (%s, %s, %d, %d, %s, %s, 1, %s) ON DUPLICATE KEY UPDATE hits = hits + 1, last_seen = VALUES(last_seen)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
 				$day,
 				$bot,
 				$flag,
@@ -458,10 +493,10 @@ class RankXAI_Crawlers {
 	 */
 	public static function prune( $today ) {
 		global $wpdb;
-		$table  = self::table();
+		$table  = esc_sql( self::table() );
 		$cutoff = gmdate( 'Y-m-d', strtotime( $today . ' -' . ( self::RETENTION_DAYS - 1 ) . ' days' ) );
 		$prev   = $wpdb->suppress_errors( true );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- This plugin's own table.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- This plugin's own table.
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE day < %s", $cutoff ) );
 		$wpdb->suppress_errors( $prev );
 	}
@@ -487,10 +522,10 @@ class RankXAI_Crawlers {
 			);
 		}
 		self::prune( gmdate( 'Y-m-d' ) );
-		$table = self::table();
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- This plugin's own table.
+		$table = esc_sql( self::table() );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- This plugin's own table.
 		$total = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE day >= %s", $since ) );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- This plugin's own table.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- This plugin's own table.
 		$raw  = $wpdb->get_results( $wpdb->prepare( "SELECT day, bot, in_range, status, path, hits, last_seen FROM {$table} WHERE day >= %s ORDER BY day, bot, in_range, status, path_hash LIMIT %d OFFSET %d", $since, $limit, $offset ), ARRAY_A );
 		$rows = array();
 		foreach ( (array) $raw as $r ) {
@@ -521,9 +556,9 @@ class RankXAI_Crawlers {
 		if ( ! self::table_exists() ) {
 			return array();
 		}
-		$table = self::table();
+		$table = esc_sql( self::table() );
 		$since = gmdate( 'Y-m-d', time() - ( $days - 1 ) * DAY_IN_SECONDS );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- This plugin's own table.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- This plugin's own table.
 		$raw = $wpdb->get_results( $wpdb->prepare( "SELECT bot, SUM(CASE WHEN in_range = 1 THEN hits ELSE 0 END) AS in_range, SUM(CASE WHEN in_range = 0 THEN hits ELSE 0 END) AS other, COUNT(DISTINCT path_hash) AS paths FROM {$table} WHERE day >= %s GROUP BY bot ORDER BY SUM(hits) DESC", $since ), ARRAY_A );
 		$out = array();
 		foreach ( (array) $raw as $r ) {

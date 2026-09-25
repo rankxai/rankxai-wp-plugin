@@ -71,5 +71,10 @@ if ( is_readable( __DIR__ . '/includes/class-rankxai-updater.php' ) ) {
 // a file read on every page for code that can never run there.
 if ( is_admin() ) {
 	require_once __DIR__ . '/includes/class-rankxai-admin.php';
+	require_once __DIR__ . '/includes/class-rankxai-ui.php';
+	require_once __DIR__ . '/includes/class-rankxai-overview.php';
+	require_once __DIR__ . '/includes/class-rankxai-pages.php';
+	require_once __DIR__ . '/includes/class-rankxai-crawler-page.php';
+	require_once __DIR__ . '/includes/class-rankxai-checks-page.php';
 	RankXAI_Admin::init();
 }

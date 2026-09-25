@@ -16,14 +16,20 @@ markup written for a browser, wrapped in a theme, and they have no agreed place
 to look for a plain description of what a business does. This plugin gives them
 one.
 
-Two halves, and the first needs no account anywhere.
+It is a companion, not an SEO plugin. It works alongside Yoast SEO, Rank Math,
+All in One SEO, SEOPress, The SEO Framework and the rest, writes into their own
+fields when a RankX AI account asks it to, and never prints a second copy of
+anything they already print.
+
+Two halves, and the first needs no account anywhere. Everything lives under its
+own **RankX AI** menu in wp-admin.
 
 = Works on its own, with no account =
 
 * **Publish an llms.txt and an agents.md.** Built from this site — its name, its
   tagline, its published pages and posts — and served from the site's own root
   address. Nothing is written to your server: WordPress answers when the address
-  is requested. Off until you switch it on, under Settings → RankX AI.
+  is requested. Off until you switch it on, under RankX AI → Settings.
 * **Publish a markdown copy of every page.** Each copy is generated from the page
   itself, so it changes when the page does. Assistants read your words instead of
   your theme's markup. Also off by default.
@@ -65,7 +71,7 @@ service, and this plugin is the site-side half of it. Connected, the plugin also
   they appear in that plugin's list with its hit counts. If you run neither, this
   plugin keeps a short list itself and answers only for addresses that would
   otherwise show "page not found", so it can never hide a page that works. Those
-  redirects are listed under Settings → RankX AI, where you can remove any of
+  redirects are listed under RankX AI → Settings, where you can remove any of
   them. The plugin never switches another plugin's modules on or off, and keeps
   no log of visitors.
 * **Checks each crawler visit against its operator's published addresses.**
@@ -82,7 +88,7 @@ adds more to say, not permission to say it.
 
 = Markdown copies, in detail =
 
-* Off until you turn it on, from Settings → RankX AI or from your RankX AI
+* Off until you turn it on, from RankX AI → Settings or from your RankX AI
   account. Activating or updating the plugin never publishes a new URL on its own.
 * Each copy answers at `/page.md`, `/page/index.md` and `/page/?format=md`, and at
   the page's normal address for a client that asks for `text/markdown`.
@@ -121,8 +127,9 @@ you your metadata — see below.
 == Installation ==
 
 1. Install and activate.
-2. Visit **Settings → RankX AI** to switch on markdown copies and root documents.
-   Nothing is published until you do.
+2. Open **RankX AI** in the admin menu. Its Settings page switches on markdown
+   copies and root documents; nothing is published until you do. (Before 0.5.0
+   the same page was under Settings → RankX AI; that address still works.)
 3. Optionally, connect the site from your RankX AI account.
 
 == Frequently Asked Questions ==
@@ -218,6 +225,22 @@ write, exactly as the editor does.
 * RankX AI: https://rankxai.com
 * Terms: https://rankxai.com/terms
 * Privacy: https://rankxai.com/privacy
+
+== Screenshots ==
+
+1. The Overview: what AI assistants can see on this site, and the next step for each feature.
+2. AI crawlers: which AI crawlers read the site, and whether robots.txt lets them in.
+3. Site checks: broken and redirected internal links, pages nothing links to, and images with no text description.
+4. Settings: markdown copies, root documents and redirects, all local.
+
+== Credits ==
+
+* The admin pages use the Geist typeface by Vercel and basement.studio, bundled
+  with the plugin under the SIL Open Font License 1.1
+  (https://github.com/vercel/geist-font, licence in `assets/fonts/Geist-OFL.txt`).
+  It is served from your own site, never from a font service.
+* The RankX AI logo is the trademark of RankX AI and is included only to identify
+  the plugin.
 
 == Changelog ==
 

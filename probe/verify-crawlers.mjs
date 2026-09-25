@@ -109,12 +109,13 @@ async function adminPost(cookie, fields) {
   await res.arrayBuffer().catch(() => undefined)
   return { status: res.status, location: res.headers.get('location') }
 }
+// Since 0.5.0 (plan 82) counting has its own switch on the AI crawlers page.
 async function screen(jar) {
-  return (await http(`${BASE}/wp-admin/options-general.php?page=rankxai`, { headers: { Cookie: jar } })).text()
+  return (await http(`${BASE}/wp-admin/admin.php?page=rankxai-crawlers`, { headers: { Cookie: jar } })).text()
 }
 
-const CRAWLER_OPTIONS = ['rankxai_crawlers_enabled', 'rankxai_crawler_tokens', 'rankxai_crawler_ranges', 'rankxai_crawlers_pruned', 'rankxai_crawlers_table']
-const SAVE_NONCE = /name="action" value="rankxai_save_settings"[^]*?name="_wpnonce" value="([a-f0-9]+)"/
+const CRAWLER_OPTIONS = ['rankxai_crawlers_enabled', 'rankxai_crawler_tokens', 'rankxai_crawler_ranges', 'rankxai_crawlers_pruned', 'rankxai_crawlers_table', 'rankxai_crawlers_enabled_at']
+const SAVE_NONCE = /name="action" value="rankxai_crawlers_switch"[^]*?name="_wpnonce" value="([a-f0-9]+)"/
 const TABLE_EXISTS_PHP = 'echo RankXAI_Crawlers::table_exists() ? "yes" : "no";'
 const COLUMNS_PHP = 'global $wpdb; echo implode(",", $wpdb->get_col("SHOW COLUMNS FROM " . RankXAI_Crawlers::table()));'
 
@@ -145,14 +146,18 @@ async function run() {
     console.log('\n== B  the switch ==')
     const jar = await login('admin', 'password')
     const s0 = await screen(jar)
-    check(s0.includes('AI crawler visits') && s0.includes('name="rankxai_crawlers_enabled"'), 'the settings screen has the section and the switch')
-    check(!/name="rankxai_crawlers_enabled" value="1"\s+checked/.test(s0), 'and the box is unticked')
+    check(s0.includes('Crawler counting') && s0.includes('name="rankxai_crawlers_enabled" value="1"'), 'the AI crawlers page has the section and the switch-on button')
+    check(!s0.includes('Switch counting off'), 'and counting is shown as off')
     const nonce = SAVE_NONCE.exec(s0)?.[1] ?? ''
-    check(nonce.length > 0, 'CONTROL — the settings form carries a nonce')
-    const forged = await adminPost(jar, { action: 'rankxai_save_settings', _wpnonce: 'deadbeef00', rankxai_crawlers_enabled: '1' })
+    check(nonce.length > 0, 'CONTROL — the switch form carries a nonce')
+    const forged = await adminPost(jar, { action: 'rankxai_crawlers_switch', _wpnonce: 'deadbeef00', rankxai_crawlers_enabled: '1' })
     check(forged.status === 403 && (await readCounts()).json?.enabled === false, `a forged nonce is refused (${forged.status}) and counting stays off`)
-    const saved = await adminPost(jar, { action: 'rankxai_save_settings', _wpnonce: nonce, rankxai_crawlers_enabled: '1' })
-    check(saved.status === 302 && (await readCounts()).json?.enabled === true, `saving with the box ticked switches it on (${saved.status})`)
+    const settingsSaved = await adminPost(jar, { action: 'rankxai_save_settings', _wpnonce: 'deadbeef00', rankxai_crawlers_enabled: '1' })
+    check(settingsSaved.status === 403 && (await readCounts()).json?.enabled === false, 'the Settings form cannot switch counting on')
+    const saved = await adminPost(jar, { action: 'rankxai_crawlers_switch', _wpnonce: nonce, rankxai_crawlers_enabled: '1' })
+    check(saved.status === 302 && (await readCounts()).json?.enabled === true, `the switch turns counting on (${saved.status})`)
+    const since = wpSoft('option', 'get', 'rankxai_crawlers_enabled_at') ?? ''
+    check(Math.abs(Date.parse(since) - Date.now()) < 5 * 60_000, `and records when counting started (${since})`)
     check(evalPhp(TABLE_EXISTS_PHP) === 'yes', 'and creates the table')
     const cols = evalPhp(COLUMNS_PHP).split(',')
     check(cols.join(',') === 'day,bot,in_range,status,path_hash,path,hits,last_seen', `the table holds no IP and no user agent: ${cols.join(', ')}`)
@@ -319,7 +324,7 @@ async function run() {
     check(privacy.includes('does not store IP addresses'), 'suggested privacy-policy text is offered to the site owner')
 
     const nonce2 = SAVE_NONCE.exec(s1)?.[1] ?? ''
-    const off = await adminPost(jar, { action: 'rankxai_save_settings', _wpnonce: nonce2 })
+    const off = await adminPost(jar, { action: 'rankxai_crawlers_switch', _wpnonce: nonce2, rankxai_crawlers_enabled: '0' })
     const offState = await readCounts('&limit=0')
     check(off.status === 302 && offState.json?.enabled === false, 'unticking the box switches it off')
     const totalOff = offState.json?.total

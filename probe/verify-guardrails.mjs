@@ -102,6 +102,8 @@ const MUST_SEE = [
   'includes/class-rankxai-redirects.php',
   'includes/class-rankxai-crawlers.php',
   'includes/class-rankxai-updater.php',
+  'includes/class-rankxai-ui.php',
+  'includes/class-rankxai-pages.php',
 ]
 code.size > 5
   ? ok(`CONTROL — the walker found ${code.size} files`)
@@ -373,10 +375,58 @@ ADMIN_GUARD.test(BOOT)
 // excluding `)` stops at the first of them and the scan silently measures
 // nothing. Mutation-proved — with the capability changed the nearest other
 // occurrence is ~1,900 characters away, well outside the window.
-const OPTIONS_PAGE = new RegExp("add_options_page\\([^]{0,200}?'manage_options'")
-OPTIONS_PAGE.test(adminSrc)
-  ? ok('the settings page itself requires `manage_options`')
-  : bad('the settings page does not require `manage_options`')
+//
+// Since 0.5.0 the pages sit under a top-level menu (plan 82 D82-8), so the check
+// covers the menu and EVERY page registered in it, derived from the calls.
+const MENU_PAGE = new RegExp("add_menu_page\\([^]{0,200}?'manage_options'")
+MENU_PAGE.test(adminSrc)
+  ? ok('the top-level menu itself requires `manage_options`')
+  : bad('the top-level menu does not require `manage_options`')
+const SUBMENU_ARGS = new RegExp('add_submenu_page\\(([^;]*?)\\);', 'g')
+const submenus = [...adminSrc.matchAll(SUBMENU_ARGS)].map((m) => m[1])
+const IN_MENU = new RegExp('^\\s*self::PAGE\\s*,')
+const HIDDEN = new RegExp("^\\s*''\\s*,")
+const menuPages = submenus.filter((args) => IN_MENU.test(args))
+const hiddenPages = submenus.filter((args) => HIDDEN.test(args))
+menuPages.length >= 1
+  ? ok(`CONTROL — found ${menuPages.length} add_submenu_page call(s) in the menu`)
+  : bad('CONTROL — no add_submenu_page call found in the menu; the capability check proves nothing')
+menuPages.every((args) => args.includes("'manage_options'"))
+  ? ok('every page in the menu requires `manage_options`')
+  : bad('a page in the RankX AI menu is registered without `manage_options`')
+hiddenPages.every((args) => args.includes("'manage_options'") || args.includes("'edit_posts'"))
+  ? ok(`every page outside the menu requires at least \`edit_posts\` (${hiddenPages.length})`)
+  : bad('a page outside the menu is registered with a weaker capability than `edit_posts`')
+
+// ── THE STYLESHEET USES THE APP'S TOKENS AND NOTHING ELSE (D82-12) ──────────
+//
+// The plugin's copy of the app's `rankxai/no-hardcoded-colors` rule: every colour
+// lives in the token block copied from app/globals.css, and nothing outside it may
+// name a raw colour.
+const css = readFileSync(join(ROOT, 'assets', 'admin.css'), 'utf8')
+const TOKEN_START = css.indexOf('/* -- tokens')
+const TOKEN_END = css.indexOf('/* -- end tokens -- */')
+const tokenBlock = TOKEN_START >= 0 && TOKEN_END > TOKEN_START ? css.slice(TOKEN_START, TOKEN_END) : ''
+tokenBlock.includes('--rx-foreground') && tokenBlock.includes('oklch(')
+  ? ok('CONTROL — found the token block, holding the app’s colours')
+  : bad('CONTROL — no token block found in assets/admin.css; the colour check proves nothing')
+const CSS_COMMENT = new RegExp('/\\*[^]*?\\*/', 'g')
+const outside = (TOKEN_START >= 0 ? css.slice(0, TOKEN_START) + css.slice(TOKEN_END) : css).replace(CSS_COMMENT, '')
+const RAW_COLOUR = new RegExp('#[0-9a-fA-F]{3,8}\\b|\\b(rgb|rgba|hsl|hsla|oklch|oklab|lab|lch|hwb)\\(|:\\s*(white|black|red|green|blue|gray|grey|orange|yellow|purple|pink)\\s*[;!]')
+const rawColour = outside.split('\n').filter((line) => RAW_COLOUR.test(line))
+outside.includes('var(--rx-')
+  ? ok('CONTROL — the rules outside the token block use the tokens')
+  : bad('CONTROL — no rule reads a token; the scan below proves nothing')
+rawColour.length === 0
+  ? ok('no raw colour outside the token block in admin.css')
+  : bad(`raw colour outside the token block: ${rawColour.slice(0, 3).join(' | ')}`)
+
+// Our stylesheet loads on our screens and no other: the enqueue is gated on the
+// hook suffixes the registration returned, never on a hand-written screen id.
+const ENQUEUE_GATE = new RegExp('function enqueue\\([^]{0,300}?in_array\\(\\s*\\$hook_suffix\\s*,\\s*self::\\$hooks')
+ENQUEUE_GATE.test(adminSrc)
+  ? ok('the stylesheet is enqueued only on the screens this plugin registered')
+  : bad('the stylesheet enqueue is not gated on the registered hook suffixes')
 
 // ── CRAWLER COUNTS STORE NO IP AND NO USER AGENT (DG80-4) ─────────────────
 //

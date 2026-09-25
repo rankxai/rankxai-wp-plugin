@@ -578,11 +578,11 @@ class RankXAI_Redirects {
 		}
 
 		global $wpdb;
-		$table = $wpdb->prefix . 'rank_math_404_logs';
+		$table = esc_sql( $wpdb->prefix . 'rank_math_404_logs' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Reading Rank Math's own log table; it exposes no API for it.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The table name is our prefix plus a constant.
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- The table name is the site prefix plus a constant, escaped above.
 				"SELECT uri, MAX(accessed) AS last_seen, SUM(times_accessed) AS hits FROM {$table} GROUP BY uri ORDER BY hits DESC LIMIT %d",
 				max( 1, min( 500, (int) $limit ) )
 			),

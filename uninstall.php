@@ -86,10 +86,10 @@ function rankxai_uninstall_current_site() {
 	$crawlers = __DIR__ . '/includes/class-rankxai-crawlers.php';
 	if ( file_exists( $crawlers ) ) {
 		require_once $crawlers;
-		$rankxai_table = $wpdb->prefix . RankXAI_Crawlers::TABLE;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dropping this plugin's own table on uninstall; the name is not user input.
+		$rankxai_table = esc_sql( $wpdb->prefix . RankXAI_Crawlers::TABLE );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Dropping this plugin's own table on uninstall; the name is the site prefix and a constant, escaped above.
 		$wpdb->query( "DROP TABLE IF EXISTS {$rankxai_table}" );
-		foreach ( array( RankXAI_Crawlers::OPTION_ENABLED, RankXAI_Crawlers::OPTION_TOKENS, RankXAI_Crawlers::OPTION_RANGES, RankXAI_Crawlers::OPTION_PRUNED, RankXAI_Crawlers::OPTION_TABLE ) as $rankxai_option ) {
+		foreach ( array( RankXAI_Crawlers::OPTION_ENABLED, RankXAI_Crawlers::OPTION_TOKENS, RankXAI_Crawlers::OPTION_RANGES, RankXAI_Crawlers::OPTION_PRUNED, RankXAI_Crawlers::OPTION_TABLE, RankXAI_Crawlers::OPTION_ENABLED_AT ) as $rankxai_option ) {
 			delete_option( $rankxai_option );
 		}
 	}
