@@ -142,7 +142,8 @@ async function run() {
         $admin_links = RankXAI_Updater::row_meta( array(), plugin_basename( RANKXAI_PLUGIN_FILE ) );
         $other_links = RankXAI_Updater::row_meta( array(), 'hello.php' );
         $_GET['rankxai-update-check'] = 'available';
-        ob_start(); RankXAI_Updater::check_notice(); $notice = ob_get_clean();
+        $notice = implode( ' ', RankXAI_Updater::row_meta( array(), plugin_basename( RANKXAI_PLUGIN_FILE ) ) );
+        unset( $_GET['rankxai-update-check'] );
         wp_set_current_user( 0 );
         $anon_links = RankXAI_Updater::row_meta( array(), plugin_basename( RANKXAI_PLUGIN_FILE ) );
         return array( 'result' => $result, 'cached' => $cached['release']['version'] ?? null, 'hits' => (int) get_option( 'rankxai_probe_updater_hits', 0 ),
@@ -151,7 +152,7 @@ async function run() {
       check(forced.result === 'available' && forced.cached === VERSION && forced.hits >= 1, `"Check for updates" replaces a stale cached answer and finds ${VERSION}`, `result ${forced.result}, cached ${forced.cached}, requests ${forced.hits}`)
       check(forced.admin.includes('Check for updates') && forced.admin.includes('action=rankxai_check_updates') && forced.admin.includes('_wpnonce='), 'an administrator sees a nonce-protected "Check for updates" link on the RankX AI row', `links: ${forced.admin}`)
       check(forced.other === 0 && forced.anon === 0, 'the link is on no other plugin’s row and not shown to someone who cannot update plugins', `other row ${forced.other}, no-capability ${forced.anon}`)
-      check(forced.notice.includes(`RankX AI ${VERSION} is available`), 'the page it returns to says what was found', `notice: ${forced.notice}`)
+      check(forced.notice.includes(`Version ${VERSION} is available.`), 'the row it returns to says what was found, beside the link', `row: ${forced.notice}`)
     }
 
     // ── 3. View details ───────────────────────────────────────────────────────

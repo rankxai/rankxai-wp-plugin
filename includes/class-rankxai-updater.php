@@ -46,8 +46,6 @@ class RankXAI_Updater {
 		add_filter( 'plugins_api', array( __CLASS__, 'filter_plugin_information' ), 10, 3 );
 		add_filter( 'plugin_row_meta', array( __CLASS__, 'row_meta' ), 10, 2 );
 		add_action( 'admin_post_' . self::CHECK_ACTION, array( __CLASS__, 'handle_check' ) );
-		add_action( 'admin_notices', array( __CLASS__, 'check_notice' ) );
-		add_action( 'network_admin_notices', array( __CLASS__, 'check_notice' ) );
 	}
 
 	/** The admin-post action behind the "Check for updates" link. */
@@ -69,6 +67,13 @@ class RankXAI_Updater {
 		}
 		$url     = wp_nonce_url( admin_url( 'admin-post.php?action=' . self::CHECK_ACTION ), self::CHECK_ACTION );
 		$links[] = '<a href="' . esc_url( $url ) . '">' . esc_html__( 'Check for updates', 'rankxai' ) . '</a>';
+
+		// The result shows here, beside the link, rather than as an admin notice:
+		// notices belong on the plugin's own settings page.
+		$result = self::check_result_text();
+		if ( '' !== $result ) {
+			$links[] = '<strong>' . esc_html( $result ) . '</strong>';
+		}
 		return $links;
 	}
 
@@ -108,38 +113,28 @@ class RankXAI_Updater {
 	}
 
 	/**
-	 * Say what the check found, once, on the page the link returned to.
+	 * What the last "Check for updates" found, for the page it returned to.
+	 *
+	 * @return string Empty when no check was just made.
 	 */
-	public static function check_notice() {
+	public static function check_result_text() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only: it only picks a message.
 		$result = isset( $_GET[ self::CHECK_RESULT_ARG ] ) ? sanitize_key( wp_unslash( $_GET[ self::CHECK_RESULT_ARG ] ) ) : '';
-		if ( '' === $result || ! current_user_can( 'update_plugins' ) ) {
-			return;
+		if ( 'current' === $result ) {
+			return __( 'Up to date.', 'rankxai' );
 		}
-
-		$release = self::latest_release();
-		if ( 'available' === $result && null !== $release ) {
-			$type    = 'warning';
-			$message = sprintf(
+		if ( 'failed' === $result ) {
+			return __( 'Could not reach GitHub. Try again in a few minutes.', 'rankxai' );
+		}
+		$release = 'available' === $result ? self::latest_release() : null;
+		if ( null !== $release ) {
+			return sprintf(
 				/* translators: %s: version number. */
-				__( 'RankX AI %s is available. Update it from this screen or from Dashboard → Updates.', 'rankxai' ),
+				__( 'Version %s is available.', 'rankxai' ),
 				$release['version']
 			);
-		} elseif ( 'current' === $result ) {
-			$type    = 'success';
-			$message = sprintf(
-				/* translators: %s: version number. */
-				__( 'RankX AI is up to date (version %s).', 'rankxai' ),
-				RANKXAI_VERSION
-			);
-		} elseif ( 'failed' === $result ) {
-			$type    = 'error';
-			$message = __( 'Could not reach GitHub to check for RankX AI updates. Try again in a few minutes.', 'rankxai' );
-		} else {
-			return;
 		}
-
-		printf( '<div class="notice notice-%1$s is-dismissible"><p>%2$s</p></div>', esc_attr( $type ), esc_html( $message ) );
+		return '';
 	}
 
 	/**
