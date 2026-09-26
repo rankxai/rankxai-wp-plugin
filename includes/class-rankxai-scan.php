@@ -794,8 +794,7 @@ class RankXAI_Scan {
 						'post_type'      => 'page',
 						'post_status'    => 'publish',
 						'post_parent'    => (int) $post->post_parent,
-						'exclude'        => array( $id ),
-						'posts_per_page' => 3,
+						'posts_per_page' => 4,
 						'fields'         => 'ids',
 					)
 				)
@@ -808,15 +807,17 @@ class RankXAI_Scan {
 						'post_type'      => $post->post_type,
 						'post_status'    => 'publish',
 						'category'       => (int) $cats[0],
-						'exclude'        => array( $id ),
-						'posts_per_page' => 3,
+						'posts_per_page' => 4,
 						'fields'         => 'ids',
 					)
 				);
 			}
 		}
+		// One extra is fetched and the post itself dropped here, rather than
+		// excluded in the query.
+		$ids = array_diff( array_unique( array_map( 'intval', $ids ) ), array( (int) $id ) );
 		$out = array();
-		foreach ( array_slice( array_unique( array_map( 'intval', $ids ) ), 0, 3 ) as $candidate ) {
+		foreach ( array_slice( $ids, 0, 3 ) as $candidate ) {
 			if ( 'publish' === get_post_status( $candidate ) ) {
 				$out[] = array(
 					'id'    => $candidate,
