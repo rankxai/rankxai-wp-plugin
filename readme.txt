@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.5.0
+Stable tag: 0.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -272,6 +272,11 @@ write, exactly as the editor does.
   the plugin.
 
 == Changelog ==
+
+= 0.5.1 =
+* Site checks read only the content types your sitemap lists. With Rank Math, that is the types its sitemap includes, so theme content blocks and form entries are no longer listed as pages.
+* Site checks count links in your home page's header, footer and menus, so a footer or mega menu built from reusable blocks counts.
+* Page titles sent to RankX AI are plain text.
 
 = 0.5.0 =
 * Its own RankX AI menu, with Overview, AI crawlers, Site checks and Settings pages. The old Settings → RankX AI address redirects.

@@ -190,11 +190,21 @@ class RankXAI_Scan {
 		}
 		// An SEO plugin that keeps a type out of its own sitemap has decided it
 		// is not a page anyone should find.
+		// Rank Math turns core's sitemap off and lists a type only when its own
+		// setting says 'on', so a type with no setting is not in the sitemap.
 		$rank_math = get_option( 'rank-math-options-sitemap' );
+		$rm_owns   = defined( 'RANK_MATH_VERSION' ) && is_array( $rank_math ) && in_array( 'sitemap', (array) get_option( 'rank_math_modules', array() ), true );
 		$yoast     = get_option( 'wpseo_titles' );
+		$pretty    = '' !== (string) get_option( 'permalink_structure' );
 		$out       = array();
 		foreach ( $types as $type ) {
-			if ( defined( 'RANK_MATH_VERSION' ) && is_array( $rank_math ) && isset( $rank_math[ 'pt_' . $type . '_sitemap' ] ) && 'off' === $rank_math[ 'pt_' . $type . '_sitemap' ] ) {
+			if ( $rm_owns && ( ! isset( $rank_math[ 'pt_' . $type . '_sitemap' ] ) || 'on' !== $rank_math[ 'pt_' . $type . '_sitemap' ] ) ) {
+				continue;
+			}
+			// A type with no address of its own (a form, say) is reached only
+			// as ?post_type=…&p=…, so it is not a page to link to.
+			$object = get_post_type_object( $type );
+			if ( $pretty && $object && empty( $object->_builtin ) && false === $object->rewrite ) {
 				continue;
 			}
 			if ( defined( 'WPSEO_VERSION' ) && is_array( $yoast ) && ! empty( $yoast[ 'noindex-' . $type ] ) ) {
@@ -378,6 +388,11 @@ class RankXAI_Scan {
 				}
 			}
 		}
+		// What every page carries: the header, footer and menus of the home page
+		// as the server sends it. This is where a theme's own header and footer
+		// builder, a mega menu or a footer made of reusable blocks puts links,
+		// none of which is in a menu location or in any page's content.
+		$state['chrome'] = self::read_chrome();
 		if ( ! empty( $state['blockTheme'] ) ) {
 			$sources = array();
 			foreach ( get_posts(
@@ -416,6 +431,44 @@ class RankXAI_Scan {
 		$state['phase']     = 'confirm';
 		$state['lastBatch'] = gmdate( 'c' );
 		self::save_state( $state );
+	}
+
+	/**
+	 * Store the links in the home page's header, footer and navigation as menu
+	 * links. Runs in WP-Cron, like every request this scan makes.
+	 *
+	 * @return string 'read', or 'could_not_read' when the page did not answer 200.
+	 */
+	private static function read_chrome() {
+		$response = RankXAI_Loopback::request( RankXAI_Loopback::url( '/' ), 'GET' );
+		if ( 200 !== $response['status'] || '' === $response['body'] || ! class_exists( 'DOMDocument' ) ) {
+			return 'could_not_read';
+		}
+		$dom      = new DOMDocument( '1.0', 'UTF-8' );
+		$previous = libxml_use_internal_errors( true );
+		$loaded   = $dom->loadHTML( '<?xml encoding="utf-8" ?>' . $response['body'], LIBXML_NOERROR | LIBXML_NOWARNING );
+		libxml_clear_errors();
+		libxml_use_internal_errors( $previous );
+		if ( ! $loaded ) {
+			return 'could_not_read';
+		}
+		$xpath = new DOMXPath( $dom );
+		// The page's own header, footer and navigation, never those inside the
+		// content: each post in a blog list has its own <header>, and counting
+		// it would call every listed post linked from every page.
+		$outside = 'not(ancestor::article) and not(ancestor::main)';
+		$query   = "//header[{$outside}]//a[@href] | //footer[{$outside}]//a[@href] | //nav[{$outside}]//a[@href] | //*[(@role=\"banner\" or @role=\"navigation\" or @role=\"contentinfo\") and {$outside}]//a[@href]";
+		$seen  = array();
+		foreach ( $xpath->query( $query ) as $anchor ) {
+			$path = self::internal_path( (string) $anchor->getAttribute( 'href' ), home_url( '/' ) );
+			if ( '' === $path || isset( $seen[ $path ] ) ) {
+				continue;
+			}
+			$seen[ $path ] = true;
+			// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- DOM property.
+			self::insert_edge( 0, 'menu', $path, trim( (string) $anchor->textContent ) );
+		}
+		return 'read';
 	}
 
 	/**
@@ -576,6 +629,7 @@ class RankXAI_Scan {
 			'total'         => isset( $state['total'] ) ? (int) $state['total'] : 0,
 			'capped'        => ! empty( $state['capped'] ),
 			'types'         => isset( $state['types'] ) ? (array) $state['types'] : array(),
+			'chrome'        => isset( $state['chrome'] ) ? (string) $state['chrome'] : '',
 			'links'         => 0,
 			'broken'        => array(),
 			'redirects'     => array(),

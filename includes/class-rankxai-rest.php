@@ -442,6 +442,17 @@ class RankXAI_REST {
 	}
 
 	/**
+	 * A title as plain text: tags removed and entities decoded, so RankX AI
+	 * shows "Mega Menu – Products" rather than the HTML for it.
+	 *
+	 * @param string $title Title as WordPress renders it.
+	 * @return string
+	 */
+	private static function plain_title( $title ) {
+		return html_entity_decode( wp_strip_all_tags( (string) $title ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+	}
+
+	/**
 	 * The last site check's findings. Lists are capped; `totals` are the true counts.
 	 *
 	 * @return WP_REST_Response
@@ -453,7 +464,7 @@ class RankXAI_REST {
 			foreach ( array_slice( $items, 0, $limit ) as $item ) {
 				$out[] = array(
 					'id'     => (int) $item['id'],
-					'title'  => wp_strip_all_tags( (string) $item['title'] ),
+					'title'  => self::plain_title( (string) $item['title'] ),
 					'path'   => (string) $item['path'],
 					'visits' => isset( $item['visits'] ) ? (int) $item['visits'] : 0,
 				);
@@ -466,7 +477,7 @@ class RankXAI_REST {
 				$path  = (string) wp_parse_url( (string) get_permalink( $id ), PHP_URL_PATH );
 				$out[] = array(
 					'id'    => (int) $id,
-					'title' => wp_strip_all_tags( get_the_title( $id ) ),
+					'title' => self::plain_title( get_the_title( $id ) ),
 					'path'  => '' === $path ? '/' : $path,
 				);
 			}
@@ -489,7 +500,7 @@ class RankXAI_REST {
 			$path  = (string) wp_parse_url( (string) get_permalink( $item['id'] ), PHP_URL_PATH );
 			$alt[] = array(
 				'id'      => (int) $item['id'],
-				'title'   => wp_strip_all_tags( (string) $item['title'] ),
+				'title'   => self::plain_title( (string) $item['title'] ),
 				'path'    => '' === $path ? '/' : $path,
 				'missing' => (int) $item['missing'],
 			);

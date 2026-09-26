@@ -27,6 +27,43 @@ if ( get_option( 'rankxai_probe_401' ) && isset( $_SERVER['HTTP_USER_AGENT'] ) &
 	exit;
 }
 
+// A link that exists only in the site-wide footer, as a theme's footer builder
+// or a footer made of reusable blocks would print it.
+add_action(
+	'wp_footer',
+	function () {
+		$path = get_option( 'rankxai_probe_footer_link' );
+		if ( is_string( $path ) && '' !== $path ) {
+			echo '<footer class="rx-probe-footer"><a href="' . esc_url( home_url( $path ) ) . '">footer only</a></footer>';
+		}
+	}
+);
+
+// A public type with no address of its own, as a form plugin registers one.
+add_action(
+	'init',
+	function () {
+		if ( get_option( 'rankxai_probe_form_type' ) ) {
+			register_post_type(
+				'rx_probe_form',
+				array(
+					'public'  => true,
+					'label'   => 'Probe forms',
+					'rewrite' => false,
+				)
+			);
+			// And one with an address, as a theme's content blocks have.
+			register_post_type(
+				'rx_probe_block',
+				array(
+					'public' => true,
+					'label'  => 'Probe blocks',
+				)
+			);
+		}
+	}
+);
+
 if ( get_option( 'rankxai_probe_disable_cron' ) && ! defined( 'DISABLE_WP_CRON' ) ) {
 	define( 'DISABLE_WP_CRON', true );
 }

@@ -80,7 +80,7 @@ const read = () => evalJson(FINDINGS)
 async function run() {
   const theme = wp('theme', 'list', '--status=active', '--field=name')
   const plugins = (wpSoft('plugin', 'list', '--status=active', '--field=name') ?? '').split('\n').filter(Boolean)
-  const savedOptions = Object.fromEntries(['rankxai_redirects', 'rankxai_scan_state', 'surerank_settings', 'rankxai_probe_block_loopback', 'rankxai_probe_disable_cron', 'nav_menu_locations'].map((o) => [o, wpSoft('option', 'get', o, '--format=json')]))
+  const savedOptions = Object.fromEntries(['rankxai_redirects', 'rankxai_scan_state', 'surerank_settings', 'rankxai_probe_block_loopback', 'rankxai_probe_disable_cron', 'nav_menu_locations', 'rankxai_probe_footer_link', 'rankxai_probe_form_type'].map((o) => [o, wpSoft('option', 'get', o, '--format=json')]))
   const created = { posts: [], terms: [], menus: [] }
   const jar = await login()
 
@@ -256,6 +256,47 @@ async function run() {
     } else {
       await wordfence(jar, ids, created)
     }
+
+    // ── K ─────────────────────────────────────────────────────────────────
+    // Found on the first live scan (aiagencyplus.com, 2026-09-26): content
+    // blocks and form posts were read as pages, and a footer made of content
+    // blocks was invisible.
+    console.log('\n== K  what a real site taught ==')
+    wp('theme', 'activate', 'twentytwentyone')
+    const orphanPath = `/${MARK}-orphan/`
+    wp('option', 'update', 'rankxai_probe_form_type', '1')
+    const formId = Number(evalPhp(`echo wp_insert_post( array( "post_title" => "${MARK} form", "post_type" => "rx_probe_form", "post_status" => "publish" ) );`))
+    created.posts.push(formId)
+    const coreTypes = JSON.parse(evalPhp('echo json_encode( RankXAI_Scan::post_types() );'))
+    check(coreTypes.includes('rx_probe_block'), 'CONTROL — with no SEO plugin, a public type with an address is read (core lists it)')
+    const k0 = scanAndRead()
+    check(k0.orphans.includes(`${MARK} orphan`), 'CONTROL — with nothing in the footer, the page is an orphan')
+    check(!k0.types.includes('rx_probe_form') && !k0.unlinked.includes(`${MARK} form`), 'a public type with no address of its own (a form) is not read as a page')
+    wp('option', 'update', 'rankxai_probe_footer_link', orphanPath)
+    const k1 = scanAndRead()
+    check(evalPhp('echo RankXAI_Scan::findings()["chrome"];') === 'read', 'the home page\'s header and footer were read')
+    check(!k1.orphans.includes(`${MARK} orphan`) && !k1.weak.includes(`${MARK} orphan`), 'a page linked only from the site-wide footer is not an orphan')
+    const kPage = await checksPage(jar)
+    check(kPage.includes('the header, footer and menus of your home page'), 'the page says it read them')
+    wp('option', 'update', 'rankxai_probe_block_loopback', '1')
+    scanAndRead()
+    check(evalPhp('echo RankXAI_Scan::findings()["chrome"];') === 'could_not_read', 'with the site unable to ask itself, the header and footer are "could not read"')
+    check((await checksPage(jar)).includes('Could not read the header and footer of your home page'), 'and the page says a page linked only from there may be listed')
+    wpSoft('option', 'delete', 'rankxai_probe_block_loopback')
+    wpSoft('option', 'delete', 'rankxai_probe_footer_link')
+    if (wpSoft('plugin', 'is-installed', 'seo-by-rank-math') !== null) {
+      const rmSaved = ['rank_math_modules', 'rank-math-options-sitemap'].map((o) => [o, wpSoft('option', 'get', o, '--format=json')])
+      wp('plugin', 'activate', 'seo-by-rank-math')
+      evalPhp('$m = (array) get_option( "rank_math_modules", array() ); if ( ! in_array( "sitemap", $m, true ) ) { $m[] = "sitemap"; update_option( "rank_math_modules", $m ); } $s = (array) get_option( "rank-math-options-sitemap", array() ); $s["pt_post_sitemap"] = "on"; $s["pt_page_sitemap"] = "on"; unset( $s["pt_rx_probe_form_sitemap"] ); update_option( "rank-math-options-sitemap", $s );')
+      const rmTypes = JSON.parse(evalPhp('echo json_encode( RankXAI_Scan::post_types() );'))
+      const rmOn = JSON.parse(evalPhp('$s = (array) get_option( "rank-math-options-sitemap" ); $on = array(); foreach ( $s as $k => $v ) { if ( "on" === $v && preg_match( "/^pt_(.+)_sitemap$/", $k, $m ) ) { $on[] = $m[1]; } } echo json_encode( $on );'))
+      check(!rmTypes.includes('rx_probe_block') && rmTypes.every((t) => rmOn.includes(t)), `with Rank Math's sitemap on, only the types it lists "on" are read (${rmTypes.join(', ')}); a type it has no setting for is not`)
+      wp('plugin', 'deactivate', 'seo-by-rank-math')
+      for (const [o, v] of rmSaved) { if (v === null) wpSoft('option', 'delete', o); else wpSoft('option', 'update', o, v, '--format=json') }
+    } else {
+      skip('Rank Math is not installed on this rig')
+    }
+    wpSoft('option', 'delete', 'rankxai_probe_form_type')
 
     // ── J ─────────────────────────────────────────────────────────────────
     console.log('\n== J  uninstall ==')

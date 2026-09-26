@@ -431,11 +431,16 @@ class RankXAI_Checks_Page {
 				implode( ', ', $types )
 			)
 		) . '</li>';
-		echo '<li>' . esc_html(
-			function_exists( 'wp_is_block_theme' ) && wp_is_block_theme()
+		if ( 'could_not_read' === $findings['chrome'] ) {
+			$chrome = __( 'Could not read the header and footer of your home page, because this site did not answer a request to itself. A page linked only from there may be listed as having no links. Does not see: widgets in a sidebar, and anything added by JavaScript in the browser.', 'rankxai' );
+		} elseif ( 'read' === $findings['chrome'] ) {
+			$chrome = __( 'Also reads: the header, footer and menus of your home page as the server sends it, so links your theme or a page builder puts there count. Does not see: widgets in a sidebar, and anything added by JavaScript in the browser.', 'rankxai' );
+		} else {
+			$chrome = function_exists( 'wp_is_block_theme' ) && wp_is_block_theme()
 				? __( 'Also reads: your theme\'s header and footer, and its navigation. Does not see: links a page builder keeps outside the page content, and anything added by JavaScript in the browser.', 'rankxai' )
-				: __( 'Does not see: widgets, links your theme writes into its own header and footer templates, links a page builder keeps outside the page content, and anything added by JavaScript in the browser.', 'rankxai' )
-		) . '</li>';
+				: __( 'Does not see: widgets, links your theme writes into its own header and footer templates, links a page builder keeps outside the page content, and anything added by JavaScript in the browser.', 'rankxai' );
+		}
+		echo '<li>' . esc_html( $chrome ) . '</li>';
 		echo '<li>' . esc_html__( 'Links to other websites are not checked here. A RankX AI site audit checks them.', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'Each address is confirmed by asking this site for it, from your own server, with the user agent RankXAI-SiteCheck. A security plugin\'s or a redirect plugin\'s 404 log may list these requests.', 'rankxai' ) . '</li>';
 		echo '</ul>';
