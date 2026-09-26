@@ -458,7 +458,7 @@ class RankXAI_Scan {
 		// it would call every listed post linked from every page.
 		$outside = 'not(ancestor::article) and not(ancestor::main)';
 		$query   = "//header[{$outside}]//a[@href] | //footer[{$outside}]//a[@href] | //nav[{$outside}]//a[@href] | //*[(@role=\"banner\" or @role=\"navigation\" or @role=\"contentinfo\") and {$outside}]//a[@href]";
-		$seen  = array();
+		$seen    = array();
 		foreach ( $xpath->query( $query ) as $anchor ) {
 			$path = self::internal_path( (string) $anchor->getAttribute( 'href' ), home_url( '/' ) );
 			if ( '' === $path || isset( $seen[ $path ] ) ) {
