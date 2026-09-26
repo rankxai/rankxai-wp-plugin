@@ -43,6 +43,15 @@ const tag = `v${version}`
 step(`RankX AI ${version}${DRY ? ' (dry run)' : ''}`)
 if (!/^\d+\.\d+\.\d+$/.test(version)) die(`plugin header version "${version}" is not x.y.z — the updater accepts nothing else`)
 if (constant !== version || stable !== version) die(`versions disagree: header ${version}, RANKXAI_VERSION ${constant}, Stable tag ${stable}`)
+
+// The owner's rule (2026-09-26): releases stay on 0.5.x, however large the
+// change, until the owner decides otherwise. Moving to a new series takes an
+// explicit RANKXAI_RELEASE_SERIES=<major.minor> naming exactly that series.
+const SERIES = '0.5'
+const series = version.split('.').slice(0, 2).join('.')
+if (series !== SERIES && process.env.RANKXAI_RELEASE_SERIES !== series) {
+  die(`version ${version} is outside the ${SERIES}.x series. Releases stay on ${SERIES}.x until the owner says otherwise: use the next ${SERIES}.x patch number, or, only with the owner's say-so, run with RANKXAI_RELEASE_SERIES=${series}`)
+}
 if (header(main, 'Update URI') !== `https://github.com/${REPO}`) die('rankxai.php has no Update URI for this repository, so no site would ever see the release')
 
 // The changelog entry for this version becomes the release notes and the "View details" text.
