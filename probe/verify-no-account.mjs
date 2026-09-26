@@ -342,7 +342,7 @@ $user = get_user_by( 'login', '${asUser}' );
 if ( ! $user ) { echo 'no-such-user'; return; }
 wp_set_current_user( $user->ID );
 ob_start();
-RankXAI_Admin::render();
+RankXAI_Pages::settings();
 echo ob_get_clean();
 `)
 }
@@ -351,8 +351,9 @@ echo ob_get_clean();
  * What `admin_menu` actually registers, as WordPress records it.
  *
  * Asserting on `$submenu` rather than on the source is the difference between
- * "the code calls add_options_page" and "WordPress has this screen, under
- * Settings, behind this capability".
+ * "the code calls add_submenu_page" and "WordPress has this screen, under the
+ * RankX AI menu, behind this capability". Since 0.5.0 (plan 82) the settings are
+ * the RankX AI menu's Settings page, not a page under Settings.
  */
 function registeredMenuEntry() {
   return wpEval(`<?php
@@ -361,8 +362,8 @@ wp_set_current_user( get_user_by( 'login', 'admin' )->ID );
 RankXAI_Admin::init();
 do_action( 'admin_menu' );
 $found = null;
-foreach ( (array) ( $GLOBALS['submenu']['options-general.php'] ?? array() ) as $item ) {
-	if ( isset( $item[2] ) && RankXAI_Admin::PAGE === $item[2] ) {
+foreach ( (array) ( $GLOBALS['submenu'][ RankXAI_Admin::PAGE ] ?? array() ) as $item ) {
+	if ( isset( $item[2] ) && RankXAI_Admin::PAGE_SETTINGS === $item[2] ) {
 		$found = array(
 			'title'      => $item[0],
 			'capability' => $item[1],
@@ -409,8 +410,8 @@ async function run() {
 
   // ---- THE SCREEN ---------------------------------------------------------
   const menu = registeredMenuEntry()
-  menu.includes('"slug":"rankxai"') && menu.includes('"capability":"manage_options"')
-    ? ok(`SCREEN — WordPress registers it under Settings behind manage_options (${menu})`)
+  menu.includes('"slug":"rankxai-settings"') && menu.includes('"capability":"manage_options"')
+    ? ok(`SCREEN — WordPress registers it under the RankX AI menu behind manage_options (${menu})`)
     : bad(`SCREEN — the menu entry was ${menu}`)
 
   const screen = renderScreen()
