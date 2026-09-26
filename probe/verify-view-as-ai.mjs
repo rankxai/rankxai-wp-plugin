@@ -81,11 +81,13 @@ async function run() {
       update_post_meta( $out["noindex"], "_seopress_robots_index", "yes" );
       $out["draft"]   = $mk( "draft", "<p>$p</p>", "post", "draft" );
       $out["short"]   = $mk( "short", "<p>Only a few words here.</p>" );
+      $out["greet"]   = $mk( "greet", "[rankxai_greeting]<p>$p</p>" );
+      $out["titled"]  = $mk( "titled", "<!-- wp:heading {\\"level\\":1} --><h1 class=\\"wp-block-heading\\">$m titled</h1><!-- /wp:heading --><p>$p</p>" );
       $out["author"]  = wp_insert_user( array( "user_login" => "$m-author", "user_pass" => "pw-$m", "role" => "author", "user_email" => "$m-a@example.test" ) );
       $out["sub"]     = wp_insert_user( array( "user_login" => "$m-sub", "user_pass" => "pw-$m", "role" => "subscriber", "user_email" => "$m-s@example.test" ) );
       $out["own"]     = $mk( "authors own", "<p>$p</p>", "post", "publish", $out["author"] );
       echo json_encode( $out );`)
-    created.posts.push(...['plain', 'page', 'builder', 'js', 'noindex', 'draft', 'short', 'own'].map((k) => ids[k]))
+    created.posts.push(...['plain', 'page', 'builder', 'js', 'noindex', 'draft', 'short', 'own', 'greet', 'titled'].map((k) => ids[k]))
     created.users.push(ids.author, ids.sub)
 
     // ── A ─────────────────────────────────────────────────────────────────
@@ -120,7 +122,8 @@ async function run() {
     // ── D ─────────────────────────────────────────────────────────────────
     console.log('\n== D  a body written by JavaScript ==')
     const js = await view(admin, ids.js)
-    check(js.text.includes('Most of this page\'s text is not in the HTML the server sends'), 'the warning fires')
+    const jsSaid = js.text.slice(js.text.indexOf('Does the server'), js.text.indexOf('Does the server') + 300)
+    check(js.text.includes('Most of this page\'s text is not in the HTML the server sends'), `the warning fires${js.text.includes('Most of this page') ? '' : ` (${jsSaid})`}`)
     check(/\b[0-9]%/.test(js.text) || /\b1[0-9]%/.test(js.text), 'with a coverage figure near zero')
 
     // ── E ─────────────────────────────────────────────────────────────────
@@ -146,6 +149,24 @@ async function run() {
     const short = await view(admin, ids.short)
     check(short.text.includes('too little text in the editor to compare'), 'a post with too few words says so rather than guessing')
     check(draft.text.includes('Canonical address Not known until the page can be read'), 'a draft does not guess its canonical')
+    // cfc.aiagencyplus.com, 2026-09-26: a short page is still read for its signals.
+    const shortOk = !short.text.includes('Canonical address Not known') && short.text.includes(`${MARK}-short`)
+    check(shortOk, `a post too short to compare still shows the canonical it prints${shortOk ? '' : ` (${short.text.slice(short.text.indexOf('Does the server'), short.text.indexOf('Does the server') + 400)})`}`)
+
+    // ── F2 ────────────────────────────────────────────────────────────────
+    // The same day: the Markdown was rendered as the admin, so a page that
+    // greets its reader showed their name and a log-out link; and a page that
+    // opens with its own title as a heading said it twice.
+    console.log('\n== F2  rendered as an assistant sees it ==')
+    const greet = await view(admin, ids.greet)
+    check(greet.text.includes('Hello visitor') && !greet.text.includes('Hello admin'), 'the Markdown is rendered for a visitor, not for the admin looking')
+    const asAdmin = wp('eval', 'wp_set_current_user( 1 ); echo do_shortcode( "[rankxai_greeting]" );')
+    check(asAdmin.includes('Hello admin'), `CONTROL — rendered for the admin, the same page greets them by name (${asAdmin})`)
+    const titled = await view(admin, ids.titled)
+    const heads = (titled.html.match(new RegExp(`# ${MARK} titled`, 'g')) ?? []).length
+    check(heads === 1, `a page that opens with its own title says it once (${heads})`)
+    const plainView = await view(admin, ids.plain)
+    check((plainView.html.match(new RegExp(`# ${MARK} plain`, 'g')) ?? []).length === 1, 'CONTROL — a page without one still gets the title as its heading')
     wp('option', 'update', 'rankxai_probe_robots', `User-agent: OAI-SearchBot\nDisallow: /${MARK}-draft\n`)
     wp('eval', 'delete_transient( "rankxai_robots_reading" );')
     const draftBlocked = await view(admin, ids.draft)

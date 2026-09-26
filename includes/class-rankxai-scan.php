@@ -194,11 +194,15 @@ class RankXAI_Scan {
 		// setting says 'on', so a type with no setting is not in the sitemap.
 		$rank_math = get_option( 'rank-math-options-sitemap' );
 		$rm_owns   = defined( 'RANK_MATH_VERSION' ) && is_array( $rank_math ) && in_array( 'sitemap', (array) get_option( 'rank_math_modules', array() ), true );
+		$rm_listed = $rm_owns ? self::rank_math_sitemap_types( $types ) : null;
 		$yoast     = get_option( 'wpseo_titles' );
 		$pretty    = '' !== (string) get_option( 'permalink_structure' );
 		$out       = array();
 		foreach ( $types as $type ) {
-			if ( $rm_owns && ( ! isset( $rank_math[ 'pt_' . $type . '_sitemap' ] ) || 'on' !== $rank_math[ 'pt_' . $type . '_sitemap' ] ) ) {
+			if ( null !== $rm_listed && ! in_array( $type, $rm_listed, true ) ) {
+				continue;
+			}
+			if ( $rm_owns && null === $rm_listed && ( ! isset( $rank_math[ 'pt_' . $type . '_sitemap' ] ) || 'on' !== $rank_math[ 'pt_' . $type . '_sitemap' ] ) ) {
 				continue;
 			}
 			// A type with no address of its own (a form, say) is reached only
@@ -213,6 +217,38 @@ class RankXAI_Scan {
 			$out[] = $type;
 		}
 		return $out;
+	}
+
+	/**
+	 * The post types Rank Math's sitemap index lists, asked of Rank Math itself.
+	 *
+	 * Its settings are not enough: another plugin can drop a type through Rank
+	 * Math's filters with the setting still on (seen live with a theme's
+	 * Content Blocks). The index links are what sitemap_index.xml prints.
+	 *
+	 * @param string[] $types Candidate post types.
+	 * @return string[]|null Null when Rank Math could not be asked.
+	 */
+	private static function rank_math_sitemap_types( $types ) {
+		if ( ! class_exists( '\RankMath\Sitemap\Providers\Post_Type' ) ) {
+			return null;
+		}
+		try {
+			$provider = new \RankMath\Sitemap\Providers\Post_Type();
+			$links    = (array) $provider->get_index_links( 1000 );
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+		$listed = array();
+		foreach ( $links as $link ) {
+			$file = isset( $link['loc'] ) ? basename( (string) wp_parse_url( (string) $link['loc'], PHP_URL_PATH ) ) : '';
+			foreach ( $types as $type ) {
+				if ( preg_match( '/^' . preg_quote( $type, '/' ) . '-sitemap\d*\.xml$/', $file ) ) {
+					$listed[] = $type;
+				}
+			}
+		}
+		return array_values( array_unique( $listed ) );
 	}
 
 	// -----------------------------------------------------------------------
@@ -654,13 +690,18 @@ class RankXAI_Scan {
 
 		// Broken and redirected targets, each with the pages that link to it.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
-		$rows = $wpdb->get_results( "SELECT to_hash, MIN(to_path) AS to_path, MIN(state) AS state, MAX(http_status) AS http_status, MAX(final_path) AS final_path, GROUP_CONCAT(DISTINCT CASE WHEN from_kind = 'post' THEN from_id END) AS sources FROM {$table} WHERE state IN ('broken','redirects') GROUP BY to_hash ORDER BY COUNT(*) DESC LIMIT 200", ARRAY_A );
+		$rows = $wpdb->get_results( "SELECT to_hash, MIN(to_path) AS to_path, MIN(state) AS state, MAX(http_status) AS http_status, MAX(final_path) AS final_path, GROUP_CONCAT(DISTINCT CASE WHEN from_kind = 'post' THEN from_id END) AS sources, GROUP_CONCAT(DISTINCT CASE WHEN from_kind = 'menu' AND from_id > 0 THEN from_id END) AS menus, MAX(CASE WHEN from_kind = 'menu' AND from_id = 0 THEN 1 ELSE 0 END) AS chrome FROM {$table} WHERE state IN ('broken','redirects') GROUP BY to_hash ORDER BY COUNT(*) DESC LIMIT 200", ARRAY_A );
 		foreach ( (array) $rows as $r ) {
+			// Besides pages: 'menus' are the menus (or, on a block theme, the
+			// navigation and template parts) holding the link, and 'chrome' is
+			// the home page's header or footer, read from the page itself.
 			$item = array(
 				'path'    => (string) $r['to_path'],
 				'status'  => (int) $r['http_status'],
 				'final'   => (string) $r['final_path'],
 				'sources' => array_values( array_filter( array_map( 'intval', explode( ',', (string) $r['sources'] ) ) ) ),
+				'menus'   => array_values( array_filter( array_map( 'intval', explode( ',', (string) $r['menus'] ) ) ) ),
+				'chrome'  => 1 === (int) $r['chrome'],
 			);
 			if ( 'broken' === $r['state'] ) {
 				$out['broken'][] = $item;

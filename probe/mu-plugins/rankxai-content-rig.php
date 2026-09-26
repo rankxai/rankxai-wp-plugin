@@ -6,6 +6,7 @@
  *                                               the content is rendered
  *   [rankxai_js_body]text[/rankxai_js_body]     text the server never sends:
  *                                               a script writes it in the browser
+ *   [rankxai_greeting]                          "Hello <login>", or "Hello visitor"
  *
  * While `rankxai_probe_401` is set, the site's requests to itself answer 401,
  * as a staging site behind HTTP basic auth does.
@@ -64,6 +65,16 @@ add_action(
 	}
 );
 
+// A plugin that drops a type from Rank Math's sitemap with the setting left on.
+add_filter(
+	'rank_math/sitemap/exclude_post_type',
+	function ( $exclude, $type ) {
+		return get_option( 'rankxai_probe_rm_exclude' ) === $type ? true : $exclude;
+	},
+	10,
+	2
+);
+
 if ( get_option( 'rankxai_probe_disable_cron' ) && ! defined( 'DISABLE_WP_CRON' ) ) {
 	define( 'DISABLE_WP_CRON', true );
 }
@@ -73,6 +84,15 @@ add_shortcode(
 	function ( $atts, $content = '' ) {
 		$atts = shortcode_atts( array( 'to' => '/' ), $atts );
 		return '<a href="' . esc_url( home_url( $atts['to'] ) ) . '">' . esc_html( $content ) . '</a>';
+	}
+);
+
+// Greets its reader, as a membership page does.
+add_shortcode(
+	'rankxai_greeting',
+	function () {
+		$user = wp_get_current_user();
+		return '<p>' . esc_html( $user->exists() ? 'Hello ' . $user->user_login : 'Hello visitor' ) . '</p>';
 	}
 );
 

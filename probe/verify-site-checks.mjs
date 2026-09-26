@@ -80,7 +80,7 @@ const read = () => evalJson(FINDINGS)
 async function run() {
   const theme = wp('theme', 'list', '--status=active', '--field=name')
   const plugins = (wpSoft('plugin', 'list', '--status=active', '--field=name') ?? '').split('\n').filter(Boolean)
-  const savedOptions = Object.fromEntries(['rankxai_redirects', 'rankxai_scan_state', 'surerank_settings', 'rankxai_probe_block_loopback', 'rankxai_probe_disable_cron', 'nav_menu_locations', 'rankxai_probe_footer_link', 'rankxai_probe_form_type'].map((o) => [o, wpSoft('option', 'get', o, '--format=json')]))
+  const savedOptions = Object.fromEntries(['rankxai_redirects', 'rankxai_scan_state', 'surerank_settings', 'rankxai_probe_block_loopback', 'rankxai_probe_disable_cron', 'nav_menu_locations', 'rankxai_probe_footer_link', 'rankxai_probe_form_type', 'rankxai_probe_rm_exclude'].map((o) => [o, wpSoft('option', 'get', o, '--format=json')]))
   const created = { posts: [], terms: [], menus: [] }
   const jar = await login()
 
@@ -283,6 +283,19 @@ async function run() {
     check(evalPhp('echo RankXAI_Scan::findings()["chrome"];') === 'could_not_read', 'with the site unable to ask itself, the header and footer are "could not read"')
     check((await checksPage(jar)).includes('Could not read the header and footer of your home page'), 'and the page says a page linked only from there may be listed')
     wpSoft('option', 'delete', 'rankxai_probe_block_loopback')
+    // A broken link only in the site-wide header or footer (cfc.aiagencyplus.com,
+    // 2026-09-26: a header button to a page that had moved) must say so, not
+    // leave "Linked from" empty and tell the customer to edit a page.
+    const footerMissing = `/${MARK}-footer-missing/`
+    wp('option', 'update', 'rankxai_probe_footer_link', footerMissing)
+    scanAndRead()
+    const fb = evalJson(`$hit = null; foreach ( RankXAI_Scan::findings()["broken"] as $b ) { if ( "${footerMissing}" === $b["path"] ) { $hit = $b; } } echo json_encode( $hit );`)
+    check(fb !== null, `CONTROL — a footer link to a missing page is reported broken (${JSON.stringify(fb)})`)
+    check(fb && fb.chrome === true && fb.sources.length === 0 && fb.menus.length === 0, 'it is recorded as the header or footer, with no page and no menu')
+    const fr = evalJson(`wp_set_current_user( 1 ); $d = rest_do_request( new WP_REST_Request( "GET", "/rankxai/v1/checks" ) )->get_data(); $hit = null; foreach ( $d["broken"] as $b ) { if ( "${footerMissing}" === $b["path"] ) { $hit = $b; } } echo json_encode( array( "item" => $hit, "hf" => $d["scan"]["headerFooter"] ) );`)
+    check(fr.item && fr.item.inHeaderFooter === true && fr.item.inMenu === false && fr.item.sources.length === 0 && fr.hf === 'read', `the checks endpoint says so too (${JSON.stringify(fr)})`)
+    const fPage = await checksPage(jar)
+    check(fPage.includes('The header or footer on every page') && fPage.includes('Change the link in your site&#039;s header or footer'), 'the page names the header or footer and says where to change it')
     wpSoft('option', 'delete', 'rankxai_probe_footer_link')
     if (wpSoft('plugin', 'is-installed', 'seo-by-rank-math') !== null) {
       const rmSaved = ['rank_math_modules', 'rank-math-options-sitemap'].map((o) => [o, wpSoft('option', 'get', o, '--format=json')])
@@ -291,6 +304,19 @@ async function run() {
       const rmTypes = JSON.parse(evalPhp('echo json_encode( RankXAI_Scan::post_types() );'))
       const rmOn = JSON.parse(evalPhp('$s = (array) get_option( "rank-math-options-sitemap" ); $on = array(); foreach ( $s as $k => $v ) { if ( "on" === $v && preg_match( "/^pt_(.+)_sitemap$/", $k, $m ) ) { $on[] = $m[1]; } } echo json_encode( $on );'))
       check(!rmTypes.includes('rx_probe_block') && rmTypes.every((t) => rmOn.includes(t)), `with Rank Math's sitemap on, only the types it lists "on" are read (${rmTypes.join(', ')}); a type it has no setting for is not`)
+      // aiagencyplus.com, 2026-09-26: Content Blocks had Rank Math's setting on,
+      // but another plugin dropped them through Rank Math's filter, so its
+      // sitemap never listed them. What counts is what Rank Math's index lists.
+      const blockId = Number(evalPhp(`echo wp_insert_post( array( "post_title" => "${MARK} block", "post_type" => "rx_probe_block", "post_status" => "publish" ) );`))
+      created.posts.push(blockId)
+      evalPhp('$s = (array) get_option( "rank-math-options-sitemap", array() ); $s["pt_rx_probe_block_sitemap"] = "on"; update_option( "rank-math-options-sitemap", $s );')
+      const rmOnTypes = JSON.parse(evalPhp('echo json_encode( RankXAI_Scan::post_types() );'))
+      check(rmOnTypes.includes('rx_probe_block'), `CONTROL — with Rank Math listing the type, it is read (${rmOnTypes.join(', ')})`)
+      wp('option', 'update', 'rankxai_probe_rm_exclude', 'rx_probe_block')
+      const rmFiltered = JSON.parse(evalPhp('echo json_encode( RankXAI_Scan::post_types() );'))
+      const rmSetting = evalPhp('$s = (array) get_option( "rank-math-options-sitemap" ); echo isset( $s["pt_rx_probe_block_sitemap"] ) ? $s["pt_rx_probe_block_sitemap"] : "";')
+      check(rmSetting === 'on' && !rmFiltered.includes('rx_probe_block') && rmFiltered.includes('post'), `with the setting still on but a filter dropping it from Rank Math's sitemap, it is not read (${rmFiltered.join(', ')})`)
+      wpSoft('option', 'delete', 'rankxai_probe_rm_exclude')
       wp('plugin', 'deactivate', 'seo-by-rank-math')
       for (const [o, v] of rmSaved) { if (v === null) wpSoft('option', 'delete', o); else wpSoft('option', 'update', o, v, '--format=json') }
     } else {

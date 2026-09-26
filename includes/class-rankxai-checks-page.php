@@ -200,6 +200,60 @@ class RankXAI_Checks_Page {
 	}
 
 	/**
+	 * Where a link was found: pages, menus, and the site-wide header or footer.
+	 *
+	 * @param array $item A broken or redirected link.
+	 * @return string HTML.
+	 */
+	private static function link_sources( $item ) {
+		$parts = array();
+		if ( $item['sources'] ) {
+			$parts[] = self::edit_links( $item['sources'] );
+		}
+		$menus = isset( $item['menus'] ) ? (array) $item['menus'] : array();
+		foreach ( array_slice( $menus, 0, 3 ) as $id ) {
+			$post = get_post( $id );
+			if ( $post && in_array( $post->post_type, array( 'wp_navigation', 'wp_block', 'wp_template_part' ), true ) ) {
+				$title   = '' === $post->post_title ? __( 'Navigation', 'rankxai' ) : $post->post_title;
+				$parts[] = '<a href="' . esc_url( admin_url( 'site-editor.php' ) ) . '">' . esc_html( $title ) . '</a>';
+				continue;
+			}
+			$term = get_term( $id, 'nav_menu' );
+			if ( $term && ! is_wp_error( $term ) ) {
+				/* translators: %s: menu name. */
+				$parts[] = '<a href="' . esc_url( admin_url( 'nav-menus.php?action=edit&menu=' . (int) $id ) ) . '">' . esc_html( sprintf( __( 'Menu "%s"', 'rankxai' ), $term->name ) ) . '</a>';
+			}
+		}
+		if ( ! empty( $item['chrome'] ) && ! $menus ) {
+			$url     = function_exists( 'wp_is_block_theme' ) && wp_is_block_theme() ? admin_url( 'site-editor.php' ) : admin_url( 'customize.php' );
+			$parts[] = '<a href="' . esc_url( $url ) . '">' . esc_html__( 'The header or footer on every page', 'rankxai' ) . '</a>';
+		}
+		return $parts ? implode( ', ', $parts ) : '—';
+	}
+
+	/**
+	 * What to do about a broken link, depending on where it is.
+	 *
+	 * @param array $item A broken link.
+	 * @return string
+	 */
+	private static function broken_advice( $item ) {
+		$pages  = ! empty( $item['sources'] );
+		$menus  = ! empty( $item['menus'] );
+		$chrome = ! empty( $item['chrome'] );
+		if ( ! $pages && ! $menus && $chrome ) {
+			return __( 'Change the link in your site\'s header or footer. Your theme sets it (Appearance → Customize, or the theme\'s header and footer builder), not a page.', 'rankxai' );
+		}
+		if ( ! $pages && $menus ) {
+			return __( 'Edit the menu and point the link at the right page, or remove it.', 'rankxai' );
+		}
+		if ( $pages && $menus ) {
+			return __( 'Edit the linking pages and menus and point the link at the right page, or remove it.', 'rankxai' );
+		}
+		return __( 'Edit the linking page and point the link at the right page, or remove it.', 'rankxai' );
+	}
+
+	/**
 	 * Broken internal links.
 	 *
 	 * @param array $findings Findings.
@@ -223,8 +277,8 @@ class RankXAI_Checks_Page {
 		$forms = false;
 		foreach ( $findings['broken'] as $item ) {
 			echo '<tr><td><code>' . esc_html( $item['path'] ) . '</code></td>';
-			echo '<td>' . wp_kses_post( self::edit_links( $item['sources'] ) ) . '</td>';
-			echo '<td>' . esc_html__( 'Edit the linking page and point the link at the right page, or remove it.', 'rankxai' ) . '</td><td>';
+			echo '<td>' . wp_kses_post( self::link_sources( $item ) ) . '</td>';
+			echo '<td>' . esc_html( self::broken_advice( $item ) ) . '</td><td>';
 			$path = (string) wp_parse_url( $item['path'], PHP_URL_PATH );
 			if ( '' !== $backend['backend'] && RankXAI_Redirect_Requests::offerable( $path ) && false === strpos( $item['path'], '?' ) ) {
 				RankXAI_Crawler_Page::redirect_form( $path, 'checks' );
@@ -263,10 +317,10 @@ class RankXAI_Checks_Page {
 			$rows[] = array(
 				'<code>' . esc_html( $item['path'] ) . '</code>',
 				'' === $item['final'] ? esc_html__( 'Somewhere else', 'rankxai' ) : '<code>' . esc_html( $item['final'] ) . '</code>',
-				self::edit_links( $item['sources'] ),
+				self::link_sources( $item ),
 			);
 		}
-		RankXAI_UI::table( array( __( 'Link points at', 'rankxai' ), __( 'Final page', 'rankxai' ), __( 'Edit the page', 'rankxai' ) ), $rows, array( 0, 1, 2 ) );
+		RankXAI_UI::table( array( __( 'Link points at', 'rankxai' ), __( 'Final page', 'rankxai' ), __( 'Linked from', 'rankxai' ) ), $rows, array( 0, 1, 2 ) );
 		RankXAI_UI::card_close();
 	}
 

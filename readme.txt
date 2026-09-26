@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.5.1
+Stable tag: 0.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -272,6 +272,10 @@ write, exactly as the editor does.
   the plugin.
 
 == Changelog ==
+
+= 0.5.2 =
+* Site checks ask Rank Math which content types its sitemap lists, so a type another plugin keeps out of that sitemap is not read as pages, even with Rank Math's own setting left on.
+* A broken or redirected link in a menu, or in the header or footer every page carries, now says so in "Linked from", with a link to where it is changed and advice to match. Before, the row was blank and said to edit a page.
 
 = 0.5.1 =
 * Site checks read only the content types your sitemap lists. With Rank Math, that is the types its sitemap includes, so theme content blocks and form entries are no longer listed as pages.

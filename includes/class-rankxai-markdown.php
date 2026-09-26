@@ -126,10 +126,16 @@ class RankXAI_Markdown {
 		$lines[] = '---';
 
 		$document = implode( "\n", $lines ) . "\n\n";
+		$body     = self::convert( self::rendered_content( $post ) );
 		if ( '' !== $title ) {
-			$document .= '# ' . self::escape_text( $title ) . "\n\n";
+			// A page that opens with its own title as a heading would say it twice.
+			$heading = '# ' . self::escape_text( $title );
+			$first   = trim( (string) strstr( ltrim( $body ) . "\n", "\n", true ) );
+			if ( 0 !== strcasecmp( $first, $heading ) ) {
+				$document .= $heading . "\n\n";
+			}
 		}
-		$document .= self::convert( self::rendered_content( $post ) );
+		$document .= $body;
 
 		$context = trim( (string) $context );
 		if ( '' !== $context ) {

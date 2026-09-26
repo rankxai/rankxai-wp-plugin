@@ -487,10 +487,12 @@ class RankXAI_REST {
 			$out = array();
 			foreach ( array_slice( $items, 0, 200 ) as $item ) {
 				$out[] = array(
-					'path'    => (string) $item['path'],
-					'status'  => (int) $item['status'],
-					'final'   => (string) $item['final'],
-					'sources' => $source( $item['sources'] ),
+					'path'           => (string) $item['path'],
+					'status'         => (int) $item['status'],
+					'final'          => (string) $item['final'],
+					'sources'        => $source( $item['sources'] ),
+					'inMenu'         => ! empty( $item['menus'] ),
+					'inHeaderFooter' => ! empty( $item['chrome'] ),
 				);
 			}
 			return $out;
@@ -516,6 +518,7 @@ class RankXAI_REST {
 					'capped'        => $f['capped'],
 					'links'         => $f['links'],
 					'couldNotCheck' => $f['couldNotCheck'],
+					'headerFooter'  => isset( $f['chrome'] ) ? (string) $f['chrome'] : '',
 				),
 				'broken'        => $links( $f['broken'] ),
 				'redirects'     => $links( $f['redirects'] ),

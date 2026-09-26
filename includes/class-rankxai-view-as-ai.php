@@ -139,25 +139,27 @@ class RankXAI_View_As_AI {
 		}
 		$editor             = self::words( self::editor_text( $post ) );
 		$out['editorWords'] = count( $editor );
-		if ( count( $editor ) < self::MIN_WORDS ) {
-			$out['state'] = 'too_short';
-			return $out;
-		}
 
+		// Fetched even when there is too little to compare: the noindex and
+		// canonical signals come from the page itself.
 		$path          = (string) wp_parse_url( (string) get_permalink( $post ), PHP_URL_PATH );
 		$query         = (string) wp_parse_url( (string) get_permalink( $post ), PHP_URL_QUERY );
 		$response      = RankXAI_Loopback::request( RankXAI_Loopback::url( $path . ( '' === $query ? '' : '?' . $query ) ), 'GET' );
 		$out['status'] = $response['status'];
 		if ( 200 !== $response['status'] ) {
-			$out['state'] = 'could_not_check';
+			$out['state'] = count( $editor ) < self::MIN_WORDS ? 'too_short' : 'could_not_check';
 			return $out;
 		}
 		$out['html']           = $response['body'];
 		$delivered             = self::words( self::visible_text( $response['body'] ) );
 		$out['deliveredWords'] = count( $delivered );
-		$found                 = count( array_intersect_key( $editor, $delivered ) );
-		$out['coverage']       = $found / count( $editor );
-		$out['state']          = $out['coverage'] < self::THRESHOLD ? 'missing' : 'ok';
+		if ( count( $editor ) < self::MIN_WORDS ) {
+			$out['state'] = 'too_short';
+			return $out;
+		}
+		$found           = count( array_intersect_key( $editor, $delivered ) );
+		$out['coverage'] = $found / count( $editor );
+		$out['state']    = $out['coverage'] < self::THRESHOLD ? 'missing' : 'ok';
 		return $out;
 	}
 
@@ -386,8 +388,16 @@ class RankXAI_View_As_AI {
 					: __( 'Shown here only. Markdown copies are switched off, so nothing is published.', 'rankxai' ),
 			)
 		);
-		$context  = RankXAI_Twins::context();
-		$markdown = RankXAI_Markdown::document( $post, '', $context['content'] );
+		$context = RankXAI_Twins::context();
+		// An assistant is never logged in. Rendered as the admin, a page that
+		// greets its reader shows their name and a log-out link.
+		$user = get_current_user_id();
+		wp_set_current_user( 0 );
+		try {
+			$markdown = RankXAI_Markdown::document( $post, '', $context['content'] );
+		} finally {
+			wp_set_current_user( $user );
+		}
 		echo '<pre class="rankxai-pre">' . esc_html( $markdown ) . '</pre>';
 		RankXAI_UI::card_close();
 	}
