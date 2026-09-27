@@ -149,11 +149,11 @@ async function run() {
     // ── B ─────────────────────────────────────────────────────────────────
     console.log('\n== B  the page ==')
     const html = await checksPage(jar)
-    if (!html.includes('Broken internal links')) console.log(`  (diagnostic) the page said: ${html.replace(/s+/g, ' ').slice(html.indexOf('rankxai-page'), html.indexOf('rankxai-page') + 600)}`)
+    if (!html.includes('Broken internal links')) console.log(`  (diagnostic) the page said: ${html.replace(/\s+/g, ' ').slice(html.indexOf('rankxai-page'), html.indexOf('rankxai-page') + 600)}`)
     check(html.includes('Broken internal links') && html.includes(`<code>/${MARK}-missing/</code>`), 'the broken link is on the page')
     check(html.includes('name="action" value="rankxai_add_redirect"'), 'with an "Add redirect" form')
     check(html.includes('Links through a redirect') && html.includes('Point them straight at the final page'), 'the redirected link has its own card, worded as an improvement')
-    check(html.includes('No links to these pages were found in your content or menus.'), 'orphans are worded as "no links we could see"')
+    check(html.includes('Pages few links point to') && html.includes('No link, or only one, was found to these pages in your content or menus.'), 'orphans and one-link pages together are worded as "no link, or one, that we could see"')
     check(html.includes('Archives and the shop still list these'), 'posts are never called orphans')
     check(html.includes('That is right for a decorative image') && !/rankxai-chip--danger[^<]*<\/span>[^<]*empty/i.test(html), 'empty alt text is explained, not shown as a failure')
     check(html.includes('What a site check covers') && html.includes('Does not see'), 'the page says what the check could not see')

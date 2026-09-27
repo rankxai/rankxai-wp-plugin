@@ -333,10 +333,22 @@ class RankXAI_Checks_Page {
 		if ( ! $findings['orphans'] && ! $findings['weak'] ) {
 			return;
 		}
+		// The heading says what the lists below actually hold: a site can have
+		// pages with one link and none with no links at all.
+		if ( ! $findings['orphans'] ) {
+			$title    = __( 'Pages with only one link', 'rankxai' );
+			$subtitle = __( 'Each of these has one link from your content or menus, so a crawler has one way to find it.', 'rankxai' );
+		} elseif ( ! $findings['weak'] ) {
+			$title    = __( 'Pages nothing links to', 'rankxai' );
+			$subtitle = __( 'No links to these pages were found in your content or menus.', 'rankxai' );
+		} else {
+			$title    = __( 'Pages few links point to', 'rankxai' );
+			$subtitle = __( 'No link, or only one, was found to these pages in your content or menus.', 'rankxai' );
+		}
 		RankXAI_UI::card_open(
 			array(
-				'title'    => __( 'Pages nothing links to', 'rankxai' ),
-				'subtitle' => __( 'No links to these pages were found in your content or menus.', 'rankxai' ),
+				'title'    => $title,
+				'subtitle' => $subtitle,
 			)
 		);
 		foreach ( array(
