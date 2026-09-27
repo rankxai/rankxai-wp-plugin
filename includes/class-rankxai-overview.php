@@ -19,12 +19,13 @@ defined( 'ABSPATH' ) || exit;
 class RankXAI_Overview {
 
 	/**
-	 * The public AI Visibility Checker on rankxai.com (plan 82 4a).
+	 * The public AI Visibility Checker on rankxai.com (plan 82 4a, live 27 Sep 2026).
 	 *
-	 * Empty until that page is live: a link must never point at a page that is
-	 * not there. While empty, the card says what an account adds instead.
+	 * The link carries this site's host as ?domain= and only fills the form;
+	 * nothing runs until the visitor gives an email address and starts it.
+	 * Empty would hide the link and show what an account adds instead.
 	 */
-	const CHECKER_URL = '';
+	const CHECKER_URL = 'https://rankxai.com/tools/ai-visibility-checker';
 
 	/**
 	 * The hero sentence and its one action.
@@ -269,7 +270,7 @@ class RankXAI_Overview {
 			$card['state'] = RankXAI_UI::chip( __( 'Needs RankX AI', 'rankxai' ), 'info' );
 			if ( '' !== self::CHECKER_URL ) {
 				$domain         = (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST );
-				$card['text']   = __( 'Run the free AI visibility check on rankxai.com: it asks ChatGPT and Gemini a few questions a customer would ask and tells you whether this site is named, and who is named instead.', 'rankxai' );
+				$card['text']   = __( 'Run the free AI visibility check on rankxai.com: it asks ChatGPT and Gemini three questions a customer would ask and tells you whether this site is named, and who is named instead.', 'rankxai' );
 				$card['action'] = RankXAI_UI::button_link( __( 'Run the free check', 'rankxai' ), add_query_arg( 'domain', rawurlencode( $domain ), self::CHECKER_URL ), 'outline', true );
 			} else {
 				$card['text']   = __( 'With a RankX AI account, the questions your customers ask are put to AI assistants such as ChatGPT, Claude, Gemini and Perplexity on a schedule, and this card shows how often each one names you, and which of your pages AI crawlers read but never cite.', 'rankxai' );

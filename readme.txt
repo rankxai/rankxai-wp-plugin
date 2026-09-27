@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.5.2
+Stable tag: 0.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -251,9 +251,14 @@ already: a content update is refused unless the connected account may edit that
 exact post, and the plugin applies WordPress's own content filters to every
 write, exactly as the editor does.
 
+The Overview offers a link to RankX AI's free AI Visibility Checker at
+https://rankxai.com/tools/ai-visibility-checker. The plugin makes no request for
+it: clicking the link opens that page in your browser with this site's address
+filled in, and nothing runs until you enter an email address and start the check.
+
 * RankX AI: https://rankxai.com
-* Terms: https://rankxai.com/terms
-* Privacy: https://rankxai.com/privacy
+* Terms: https://rankxai.com/terms-of-service
+* Privacy: https://rankxai.com/privacy-policy
 
 == Screenshots ==
 
@@ -272,6 +277,10 @@ write, exactly as the editor does.
   the plugin.
 
 == Changelog ==
+
+= 0.5.3 =
+* Overview: "Run the free check" opens RankX AI's free AI Visibility Checker with this site's address filled in. It asks ChatGPT and Gemini three questions a customer would ask and shows whether this site is named, and who is named instead.
+* Site checks: when no page is missing links and some have only one, the card's heading says so, instead of "Pages nothing links to".
 
 = 0.5.2 =
 * Site checks ask Rank Math which content types its sitemap lists, so a type another plugin keeps out of that sitemap is not read as pages, even with Rank Math's own setting left on.
