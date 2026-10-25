@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       RankX AI
  * Plugin URI:        https://github.com/rankxai/rankxai-wp-plugin
- * Description:       Publishes llms.txt, agents.md and markdown copies of your pages for AI assistants, and writes SEO metadata from your RankX AI account through whichever SEO plugin you use, or none.
- * Version:           0.5.4
+ * Description:       Publishes llms.txt, agents.md and markdown copies of your pages for AI assistants, writes SEO metadata from your RankX AI account through whichever SEO plugin you use, or none, and on a WooCommerce store brings RankX AI's store app into your dashboard.
+ * Version:           0.5.5
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            RankX AI
@@ -11,6 +11,8 @@
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       rankxai
+ * WC requires at least: 8.2
+ * WC tested up to:   11.2
  * Update URI:        https://github.com/rankxai/rankxai-wp-plugin
  *
  * @package RankXAI
@@ -18,7 +20,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'RANKXAI_VERSION', '0.5.4' );
+define( 'RANKXAI_VERSION', '0.5.5' );
 
 /**
  * REST contract version, separate from the plugin version.
@@ -55,6 +57,9 @@ require_once __DIR__ . '/includes/class-rankxai-site-health.php';
 require_once __DIR__ . '/includes/class-rankxai-scan.php';
 require_once __DIR__ . '/includes/class-rankxai-summary.php';
 require_once __DIR__ . '/includes/class-rankxai-rest.php';
+require_once __DIR__ . '/includes/class-rankxai-app-client.php';
+require_once __DIR__ . '/includes/class-rankxai-session-cache.php';
+require_once __DIR__ . '/includes/class-rankxai-connection.php';
 
 RankXAI_REST::init();
 RankXAI_SEO::init();
@@ -71,6 +76,40 @@ RankXAI_Crawlers::init();
 RankXAI_Redirect_Requests::init();
 RankXAI_Site_Health::init();
 RankXAI_Scan::init();
+RankXAI_Connection::init();
+
+// Disconnecting on deactivation removes the token and RankX AI's Application
+// Passwords, so RankX AI stops writing to a site that switched it off.
+register_deactivation_hook( __FILE__, array( 'RankXAI_Connection', 'on_deactivate' ) );
+
+// The WooCommerce store experience. Plugins load in alphabetical order, so
+// WooCommerce is not loaded yet when this file runs: the check waits for
+// `plugins_loaded`. The plugin works the same without WooCommerce.
+add_action(
+	'plugins_loaded',
+	function () {
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			return;
+		}
+		require_once __DIR__ . '/includes/store/class-rankxai-session.php';
+		RankXAI_Session::init();
+		if ( is_admin() ) {
+			require_once __DIR__ . '/includes/store/class-rankxai-store-admin.php';
+		}
+	}
+);
+
+// Compatible with WooCommerce's order tables and its cart and checkout blocks:
+// this plugin reads and writes no orders and adds nothing to cart or checkout.
+add_action(
+	'before_woocommerce_init',
+	function () {
+		if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', __FILE__, true );
+		}
+	}
+);
 
 // Present only in the GitHub build. The WordPress.org build removes this file and
 // the `Update URI` header, because the directory delivers its own updates.

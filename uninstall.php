@@ -117,6 +117,21 @@ function rankxai_uninstall_current_site() {
 	}
 	wp_clear_scheduled_hook( 'rankxai_confirm_redirect' );
 
+	// The RankX AI connection: the site token, the connect states and the cached
+	// sessions, and the Application Passwords RankX AI's approval created. All
+	// local: deactivating (which always comes first) already told RankX AI.
+	$rankxai_connection = __DIR__ . '/includes/class-rankxai-connection.php';
+	$rankxai_cache      = __DIR__ . '/includes/class-rankxai-session-cache.php';
+	if ( file_exists( $rankxai_connection ) && file_exists( $rankxai_cache ) ) {
+		require_once $rankxai_cache;
+		require_once $rankxai_connection;
+		RankXAI_Session_Cache::clear_all();
+		delete_option( RankXAI_Connection::OPTION );
+		delete_option( RankXAI_Connection::STATES_OPTION );
+		delete_option( 'rankxai_site_token_rotating' );
+		RankXAI_Connection::remove_app_passwords();
+	}
+
 	// Which documents were generated locally. One option holding every slug, so
 	// unlike the catalogue above there is nothing to derive.
 	$generate = __DIR__ . '/includes/class-rankxai-generate.php';

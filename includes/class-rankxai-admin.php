@@ -54,6 +54,9 @@ class RankXAI_Admin {
 	/** Settings page. */
 	const PAGE_SETTINGS = 'rankxai-settings';
 
+	/** The store app, on a WooCommerce site. */
+	const PAGE_STORE = 'rankxai-store';
+
 	/** View as AI, reached from a post's row actions. Not in the menu. */
 	const PAGE_VIEW = 'rankxai-view-as-ai';
 
@@ -93,12 +96,15 @@ class RankXAI_Admin {
 	 * @return array<string, string>
 	 */
 	public static function pages() {
-		return array(
-			self::PAGE          => __( 'Overview', 'rankxai' ),
-			self::PAGE_CRAWLERS => __( 'AI crawlers', 'rankxai' ),
-			self::PAGE_CHECKS   => __( 'Site checks', 'rankxai' ),
-			self::PAGE_SETTINGS => __( 'Settings', 'rankxai' ),
-		);
+		$pages = array( self::PAGE => __( 'Overview', 'rankxai' ) );
+		// The Store page exists only on a WooCommerce site (its class is loaded then).
+		if ( class_exists( 'RankXAI_Store_Admin' ) ) {
+			$pages[ self::PAGE_STORE ] = __( 'Store', 'rankxai' );
+		}
+		$pages[ self::PAGE_CRAWLERS ] = __( 'AI crawlers', 'rankxai' );
+		$pages[ self::PAGE_CHECKS ]   = __( 'Site checks', 'rankxai' );
+		$pages[ self::PAGE_SETTINGS ] = __( 'Settings', 'rankxai' );
+		return $pages;
 	}
 
 	/**
@@ -121,6 +127,7 @@ class RankXAI_Admin {
 
 		$renderers = array(
 			self::PAGE          => array( 'RankXAI_Pages', 'overview' ),
+			self::PAGE_STORE    => array( 'RankXAI_Store_Admin', 'render' ),
 			self::PAGE_CRAWLERS => array( 'RankXAI_Pages', 'crawlers' ),
 			self::PAGE_CHECKS   => array( 'RankXAI_Pages', 'checks' ),
 			self::PAGE_SETTINGS => array( 'RankXAI_Pages', 'settings' ),
@@ -129,6 +136,10 @@ class RankXAI_Admin {
 			$hook = add_submenu_page( self::PAGE, $label . ' ‹ ' . __( 'RankX AI', 'rankxai' ), $label, 'manage_options', $slug, $renderers[ $slug ] );
 			if ( $hook ) {
 				self::$hooks[] = $hook;
+				// The store app's script loads on its own page, and only once connected.
+				if ( self::PAGE_STORE === $slug ) {
+					add_action( 'load-' . $hook, array( 'RankXAI_Store_Admin', 'load' ) );
+				}
 			}
 		}
 

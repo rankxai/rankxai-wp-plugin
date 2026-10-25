@@ -20,8 +20,9 @@
  *
  * Usage: node build-zip.mjs [--target=github|wporg] [outfile]
  */
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync, execSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -50,33 +51,93 @@ if (dirty && !process.env.RANKXAI_ALLOW_DIRTY_BUILD) {
   process.exit(1)
 }
 
+// ── The store app (plan 90d D2) ──────────────────────────────────────────────
+//
+// admin-app/src is the store app's published source (sync-store-app.mjs copies
+// it from the platform). It is built HERE, from that copy, for both targets, so
+// the bundle in every zip is provably made from the source in the same zip
+// (guideline 4). The build output is never committed: it is injected into the
+// archived tree, the same way the wporg target edits the tree.
+const STORE_SRC = 'admin-app/src'
+const STORE_OUT = join(STORE_SRC, 'dist', 'wordpress')
+const STORE_ENTRY = 'store-app/hosts/wordpress/main.tsx'
+const ASSET_MAP = 'admin-app/build/store-app.asset.php'
+
+function buildStoreApp() {
+  if (!existsSync(join(STORE_SRC, 'package.json'))) {
+    throw new Error(`${STORE_SRC}/package.json is missing. Run: node sync-store-app.mjs`)
+  }
+  // `npm install` with the exact versions the source names (no lockfile ships,
+  // as published). Skipped when already installed, unless asked.
+  if (!existsSync(join(STORE_SRC, 'node_modules', 'vite')) || process.env.RANKXAI_STORE_REINSTALL) {
+    execSync('npm install --no-audit --no-fund --no-package-lock', { cwd: STORE_SRC, stdio: 'inherit' })
+  }
+  execSync('npm run build', { cwd: STORE_SRC, stdio: 'inherit' })
+  const manifest = JSON.parse(readFileSync(join(STORE_OUT, '.vite', 'manifest.json'), 'utf8'))
+  const entry = manifest[STORE_ENTRY]
+  if (!entry || !entry.file || !entry.isEntry) throw new Error(`the build manifest has no entry for ${STORE_ENTRY}`)
+  const assets = readdirSync(join(STORE_OUT, 'assets')).sort()
+  for (const f of [entry.file, ...(entry.css ?? [])]) {
+    if (!assets.includes(f.replace(/^assets\//, ''))) throw new Error(`the build manifest names ${f}, which was not built`)
+  }
+  const version = createHash('sha256').update(readFileSync(join(STORE_OUT, '.vite', 'manifest.json'))).digest('hex').slice(0, 12)
+  // The PHP the plugin reads: it may not read JSON from disk (check.sh refuses a
+  // shipped .json, and the guardrail counts file_get_contents as outbound).
+  const php = (s) => `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  const assetMap = [
+    '<?php',
+    '/**',
+    ' * The store app build: its entry module, stylesheets and version.',
+    ' *',
+    ' * Written by build-zip.mjs from the build manifest; never edited by hand.',
+    ' *',
+    ' * @package RankXAI',
+    ' */',
+    '',
+    "defined( 'ABSPATH' ) || exit;",
+    '',
+    'return array(',
+    `\t'file'    => ${php(entry.file)},`,
+    `\t'css'     => array( ${(entry.css ?? []).map(php).join(', ')} ),`,
+    `\t'version' => ${php(version)},`,
+    ');',
+    '',
+  ].join('\n')
+  return { assets: assets.map((f) => ({ path: `admin-app/build/assets/${f}`, file: join(STORE_OUT, 'assets', f) })), assetMap, entry: `admin-app/build/${entry.file}` }
+}
+
 /**
- * The tree to archive. For `wporg`, HEAD's tree with the updater removed and the
- * header line dropped, written through a throwaway index so the real one is
- * untouched.
+ * The tree to archive: HEAD's tree, written through a throwaway index so the
+ * real one is untouched, with the store app's build added. For `wporg`, also
+ * the updater removed and the header line dropped.
  */
-function treeFor(target) {
-  if (target === 'github') return 'HEAD'
-  const index = join(tmpdir(), `rankxai-wporg-index-${process.pid}`)
+function treeFor(target, store) {
+  const index = join(tmpdir(), `rankxai-${target}-index-${process.pid}`)
   const env = { ...process.env, GIT_INDEX_FILE: index }
+  const add = (path, input) => {
+    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { input, env }).toString('utf8').trim()
+    execFileSync('git', ['update-index', '--add', '--cacheinfo', `100644,${blob},${path}`], { env })
+  }
   try {
     execFileSync('git', ['read-tree', 'HEAD'], { env })
-    execFileSync('git', ['update-index', '--force-remove', UPDATER], { env })
-    const main = execFileSync('git', ['show', `HEAD:${SLUG}.php`], { encoding: 'utf8' })
-    if (!UPDATE_URI_LINE.test(main)) throw new Error(`${SLUG}.php has no Update URI line to remove`)
-    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], {
-      input: main.replace(UPDATE_URI_LINE, ''),
-      encoding: 'utf8',
-    }).trim()
-    execFileSync('git', ['update-index', '--cacheinfo', `100644,${blob},${SLUG}.php`], { env })
+    for (const a of store.assets) add(a.path, readFileSync(a.file))
+    add(ASSET_MAP, store.assetMap)
+    if (target === 'wporg') {
+      execFileSync('git', ['update-index', '--force-remove', UPDATER], { env })
+      const main = execFileSync('git', ['show', `HEAD:${SLUG}.php`], { encoding: 'utf8' })
+      if (!UPDATE_URI_LINE.test(main)) throw new Error(`${SLUG}.php has no Update URI line to remove`)
+      add(`${SLUG}.php`, main.replace(UPDATE_URI_LINE, ''))
+    }
     return execFileSync('git', ['write-tree'], { env, encoding: 'utf8' }).trim()
   } finally {
     rmSync(index, { force: true })
   }
 }
 
+const store = buildStoreApp()
+
 // -o is avoided for the same Windows path reason; the archive comes back on stdout.
-const zip = execFileSync('git', ['archive', '--format=zip', `--prefix=${SLUG}/`, treeFor(TARGET)], {
+const zip = execFileSync('git', ['archive', '--format=zip', `--prefix=${SLUG}/`, treeFor(TARGET, store)], {
   maxBuffer: 64 * 1024 * 1024,
 })
 writeFileSync(OUT, zip)
@@ -120,6 +181,14 @@ const hasHeader = UPDATE_URI_LINE.test(mainFile)
 const wanted = TARGET === 'github'
 if (hasUpdater !== wanted || hasHeader !== wanted) {
   console.error(`${TARGET} build: updater ${hasUpdater ? 'present' : 'absent'}, Update URI ${hasHeader ? 'present' : 'absent'}; both should be ${wanted ? 'present' : 'absent'}`)
+  process.exit(1)
+}
+
+// Both targets carry the store app: its build, its asset map, and its source (R1-32).
+const storeMissing = [`${SLUG}/${ASSET_MAP}`, `${SLUG}/${store.entry}`, `${SLUG}/${STORE_SRC}/package.json`, `${SLUG}/${STORE_SRC}/${STORE_ENTRY}`].filter((n) => !names.includes(n))
+const leaked = names.filter((n) => n.includes('/.vite/') || n.includes('/node_modules/') || n.startsWith(`${SLUG}/${STORE_SRC}/dist/`))
+if (storeMissing.length || leaked.length) {
+  console.error(`${TARGET} build: store app ${storeMissing.length ? `missing ${storeMissing.join(', ')}` : ''}${leaked.length ? ` carries ${leaked.slice(0, 3).join(', ')}` : ''}`)
   process.exit(1)
 }
 

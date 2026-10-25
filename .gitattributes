@@ -22,3 +22,5 @@
 /check.sh           export-ignore
 /release.mjs        export-ignore
 /.wordpress-org/    export-ignore
+/sync-store-app.mjs export-ignore
+*.webp binary

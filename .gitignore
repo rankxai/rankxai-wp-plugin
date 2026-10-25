@@ -24,3 +24,9 @@ Thumbs.db
 
 # Local probe artefacts — captured HTML and JSON from wp-env runs.
 /probe/results/
+
+# The store app (plan 90d D2): its source in admin-app/src is committed; what
+# building it makes is not. build-zip.mjs injects admin-app/build into the zips.
+/admin-app/build/
+/admin-app/src/node_modules/
+/admin-app/src/dist/

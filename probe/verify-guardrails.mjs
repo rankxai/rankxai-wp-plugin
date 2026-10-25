@@ -108,6 +108,11 @@ const MUST_SEE = [
   'includes/class-rankxai-loopback.php',
   'includes/class-rankxai-view-as-ai.php',
   'includes/class-rankxai-summary.php',
+  'includes/class-rankxai-connection.php',
+  'includes/class-rankxai-app-client.php',
+  'includes/class-rankxai-session-cache.php',
+  'includes/store/class-rankxai-session.php',
+  'includes/store/class-rankxai-store-admin.php',
 ]
 code.size > 5
   ? ok(`CONTROL — the walker found ${code.size} files`)
@@ -167,21 +172,68 @@ const UPDATER_FILE = 'includes/class-rankxai-updater.php'
 // guideline's sense, and held to the same shape: one file, one call, and a host
 // check that refuses any address that is not this site's own.
 const LOOPBACK_FILE = 'includes/class-rankxai-loopback.php'
+// A THIRD exception since 0.5.5 (plan 90d, DG90-9): RankX AI itself, and only
+// after an administrator has connected an account. One file, one call, one
+// fixed host, and the connection check before the call (proved below).
+const APP_CLIENT_FILE = 'includes/class-rankxai-app-client.php'
 const outboundOffenders = []
 const updaterCalls = []
 const loopbackCalls = []
+const appClientCalls = []
 for (const [name, src] of code) {
   for (const fn of OUTBOUND) {
     const hits = (src.match(new RegExp(`\\b${fn}\\s*\\(`, 'g')) ?? []).length
     if (hits === 0) continue
     if (name === UPDATER_FILE) updaterCalls.push(...Array(hits).fill(fn))
     else if (name === LOOPBACK_FILE) loopbackCalls.push(...Array(hits).fill(fn))
+    else if (name === APP_CLIENT_FILE) appClientCalls.push(...Array(hits).fill(fn))
     else outboundOffenders.push(`${name}: ${fn}`)
   }
 }
 outboundOffenders.length === 0
-  ? ok('nothing outside the updater and the loopback class can make a request')
+  ? ok('nothing outside the updater, the loopback class and the RankX AI client can make a request')
   : bad(`an outbound call appeared: ${outboundOffenders.join(', ')}`)
+
+// ── THE RANKX AI CLIENT: ONE HOST, ONLY WHEN CONNECTED (DG90-9) ────────────
+appClientCalls.length === 1 && appClientCalls[0] === 'wp_safe_remote_request'
+  ? ok('the RankX AI client makes exactly one request, through wp_safe_remote_request')
+  : bad(`the RankX AI client makes ${JSON.stringify(appClientCalls)}; exactly one wp_safe_remote_request is allowed`)
+const appSrc = code.get(APP_CLIENT_FILE) ?? ''
+// RAW source for addresses: the comment stripper reads the `//` in a URL as a comment.
+const appRaw = code.has(APP_CLIENT_FILE) ? readFileSync(join(ROOT, APP_CLIENT_FILE), 'utf8') : ''
+const APP_URL_LITERAL = new RegExp("'https?://[^']*'", 'g')
+const appUrls = appRaw.match(APP_URL_LITERAL) ?? []
+appUrls.length === 1 && appUrls[0] === "'https://app.rankxai.com'"
+  ? ok('the client names one address, https://app.rankxai.com')
+  : bad(`the RankX AI client names ${JSON.stringify(appUrls)}; only 'https://app.rankxai.com' is allowed`)
+const APP_TARGET = new RegExp('wp_safe_remote_request\\(\\s*self::APP_ORIGIN\\s*\\.\\s*\\$path')
+APP_TARGET.test(appSrc)
+  ? ok('and its request goes to self::APP_ORIGIN')
+  : bad('the RankX AI client request is not addressed to self::APP_ORIGIN')
+const CONNECTED_FIRST = new RegExp('RankXAI_Connection::link\\(\\)[^]{0,120}?if \\(\\s*null === \\$link\\s*\\)\\s*\\{[^]{0,200}?return new WP_Error')
+const checkAt = appSrc.indexOf('RankXAI_Connection::link()')
+CONNECTED_FIRST.test(appSrc) && checkAt > -1 && checkAt < appSrc.indexOf('wp_safe_remote_request(')
+  ? ok('and it returns before the request when no account is connected')
+  : bad('the RankX AI client does not refuse, before the request, when no account is connected')
+const PATH_ALLOW = new RegExp('in_array\\(\\s*\\$path\\s*,\\s*self::PATHS')
+PATH_ALLOW.test(appSrc) && appSrc.search(PATH_ALLOW) < appSrc.indexOf('wp_safe_remote_request(')
+  ? ok('and only to the paths it names')
+  : bad('the RankX AI client does not restrict the path before the request')
+const clientCallers = [...code].filter(([name, src]) => name !== APP_CLIENT_FILE && src.includes('RankXAI_App_Client::request(')).map(([n]) => n)
+clientCallers.includes('includes/store/class-rankxai-session.php') && clientCallers.includes('includes/class-rankxai-connection.php')
+  ? ok(`CONTROL — the client is called from ${clientCallers.join(', ')}`)
+  : bad(`CONTROL — expected the session route and the disconnect to call the client, found ${JSON.stringify(clientCallers)}`)
+
+// The session route refuses an Application Password and checks the REST nonce
+// itself: WordPress checks X-WP-Nonce only for cookie requests (R3-D11).
+const sessionSrc = code.get('includes/store/class-rankxai-session.php') ?? ''
+const canStart = sessionSrc.slice(sessionSrc.indexOf('function can_start'), sessionSrc.indexOf('function handle'))
+canStart.length > 100
+  ? ok('CONTROL — the session route’s permission callback was located')
+  : bad('CONTROL — could not isolate can_start, so the checks below prove nothing')
+canStart.includes("current_user_can( 'manage_options' )") && canStart.includes('rest_get_authenticated_app_password()') && canStart.includes("wp_verify_nonce( $nonce, 'wp_rest' )")
+  ? ok('the session route needs an administrator, refuses an Application Password, and verifies the nonce itself')
+  : bad('the session route is missing its capability, Application Password or nonce check')
 loopbackCalls.length === 1 && loopbackCalls[0] === 'wp_safe_remote_request'
   ? ok('the loopback class makes exactly one request, through wp_safe_remote_request')
   : bad(`the loopback class makes ${JSON.stringify(loopbackCalls)}; exactly one wp_safe_remote_request is allowed`)
@@ -261,9 +313,11 @@ ruleOffenders.length === 0
   : bad(`a platform rule may have moved into the plugin: ${ruleOffenders.join(', ')}`)
 
 const rest = code.get('includes/class-rankxai-rest.php') ?? ''
-const openRoutes = (rest.match(/__return_true/g) ?? []).length
-openRoutes === 1
-  ? ok('exactly one `__return_true` permission callback')
+// Over EVERY shipped file since 0.5.5 (R3-D07): a route registered in another
+// class used to be examined by nothing.
+const openRoutes = [...code.values()].reduce((n, src) => n + (src.match(/__return_true/g) ?? []).length, 0)
+openRoutes === 1 && (rest.match(/__return_true/g) ?? []).length === 1
+  ? ok('exactly one `__return_true` permission callback in the whole plugin, in the REST class')
   : bad(`${openRoutes} open permission callbacks; only the presence probe may be one`)
 // ...and it is the one we mean. A count alone would pass if somebody opened a
 // different route and closed `/status`.
@@ -285,14 +339,25 @@ statusFn.length > 20
 // entry without one is open to the world.
 const METHOD_KEY = new RegExp(String.fromCharCode(39) + 'methods' + String.fromCharCode(39), 'g')
 const CALLBACK_KEY = new RegExp(String.fromCharCode(39) + 'permission_callback' + String.fromCharCode(39), 'g')
-const methodEntries = (rest.match(METHOD_KEY) ?? []).length
-const callbacks = (rest.match(CALLBACK_KEY) ?? []).length
+// Derived per FILE over every file that registers a route (R3-D07), with a
+// control naming the classes known to.
+const routeFiles = [...code].filter(([, src]) => src.includes('register_rest_route(')).map(([n]) => n)
+;['includes/class-rankxai-rest.php', 'includes/class-rankxai-connection.php', 'includes/store/class-rankxai-session.php'].every((f) => routeFiles.includes(f))
+  ? ok(`CONTROL — ${routeFiles.length} files register routes, including the connection and session classes`)
+  : bad(`CONTROL — route files ${JSON.stringify(routeFiles)} miss a known one, so the gating check is not seeing them`)
+let methodEntries = 0
+for (const file of routeFiles) {
+  const src = code.get(file) ?? ''
+  const m = (src.match(METHOD_KEY) ?? []).length
+  const c = (src.match(CALLBACK_KEY) ?? []).length
+  methodEntries += m
+  c === m
+    ? ok(`${file}: every method entry has its own permission callback (${c} of ${m})`)
+    : bad(`${file}: ${m} method entries and ${c} permission callbacks; one of them is open`)
+}
 methodEntries > 5
   ? ok(`CONTROL — ${methodEntries} method entries found`)
   : bad(`CONTROL — only ${methodEntries} method entries found, so the gating check proves nothing`)
-callbacks === methodEntries
-  ? ok(`every method entry has its own permission callback (${callbacks} of ${methodEntries})`)
-  : bad(`${methodEntries} method entries and ${callbacks} permission callbacks; one of them is open`)
 
 // MEASURED, and its absence is silent: `wp_update_post` expects slashed data and
 // `update_metadata` unslashes every value, so an unslashed write strips every
@@ -361,17 +426,28 @@ saveBody.includes("current_user_can( 'manage_options' )")
 // here. The checks above were written when `handle_save` was the only form, and
 // a second handler added later would have been examined by nothing.
 const ADMIN_POST_HANDLER = /add_action\(\s*'admin_post_'\s*\.\s*self::\w+\s*,\s*array\(\s*__CLASS__\s*,\s*'(\w+)'/g
-const handlerNames = [...adminSrc.matchAll(ADMIN_POST_HANDLER)].map((m) => m[1])
-handlerNames.length >= 2 && handlerNames.includes('handle_save') && handlerNames.includes('handle_delete_redirect')
-  ? ok(`CONTROL — derived ${handlerNames.length} admin_post handlers, including both known ones`)
-  : bad(`CONTROL — derived handlers ${JSON.stringify(handlerNames)}; the per-handler checks prove nothing`)
-for (const name of handlerNames) {
-  const start = adminSrc.indexOf(`function ${name}`)
-  const next = adminSrc.indexOf('function ', start + 10)
-  const body = start === -1 ? '' : adminSrc.slice(start, next === -1 ? adminSrc.length : next)
-  body.includes('check_admin_referer(') && body.includes("current_user_can( 'manage_options' )")
-    ? ok(`\`${name}\` verifies its nonce and checks the capability inside the handler`)
-    : bad(`\`${name}\` is missing its nonce check or its capability check`)
+// Over EVERY shipped file since 0.5.5 (R3-D07): the Connect and Disconnect
+// handlers live in the connection class, where a scan of the admin class alone
+// never looked.
+const handlers = []
+for (const [file, src] of code) for (const m of src.matchAll(ADMIN_POST_HANDLER)) handlers.push({ file, name: m[1] })
+const handlerNames = handlers.map((h) => h.name)
+const ADMIN_POST_ANY = /add_action\(\s*'admin_post_/g
+const registrations = [...code.values()].reduce((n, src) => n + (src.match(ADMIN_POST_ANY) ?? []).length, 0)
+handlerNames.length >= 4 && ['handle_save', 'handle_delete_redirect', 'handle_connect', 'handle_disconnect'].every((n) => handlerNames.includes(n)) && registrations === handlers.length
+  ? ok(`CONTROL — derived ${handlerNames.length} admin_post handlers across the plugin, including the known ones, and every registration was read`)
+  : bad(`CONTROL — derived handlers ${JSON.stringify(handlerNames)} from ${registrations} registrations; the per-handler checks prove nothing`)
+for (const { file, name } of handlers) {
+  const src = code.get(file) ?? ''
+  const start = src.indexOf(`function ${name}`)
+  const next = src.indexOf('function ', start + 10)
+  const body = start === -1 ? '' : src.slice(start, next === -1 ? src.length : next)
+  // The updater's "Check for updates" link is core's own job and checks core's
+  // capability for it, `update_plugins`; every other handler needs `manage_options`.
+  const capability = file === UPDATER_FILE ? "current_user_can( 'update_plugins' )" : "current_user_can( 'manage_options' )"
+  body.includes('check_admin_referer(') && body.includes(capability)
+    ? ok(`\`${name}\` (${file}) verifies its nonce and checks the capability inside the handler`)
+    : bad(`\`${name}\` (${file}) is missing its nonce check or its capability check`)
 }
 
 // The admin class is loaded ONLY in wp-admin, so a front-end request never
@@ -403,7 +479,18 @@ MENU_PAGE.test(adminSrc)
   ? ok('the top-level menu itself requires `manage_options`')
   : bad('the top-level menu does not require `manage_options`')
 const SUBMENU_ARGS = new RegExp('add_submenu_page\\(([^;]*?)\\);', 'g')
-const submenus = [...adminSrc.matchAll(SUBMENU_ARGS)].map((m) => m[1])
+// Every file, so a page registered elsewhere is held to the same rule.
+const submenus = [...code.values()].flatMap((src) => [...src.matchAll(SUBMENU_ARGS)].map((m) => m[1]))
+// Not SUBMENU_ARGS: a /g regex carries lastIndex from one .test() to the next.
+const MENU_CALL = /add_submenu_page\(|add_menu_page\(/
+const menuFiles = [...code].filter(([, src]) => MENU_CALL.test(src)).map(([n]) => n)
+menuFiles.length === 1 && menuFiles[0] === 'includes/class-rankxai-admin.php'
+  ? ok('every admin page is registered in the admin class')
+  : bad(`admin pages are registered in ${JSON.stringify(menuFiles)}; register them in the admin class, where this check reads them`)
+// The Store page is the store app's mount point: its slug is the one the bundle's links use.
+adminSrc.includes("const PAGE_STORE = 'rankxai-store'")
+  ? ok('the Store page keeps the slug the store app links to (rankxai-store)')
+  : bad('the Store page slug is not rankxai-store, so the store app’s own links would break')
 const IN_MENU = new RegExp('^\\s*self::PAGE\\s*,')
 const HIDDEN = new RegExp("^\\s*''\\s*,")
 const menuPages = submenus.filter((args) => IN_MENU.test(args))
@@ -440,6 +527,21 @@ outside.includes('var(--rx-')
 rawColour.length === 0
   ? ok('no raw colour outside the token block in admin.css')
   : bad(`raw colour outside the token block: ${rawColour.slice(0, 3).join(' | ')}`)
+
+// The store app's stylesheet (plan 90d, R4-D11). Its published copy has its
+// comments stripped, so there is no marked block to find: the rule is the one
+// the source keeps, that a raw colour appears only in an `--rx-*` definition.
+const STORE_CSS = join(ROOT, 'admin-app', 'src', 'store-app', 'hosts', 'wordpress', 'store.css')
+const storeCss = readFileSync(STORE_CSS, 'utf8').replace(CSS_COMMENT, '')
+const RX_TOKEN_LINE = new RegExp('^\\s*--rx-[a-z0-9-]+\\s*:')
+const storeLines = storeCss.split('\n')
+storeLines.some((l) => RX_TOKEN_LINE.test(l) && RAW_COLOUR.test(l)) && storeLines.some((l) => l.includes('var(--rx-'))
+  ? ok('CONTROL — the store app stylesheet defines --rx- colour tokens and reads them')
+  : bad('CONTROL — no --rx- colour token found in the store app stylesheet; the check below proves nothing')
+const storeRaw = storeLines.filter((l) => RAW_COLOUR.test(l) && !RX_TOKEN_LINE.test(l))
+storeRaw.length === 0
+  ? ok('the store app stylesheet names a raw colour only in an --rx-* token')
+  : bad(`raw colour outside an --rx-* token in the store app stylesheet: ${storeRaw.slice(0, 3).join(' | ')}`)
 
 // Our stylesheet loads on our screens and no other: the enqueue is gated on the
 // hook suffixes the registration returned, never on a hand-written screen id.
@@ -519,11 +621,23 @@ shortDescription.length > 0 && shortDescription.length <= 150
 // The other half of the outbound scan above. Two ways to fail: the code starts
 // calling out while the readme says it does not, or somebody removes the
 // sentence while it is still true and hands a reviewer a question to ask.
-const CLAIMS_NO_OUTBOUND = /copy\s+from\s+WordPress\.org\s+contacts\s+no\s+external\s+service/i
+// Since 0.5.5 (DG90-9) the claim is conditional on connecting, and the one
+// service a connected plugin calls, and every path it calls, must be named.
+const CLAIMS_NO_OUTBOUND = /Until\s+you\s+connect\s+a\s+RankX\s+AI\s+account,\s+the\s+copy\s+from\s+WordPress\.org\s+contacts\s+no\s+external\s+service/i
 const NAMES_UPDATE_CHECK = /checks\s+github\.com\s+for\s+a\s+newer\s+release/i
 CLAIMS_NO_OUTBOUND.test(readme)
-  ? ok('readme.txt states that the WordPress.org copy contacts no external service, which the scan above proves')
-  : bad('readme.txt no longer carries the no-outbound claim for the WordPress.org copy')
+  ? ok('readme.txt states that the WordPress.org copy contacts no external service until an account is connected, which the scan above proves')
+  : bad('readme.txt no longer carries the no-outbound-until-connected claim for the WordPress.org copy')
+const APP_PATH_LITERAL = new RegExp("'/api/store-app/wp/[a-z]+'", 'g')
+const TERMS_LINK = new RegExp('rankxai\\.com/terms-of-service')
+const PRIVACY_LINK = new RegExp('rankxai\\.com/privacy-policy')
+const appPaths = (appRaw.match(APP_PATH_LITERAL) ?? []).map((p) => p.slice(1, -1))
+appPaths.length >= 2 && appPaths.every((p) => readme.includes(`https://app.rankxai.com${p}`)) && readme.includes('https://app.rankxai.com/api/store-app')
+  ? ok(`readme.txt names RankX AI and every path the plugin calls (${appPaths.join(', ')}), and the store app API`)
+  : bad(`readme.txt does not name every RankX AI path the client calls: ${JSON.stringify(appPaths)}`)
+TERMS_LINK.test(readme) && PRIVACY_LINK.test(readme)
+  ? ok('readme.txt links RankX AI’s terms and privacy policy (guideline 6)')
+  : bad('readme.txt does not link RankX AI’s terms and privacy policy')
 NAMES_UPDATE_CHECK.test(readme)
   ? ok('readme.txt discloses the GitHub build’s update check')
   : bad('readme.txt does not disclose the update check the updater makes')

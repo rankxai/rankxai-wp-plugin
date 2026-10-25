@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.5.4
+Stable tag: 0.5.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -162,9 +162,11 @@ generated one.
 
 = Does this send my content anywhere? =
 
-No. The only request the plugin makes to another server is a check for a newer
-version of itself, and only in the copy downloaded from GitHub or from your
-RankX AI account — see *External services*.
+Not until you connect a RankX AI account. Before that, the only request the
+plugin makes to another server is a check for a newer version of itself, and
+only in the copy downloaded from GitHub or from your RankX AI account. Once you
+click **Connect RankX AI** and approve it, the plugin also asks RankX AI for a
+session when an administrator opens the Store page — see *External services*.
 
 To check links, robots.txt and "View as AI", it asks **your own site** for a
 page, the way a visitor would. Those requests go to this site's own address and
@@ -214,7 +216,35 @@ address that is already answered, and for any real file on your server.
 
 == External services ==
 
-**The copy from WordPress.org contacts no external service.**
+**Until you connect a RankX AI account, the copy from WordPress.org contacts no external service.**
+
+= RankX AI (app.rankxai.com), only after you connect =
+
+Connecting is your choice: an administrator clicks **Connect RankX AI** in
+RankX AI › Settings (or on the Store page), signs in to RankX AI in a new tab,
+chooses which of their websites this is, and approves it. Nothing below happens
+before that, and disconnecting or deactivating the plugin stops it.
+
+Once connected, the plugin calls one address, `https://app.rankxai.com`:
+
+* When an administrator opens RankX AI › Store (or a product's RankX AI panel),
+  it asks `https://app.rankxai.com/api/store-app/wp/session` for a ten-minute
+  session. It sends this site's address, its wp-admin address, the
+  administrator's WordPress user id and display name, and the site token RankX AI
+  gave this site when you connected. The site token stays on your server.
+* The Store page then runs RankX AI's store app, which is included in this
+  plugin (`admin-app/build`, with its readable source in `admin-app/src`), and
+  which talks to `https://app.rankxai.com/api/store-app` from the administrator's
+  browser with that session: product details, AI shopping results, fixes you
+  approve, images and articles, as each screen needs them.
+* When you disconnect, or deactivate the plugin, it tells
+  `https://app.rankxai.com/api/store-app/wp/connection`, then removes the
+  site token and the Application Passwords RankX AI's approval created.
+
+A server that blocks outgoing requests (`WP_HTTP_BLOCK_EXTERNAL`) is told so on
+the Settings page, and nothing is sent.
+
+= GitHub, in the copy downloaded from GitHub or from RankX AI =
 
 The copy downloaded from GitHub or from your RankX AI account also checks
 github.com for a newer release, so WordPress can show you an update. It asks
@@ -228,9 +258,11 @@ https://docs.github.com/site-policy/github-terms/github-terms-of-service and
 privacy statement:
 https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement
 
+= What RankX AI can do on this site =
+
 It registers REST endpoints that your RankX AI account calls *inbound*, over your
 site's own REST API, authenticated with a WordPress application password you
-create and can revoke at any time. Apart from the update check above, the plugin
+approve and can revoke at any time. Apart from the calls above, the plugin
 makes no request to any other server (it asks only its own site for pages, to
 check links and robots.txt), sends no analytics, sets no cookies, and transmits no visitor data.
 
@@ -277,6 +309,11 @@ filled in, and nothing runs until you enter an email address and start the check
   the plugin.
 
 == Changelog ==
+
+= 0.5.5 =
+* Connect RankX AI from WordPress: a button in RankX AI › Settings opens RankX AI, where you sign in or create an account, choose this site, and approve it. Disconnect from the same card.
+* On a WooCommerce store, RankX AI › Store runs RankX AI's store app in your dashboard: AI shopping results, product fixes with Undo, images, SEO and blog articles. It is included in the plugin, with its source, and loads only once you connect.
+* Declares compatibility with WooCommerce's order tables and cart and checkout blocks.
 
 = 0.5.4 =
 * Product categories (and tags) get a search title and description from RankX AI, through your SEO plugin: Yoast, Rank Math, SEOPress, The SEO Framework, SiteSEO or SureRank keep them in their own settings, and with no SEO plugin RankX AI prints them on the category page itself.

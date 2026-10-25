@@ -352,12 +352,41 @@ class RankXAI_Pages {
 			array(
 				'title'    => __( 'RankX AI account', 'rankxai' ),
 				'subtitle' => __( 'Optional. Everything above works without one.', 'rankxai' ),
+				'id'       => 'rankxai-account',
 			)
 		);
+		self::flash( 'rankxai-disconnected', __( 'Disconnected from RankX AI.', 'rankxai' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading a redirect marker, not acting on it.
+		$outcome = isset( $_GET['rankxai-connect'] ) ? sanitize_key( wp_unslash( $_GET['rankxai-connect'] ) ) : '';
+		$link    = RankXAI_Connection::link();
+		$blocked = RankXAI_Connection::outbound_blocked();
+
+		if ( null !== $link ) {
+			if ( 'connected' === $outcome ) {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Connected to RankX AI.', 'rankxai' ) . '</p></div>';
+			}
+			$name = '' !== $link['project_name'] ? $link['project_name'] : home_url();
+			echo '<p>' . esc_html(
+				sprintf(
+					/* translators: %s: the website's name in RankX AI. */
+					__( 'Connected to RankX AI as the website "%s".', 'rankxai' ),
+					$name
+				)
+			) . '</p>';
+			if ( '' !== $blocked ) {
+				RankXAI_UI::note( $blocked );
+			}
+			echo '<p class="rankxai-muted">' . esc_html__( 'Disconnecting removes this site’s RankX AI token and the Application Passwords RankX AI’s approval created, so RankX AI can no longer reach the site. A password you created by hand for RankX AI is not removed: delete it in Users › Profile. Your RankX AI account and its data stay.', 'rankxai' ) . '</p>';
+			echo '<div class="rankxai-actions">';
+			echo wp_kses_post( RankXAI_UI::button_link( __( 'Open in RankX AI', 'rankxai' ), RankXAI_Connection::app_url() . '/overview', 'outline', true ) );
+			RankXAI_UI::action_form( RankXAI_Connection::ACTION_DISCONNECT, __( 'Disconnect', 'rankxai' ), array(), 'danger' );
+			echo '</div>';
+			RankXAI_UI::card_close();
+			return;
+		}
+
 		$latest = RankXAI_Admin::last_update_received();
-		if ( '' === $latest ) {
-			echo '<p>' . esc_html__( 'Nothing has been received from a RankX AI account on this site. Everything above still works.', 'rankxai' ) . '</p>';
-		} else {
+		if ( '' !== $latest ) {
 			echo '<p>' . esc_html(
 				sprintf(
 					/* translators: %s: a date. */
@@ -366,8 +395,15 @@ class RankXAI_Pages {
 				)
 			) . '</p>';
 		}
-		echo '<p class="rankxai-muted">' . esc_html__( 'With an account connected, this plugin also writes SEO titles, descriptions and social tags into whichever SEO plugin you run, or renders them itself if you run none, publishes structured data into the page head, and fills these documents with your own approved description of the business rather than a list of page titles.', 'rankxai' ) . '</p>';
-		echo '<div class="rankxai-actions">' . wp_kses_post( RankXAI_UI::button_link( __( 'rankxai.com', 'rankxai' ), 'https://rankxai.com', 'outline', true ) ) . '</div>';
+		echo '<p class="rankxai-muted">' . esc_html__( 'Connect to work on this site from here with your RankX AI account: on a WooCommerce store, the Store page shows how AI assistants show your products and fixes what keeps them out. Connecting opens RankX AI in a new tab, where you sign in or create an account and choose this site. Until you connect, this plugin sends nothing to RankX AI.', 'rankxai' ) . '</p>';
+		if ( '' !== $blocked ) {
+			RankXAI_UI::note( $blocked );
+		}
+		echo '<div class="rankxai-actions">';
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Every value is escaped in connect_button_html().
+		echo RankXAI_Connection::connect_button_html( __( 'Connect RankX AI', 'rankxai' ) );
+		echo wp_kses_post( RankXAI_UI::button_link( __( 'rankxai.com', 'rankxai' ), 'https://rankxai.com', 'outline', true ) );
+		echo '</div>';
 		RankXAI_UI::card_close();
 	}
 

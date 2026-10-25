@@ -20,7 +20,9 @@ fi
 echo "== php -l =="
 # Necessary and NOT sufficient; see the header. It catches a broken file, which
 # PHPCS would also catch, and it is fast enough to fail early.
-run_php sh -c 'set -e; for f in *.php includes/*.php; do [ -e "$f" ] || continue; php -l "$f"; done'
+# Every shipped PHP file in every folder (includes/store/ since 0.5.5): a glob
+# of `includes/*.php` would silently skip a subfolder.
+run_php sh -c 'set -e; find . -name "*.php" -not -path "./vendor/*" -not -path "./probe/*" -not -path "./dist/*" -not -path "*/node_modules/*" | sort | while read -r f; do php -l "$f"; done'
 
 echo
 echo "== PHPCS =="
@@ -44,7 +46,18 @@ fi
 echo "$ARCHIVE_FILES" | sed 's/^/  /'
 
 # Anything that is plainly a development artefact rather than plugin code.
-STRAYS=$(echo "$ARCHIVE_FILES" | grep -iE '\.(sh|mjs|cjs|ya?ml|dist|lock|json)$|^probe/|^\.' | grep -v '^readme\.txt$' || true)
+# The store app's published source (plan 90d, R4-D12) is the one place a .json
+# ships: its package.json (the build tools, which guideline 4 wants findable)
+# and tsconfig.json. Exactly those two, by name.
+STRAYS=$(echo "$ARCHIVE_FILES" | grep -iE '\.(sh|mjs|cjs|ya?ml|dist|lock|json)$|^probe/|^\.' | grep -v '^readme\.txt$' | grep -vxE 'admin-app/src/(package|tsconfig)\.json' || true)
+# And inside admin-app/src, only the kinds of file the published source is made of.
+STORE_STRAYS=$(echo "$ARCHIVE_FILES" | grep '^admin-app/' | grep -vE '\.(ts|tsx|css|webp|mts)$|^admin-app/src/(package|tsconfig)\.json$|^admin-app/src/SOURCE\.md$' || true)
+if [ -n "$STORE_STRAYS" ]; then
+  echo
+  echo "admin-app/ holds files the store app's published source is not made of:" >&2
+  echo "$STORE_STRAYS" | sed 's/^/  /' >&2
+  exit 1
+fi
 if [ -n "$STRAYS" ]; then
   echo
   echo "These would ship to customers and should not:" >&2
