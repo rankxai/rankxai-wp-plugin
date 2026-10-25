@@ -41,8 +41,11 @@ mkdirSync(dirname(OUT), { recursive: true })
 
 // A dirty tree is the wrong source for a release: every file is committed, so
 // the listing looks complete while the one uncommitted edit is missing.
+// `--local` builds the store app into this working copy (admin-app/build,
+// gitignored) for a wp-env that mounts it, and makes no zip.
+const LOCAL = args.includes('--local')
 const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()
-if (dirty && !process.env.RANKXAI_ALLOW_DIRTY_BUILD) {
+if (dirty && !LOCAL && !process.env.RANKXAI_ALLOW_DIRTY_BUILD) {
   console.error('Refusing to build: the working tree has uncommitted changes, and `git archive`')
   console.error('packages HEAD — so those changes would be ABSENT from the zip while every file')
   console.error('in it looked correct. Commit first.\n')
@@ -135,6 +138,15 @@ function treeFor(target, store) {
 }
 
 const store = buildStoreApp()
+
+if (LOCAL) {
+  rmSync('admin-app/build', { recursive: true, force: true })
+  mkdirSync('admin-app/build/assets', { recursive: true })
+  for (const a of store.assets) writeFileSync(a.path, readFileSync(a.file))
+  writeFileSync(ASSET_MAP, store.assetMap)
+  console.log(`admin-app/build written for local use (${store.assets.length} assets, entry ${store.entry}).`)
+  process.exit(0)
+}
 
 // -o is avoided for the same Windows path reason; the archive comes back on stdout.
 const zip = execFileSync('git', ['archive', '--format=zip', `--prefix=${SLUG}/`, treeFor(TARGET, store)], {

@@ -65,6 +65,14 @@ jobs:
             echo '::notice::No plugin header found yet — Plugin Check skipped. It self-enables with the first plugin file.'
           fi
 
+      # Both zips carry the store app, built here from its own source in admin-app/src
+      # (build-zip.mjs runs npm install and the build), so the bundle Plugin Check sees
+      # is provably made from the source that ships with it.
+      - if: steps.detect.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       # Check the WordPress.org build: it is the one submitted to the directory, and
       # the GitHub build's updater is exactly what Plugin Check is there to refuse.
       # Both builds are made so a broken variant fails here rather than at release.

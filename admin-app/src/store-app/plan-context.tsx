@@ -6,6 +6,7 @@ import type { StoreCapabilities } from '@/lib/store-app/capabilities-core';
 import type { StorePlatformName } from '@/lib/store-app/route-policy-core';
 export interface PlanData {
     store?: StoreCapabilities;
+    webLinks?: Record<string, string>;
     account: {
         status: string | null;
         planName: string | null;

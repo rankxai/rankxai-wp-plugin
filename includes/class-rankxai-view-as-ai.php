@@ -61,6 +61,10 @@ class RankXAI_View_As_AI {
 			admin_url( 'admin.php' )
 		);
 		$actions['rankxai_view_ai'] = '<a href="' . esc_url( $url ) . '">' . esc_html__( 'View as AI', 'rankxai' ) . '</a>';
+		// On a connected WooCommerce store, a product also opens in the Store page.
+		if ( class_exists( 'RankXAI_Product_Panel' ) ) {
+			$actions = RankXAI_Product_Panel::row_action( $actions, $post );
+		}
 		return $actions;
 	}
 

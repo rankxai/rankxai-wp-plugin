@@ -113,6 +113,7 @@ const MUST_SEE = [
   'includes/class-rankxai-session-cache.php',
   'includes/store/class-rankxai-session.php',
   'includes/store/class-rankxai-store-admin.php',
+  'includes/store/class-rankxai-product-panel.php',
 ]
 code.size > 5
   ? ok(`CONTROL — the walker found ${code.size} files`)

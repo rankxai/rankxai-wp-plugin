@@ -95,6 +95,8 @@ add_action(
 		RankXAI_Session::init();
 		if ( is_admin() ) {
 			require_once __DIR__ . '/includes/store/class-rankxai-store-admin.php';
+			require_once __DIR__ . '/includes/store/class-rankxai-product-panel.php';
+			RankXAI_Product_Panel::init();
 		}
 	}
 );

@@ -73,6 +73,12 @@ if (run('git', ['tag', '--list', tag])) die(`tag ${tag} already exists; bump the
 const coAuthored = run('git', ['log', '--format=%B', `-1`]).match(/^Co-Authored-By:.*$/im)
 if (coAuthored) die(`the release commit carries "${coAuthored[0]}"; commits in this repository are the owner's alone`)
 
+// ── The store app's source (plan 90d, R3-D10) ───────────────────────────────
+// admin-app/src must be exactly what the platform publishes, or the zip would
+// ship a bundle built from source that is not the source of record.
+step('store app source matches the platform’s published source')
+run('node', ['sync-store-app.mjs', '--check'], { stdio: 'inherit' })
+
 // ── Build and check ───────────────────────────────────────────────────────────
 step('build')
 run('node', ['build-zip.mjs'], { stdio: 'inherit' })
@@ -142,3 +148,11 @@ if (failures.length) die(`published, but:\n  ${failures.join('\n  ')}`)
 console.log(`  release by ${release.author.login}, tag by ${tagger}`)
 console.log(`  latest/ serves ${latest.version}; the package matches the build byte for byte`)
 console.log(`\nDone. Copy ${ZIP} to the platform's public/downloads/rankxai-plugin.zip so the in-product download matches.`)
+
+// ── WordPress.org (plan 90d D5, R3-D16), only when asked ──────────────────────
+// The directory is a second channel for the same slug: its build has no updater
+// and no Update URI, and it is published by SVN, as the owner's directory account.
+if (process.argv.includes('--wporg')) {
+  step('WordPress.org')
+  run('node', ['deploy-wporg.mjs', version], { stdio: 'inherit' })
+}

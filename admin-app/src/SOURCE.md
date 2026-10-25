@@ -6,4 +6,4 @@ the GPL (version 2 or later). React is WordPress's own (the `react`, `react-dom`
 Build: `npm install && npm run build` (the exact build tools are in package.json). Packages the source imports:
 `react`, `react-dom` (types only at build time; at run time both are WordPress's).
 
-145 files.
+146 files.

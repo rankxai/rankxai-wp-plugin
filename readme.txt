@@ -1,5 +1,6 @@
-=== RankX AI ===
-Tags: seo, llms.txt, markdown, ai, seo metadata
+=== RankX AI – AI Shopping & SEO for WooCommerce and WordPress ===
+Contributors: rankxai
+Tags: woocommerce, ai shopping, seo, llms.txt, ai search
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -7,9 +8,28 @@ Stable tag: 0.5.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Publish llms.txt, agents.md and markdown copies of your pages for AI assistants, and write SEO metadata through any SEO plugin, or none.
+See how ChatGPT and Google show your WooCommerce products and fix what keeps them out. Publish llms.txt and markdown copies for AI.
 
 == Description ==
+
+= On a WooCommerce store, with a RankX AI account =
+
+Connect RankX AI from the plugin's Settings page and **RankX AI › Store** runs
+RankX AI's store app inside your dashboard:
+
+* **AI search.** The questions shoppers ask ChatGPT and Google's AI Mode, which
+  of your products the answers show, and which stores they show instead.
+* **Products.** Every product checked for the details AI shopping answers need
+  (identifiers, categories, images, descriptions), fixed one at a time or in
+  bulk, each change with Undo and a "did it work?" check.
+* **Image studio, SEO and Blog.** Product photos, search titles and
+  descriptions, and articles written for your store.
+* **On WooCommerce's own screens**, a link under each product and a panel on
+  its edit screen show its open gaps and how often AI answers show it.
+
+Plans and credits are RankX AI's (a free trial, then a monthly plan); the plugin
+itself is free and complete, and anything that costs credits shows its price
+first. RankX AI's terms and privacy policy are linked under *External services*.
 
 Assistants like ChatGPT, Claude, Gemini and Perplexity read websites. They read
 markup written for a browser, wrapped in a theme, and they have no agreed place
@@ -298,6 +318,8 @@ filled in, and nothing runs until you enter an email address and start the check
 2. AI crawlers: which AI crawlers read the site, and whether robots.txt lets them in.
 3. Site checks: broken and redirected internal links, pages nothing links to, and images with no text description.
 4. Settings: markdown copies, root documents and redirects, all local.
+5. Store: the store app in wp-admin, with the products AI shopping answers show and the gaps that keep the rest out.
+6. Store › Products: one product's gaps, fixed with Undo.
 
 == Credits ==
 

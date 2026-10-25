@@ -24,3 +24,4 @@
 /.wordpress-org/    export-ignore
 /sync-store-app.mjs export-ignore
 *.webp binary
+/deploy-wporg.mjs  export-ignore

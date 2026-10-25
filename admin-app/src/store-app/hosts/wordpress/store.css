@@ -98,6 +98,12 @@
 	color: var(--rx-foreground);
 }
 
+#rx-store .rx-tab--out {
+	margin-inline-start: auto;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
 #rx-store .rx-page {
 	display: flex;
 	flex-direction: column;

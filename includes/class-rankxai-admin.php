@@ -2,10 +2,13 @@
 /**
  * The plugin's admin pages: a top-level "RankX AI" menu with four pages.
  *
- * Overview, AI crawlers, Site checks and Settings, plus a "View as AI" screen
- * reached from the post and page lists. These pages and the tests in Site
- * Health are the only places the plugin speaks. There is no dashboard widget,
- * no admin notice and no banner anywhere else in wp-admin.
+ * Overview, Store (on a WooCommerce site), AI crawlers, Site checks and
+ * Settings, plus a "View as AI" screen reached from the post and page lists.
+ * These pages, the tests in Site Health and, on a connected WooCommerce store,
+ * one link under each product and one panel on its edit screen (closed until
+ * opened, see RankXAI_Product_Panel) are the only places the plugin speaks.
+ * There is no dashboard widget, no admin notice and no banner anywhere else in
+ * wp-admin.
  *
  * Every form posts to `admin-post.php` and each handler checks the capability
  * and the nonce itself: the menu decides what is visible, the handler decides

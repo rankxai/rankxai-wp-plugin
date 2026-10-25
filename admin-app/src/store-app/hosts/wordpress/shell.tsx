@@ -3,11 +3,14 @@ import { NAV_ITEMS, APP_PATHS } from '@/lib/shopify-app/app-routes-core';
 import { useRouter } from '../../router';
 import { host } from './host';
 import { dismissToast, onToasts, setLeavePrompt, type Toast } from './registries';
-import { useStore } from '../../plan-context';
+import { usePlan, useStore } from '../../plan-context';
+import { webLinkForPath } from '@/lib/store-app/web-links-core';
 import { SPEND_NOT_ALLOWED } from '../../kit';
 export function WordPressNav() {
     const { path, navigate } = useRouter();
     const { capabilities } = useStore();
+    const { plan } = usePlan();
+    const webLink = webLinkForPath(plan?.webLinks, path);
     const items = [{ href: APP_PATHS.home, label: 'Home' }, ...NAV_ITEMS];
     const current = items.reduce<string | null>((best, i) => ((path === i.href || path.startsWith(`${i.href}/`)) && (!best || i.href.length > best.length) ? i.href : best), null);
     return (<>
@@ -20,6 +23,9 @@ export function WordPressNav() {
             }}>
             {i.label}
           </a>))}
+        {webLink ? (<a className="rx-tab rx-tab--out" href={webLink} target="_blank" rel="noopener noreferrer">
+            Open in RankX AI<span className="rx-sr-only"> (opens in a new tab)</span>
+          </a>) : null}
       </nav>
       
       {capabilities?.canSpend === false ? <div className="rx-spend-notice" role="note">{SPEND_NOT_ALLOWED}</div> : null}
