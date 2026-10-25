@@ -1,4 +1,4 @@
-=== RankX AI – AI Shopping & SEO for WooCommerce and WordPress ===
+=== RankX AI – AI Shopping & SEO for WooCommerce ===
 Contributors: rankxai
 Tags: woocommerce, ai shopping, seo, llms.txt, ai search
 Requires at least: 6.0

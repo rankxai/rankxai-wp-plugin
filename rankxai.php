@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       RankX AI
+ * Plugin Name:       RankX AI – AI Shopping & SEO for WooCommerce
  * Plugin URI:        https://github.com/rankxai/rankxai-wp-plugin
  * Description:       Publishes llms.txt, agents.md and markdown copies of your pages for AI assistants, writes SEO metadata from your RankX AI account through whichever SEO plugin you use, or none, and on a WooCommerce store brings RankX AI's store app into your dashboard.
  * Version:           0.5.5
