@@ -53,7 +53,18 @@ function rankxai_probe_filters() {
 
 $GLOBALS['rankxai_probe_fired'] = array();
 
-foreach (rankxai_probe_filters() as $plugin => $hooks) {
+/*
+ * BEHIND AN OPTION, DEFAULT OFF, for the reason the llms.txt fixture below is: a
+ * rig artefact must not produce a confident wrong answer. Unconditional, these
+ * sentinels replaced `pre_get_document_title` at 99999 on EVERY request, so a
+ * page's <title> could never show what an SEO plugin printed (measured: plan 90b
+ * B4's term-seo probe read RANKXAI_SENTINEL_PRE_GET_DOCUMENT_TITLE as Rank Math's
+ * category title). run-filter-matrix.sh switches it on for its own run.
+ *
+ *   wp option update rankxai_probe_sentinels 1     # measure which filters fire
+ *   wp option delete rankxai_probe_sentinels       # leave the pages alone
+ */
+foreach ((get_option('rankxai_probe_sentinels') ? rankxai_probe_filters() : array()) as $plugin => $hooks) {
 	foreach ($hooks as $hook) {
 		// Priority 99999: we want to be the last word.
 		add_filter($hook, function ($value) use ($hook, $plugin) {

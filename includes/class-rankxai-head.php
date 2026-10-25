@@ -38,7 +38,17 @@ class RankXAI_Head {
 	 * @return array<string, string>
 	 */
 	private static function current_values() {
-		if ( is_admin() || ! is_singular() || ! RankXAI_Detect::may_own_head() ) {
+		if ( is_admin() || ! RankXAI_Detect::may_own_head() ) {
+			return array();
+		}
+		// A term's archive (a product category, a tag): the values stored for the term.
+		if ( is_category() || is_tag() || is_tax() ) {
+			$term = get_queried_object();
+			return $term instanceof WP_Term && in_array( $term->taxonomy, RankXAI_Term_SEO::taxonomies(), true )
+				? RankXAI_Term_SEO::get_own( $term->term_id )
+				: array();
+		}
+		if ( ! is_singular() ) {
 			return array();
 		}
 		$post_id = get_queried_object_id();

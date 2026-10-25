@@ -21,3 +21,4 @@
 /build-zip.mjs      export-ignore
 /check.sh           export-ignore
 /release.mjs        export-ignore
+/.wordpress-org/    export-ignore

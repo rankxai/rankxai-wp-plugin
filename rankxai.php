@@ -3,7 +3,7 @@
  * Plugin Name:       RankX AI
  * Plugin URI:        https://github.com/rankxai/rankxai-wp-plugin
  * Description:       Publishes llms.txt, agents.md and markdown copies of your pages for AI assistants, and writes SEO metadata from your RankX AI account through whichever SEO plugin you use, or none.
- * Version:           0.5.3
+ * Version:           0.5.4
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            RankX AI
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'RANKXAI_VERSION', '0.5.3' );
+define( 'RANKXAI_VERSION', '0.5.4' );
 
 /**
  * REST contract version, separate from the plugin version.
@@ -34,6 +34,8 @@ require_once __DIR__ . '/includes/class-rankxai-seo-registry.php';
 require_once __DIR__ . '/includes/class-rankxai-detect.php';
 require_once __DIR__ . '/includes/class-rankxai-seo.php';
 require_once __DIR__ . '/includes/class-rankxai-head.php';
+require_once __DIR__ . '/includes/class-rankxai-noindex.php';
+require_once __DIR__ . '/includes/class-rankxai-term-seo.php';
 require_once __DIR__ . '/includes/class-rankxai-content.php';
 require_once __DIR__ . '/includes/class-rankxai-schema.php';
 require_once __DIR__ . '/includes/class-rankxai-schema-providers.php';
@@ -57,6 +59,8 @@ require_once __DIR__ . '/includes/class-rankxai-rest.php';
 RankXAI_REST::init();
 RankXAI_SEO::init();
 RankXAI_Head::init();
+RankXAI_Noindex::init();
+RankXAI_Term_SEO::init();
 RankXAI_Schema::init();
 RankXAI_Schema_Output::init();
 RankXAI_Fill::init();

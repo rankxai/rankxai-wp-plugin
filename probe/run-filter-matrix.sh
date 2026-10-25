@@ -18,6 +18,11 @@ mkdir -p "$OUT"
 wpcli() { docker exec -u 33 "$CLI" wp "$@" 2>/dev/null; }
 dex()   { MSYS_NO_PATHCONV=1 docker exec "$WP" "$@"; }
 
+# The sentinels in mu-plugins/rankxai-probe.php are off by default (they replace
+# every page's title). On for this run, off again however it ends.
+wpcli option update rankxai_probe_sentinels 1 >/dev/null
+trap 'wpcli option delete rankxai_probe_sentinels >/dev/null' EXIT
+
 report() { # $1 = json file
   node -e '
     const fs=require("fs");

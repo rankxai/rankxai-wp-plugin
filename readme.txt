@@ -3,7 +3,7 @@ Tags: seo, llms.txt, markdown, ai, seo metadata
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.5.3
+Stable tag: 0.5.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -277,6 +277,10 @@ filled in, and nothing runs until you enter an email address and start the check
   the plugin.
 
 == Changelog ==
+
+= 0.5.4 =
+* Product categories (and tags) get a search title and description from RankX AI, through your SEO plugin: Yoast, Rank Math, SEOPress, The SEO Framework, SiteSEO or SureRank keep them in their own settings, and with no SEO plugin RankX AI prints them on the category page itself.
+* "Keep search engines out" can be switched on or off for a product or page from RankX AI. It goes into your SEO plugin's own robots setting, so what search engines are shown is what that plugin prints.
 
 = 0.5.3 =
 * Overview: "Run the free check" opens RankX AI's free AI Visibility Checker with this site's address filled in. It asks ChatGPT and Gemini three questions a customer would ask and shows whether this site is named, and who is named instead.

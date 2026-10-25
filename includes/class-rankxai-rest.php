@@ -83,6 +83,28 @@ class RankXAI_REST {
 	}
 
 	/**
+	 * Can this request write to a specific term (a product category, a tag)?
+	 *
+	 * `edit_term` against the ACTUAL term, as `can_write_post` does for posts,
+	 * and only on a taxonomy whose archive is a public page.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return bool|WP_Error
+	 */
+	public static function can_write_term( $request ) {
+		$taxonomy = (string) $request['taxonomy'];
+		$term_id  = (int) $request['id'];
+		if ( ! in_array( $taxonomy, RankXAI_Term_SEO::taxonomies(), true ) ) {
+			return new WP_Error( 'rankxai_bad_taxonomy', __( 'That taxonomy has no search fields here.', 'rankxai' ), array( 'status' => 400 ) );
+		}
+		$term = get_term( $term_id, $taxonomy );
+		if ( $term_id <= 0 || ! $term instanceof WP_Term ) {
+			return new WP_Error( 'rankxai_not_found', __( 'No such term.', 'rankxai' ), array( 'status' => 404 ) );
+		}
+		return current_user_can( 'edit_term', $term_id );
+	}
+
+	/**
 	 * Can this request publish a site-wide document?
 	 *
 	 * @return bool
@@ -128,6 +150,31 @@ class RankXAI_REST {
 					'methods'             => WP_REST_Server::CREATABLE,
 					'callback'            => array( __CLASS__, 'handle_seo_set' ),
 					'permission_callback' => array( __CLASS__, 'can_write_post' ),
+					'args'                => array(
+						'fields' => array(
+							'required' => true,
+							'type'     => 'object',
+						),
+					),
+				),
+			)
+		);
+
+		// A term's search title and description (plan 90b B4): a product
+		// category, a product tag, a post category or tag.
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/term-seo/(?P<taxonomy>[a-z_]+)/(?P<id>\d+)',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'handle_term_seo_get' ),
+					'permission_callback' => array( __CLASS__, 'can_write_term' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( __CLASS__, 'handle_term_seo_set' ),
+					'permission_callback' => array( __CLASS__, 'can_write_term' ),
 					'args'                => array(
 						'fields' => array(
 							'required' => true,
@@ -1384,7 +1431,7 @@ class RankXAI_REST {
 					'mayOwnHead'     => RankXAI_Detect::may_own_head(),
 					'writableFields' => self::writable_fields(),
 				),
-				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'seo.fill', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config', 'crawlers.config.v2', 'checks.read', 'summary.write' ),
+				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'seo.fill', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config', 'crawlers.config.v2', 'checks.read', 'summary.write', 'seo.noindex', 'term_seo.read', 'term_seo.write' ),
 				// Which root documents this contract serves, so the platform
 				// offers exactly what this install can publish rather than
 				// discovering a 404 after the customer pressed the button.
@@ -1432,12 +1479,41 @@ class RankXAI_REST {
 		return new WP_REST_Response(
 			array(
 				'postId'       => $post_id,
-				'rankxai'      => RankXAI_SEO::get_own( $post_id ),
-				'pluginStored' => RankXAI_SEO::get_plugin_stored( $post_id ),
+				'rankxai'      => self::own_with_noindex( $post_id ),
+				'pluginStored' => self::plugin_with_noindex( $post_id ),
 				'targetPlugin' => RankXAI_Detect::target_plugin(),
 			),
 			200
 		);
+	}
+
+	/**
+	 * Our values for a post, with `noindex` ('1') when we hold it.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return array<string, string>
+	 */
+	private static function own_with_noindex( $post_id ) {
+		$own = RankXAI_SEO::get_own( $post_id );
+		if ( '1' === RankXAI_Noindex::own( $post_id ) ) {
+			$own['noindex'] = '1';
+		}
+		return $own;
+	}
+
+	/**
+	 * The SEO plugin's values, with `noindex` as the post renders ('1' or '0')
+	 * when an SEO plugin owns the robots tag. With none, the platform reads ours.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return array<string, string>
+	 */
+	private static function plugin_with_noindex( $post_id ) {
+		$stored = RankXAI_SEO::get_plugin_stored( $post_id );
+		if ( '' !== RankXAI_Detect::target_plugin() ) {
+			$stored['noindex'] = RankXAI_Noindex::rendered( $post_id ) ? '1' : '0';
+		}
+		return $stored;
 	}
 
 	/**
@@ -1460,7 +1536,9 @@ class RankXAI_REST {
 			return new WP_Error( 'rankxai_bad_fields', __( '`fields` must be an object.', 'rankxai' ), array( 'status' => 400 ) );
 		}
 
-		$known   = RankXAI_SEO_Registry::fields();
+		// `noindex` (plan 90b B4) is written by RankXAI_Noindex, which mirrors it
+		// into the SEO plugin's robots storage in that plugin's own shape.
+		$known   = array_merge( RankXAI_SEO_Registry::fields(), array( 'noindex' ) );
 		$unknown = array_values( array_diff( array_keys( $fields ), $known ) );
 		if ( $unknown ) {
 			// Refused rather than ignored: a caller that sent `metaTitle` expecting it
@@ -1483,6 +1561,9 @@ class RankXAI_REST {
 		// value to '' would clear whatever was already on the post, so the whole
 		// request is refused and the error names each field.
 		$rejected = RankXAI_SEO::rejections( $fields );
+		if ( array_key_exists( 'noindex', $fields ) && ! in_array( $fields['noindex'], array( '1', '' ), true ) ) {
+			$rejected['noindex'] = 'must be "1" or ""';
+		}
 		if ( $rejected ) {
 			$detail = array();
 			foreach ( $rejected as $field => $reason ) {
@@ -1503,13 +1584,91 @@ class RankXAI_REST {
 		}
 
 		$written = RankXAI_SEO::set( $post_id, $fields );
+		if ( array_key_exists( 'noindex', $fields ) ) {
+			RankXAI_Noindex::set( $post_id, '1' === $fields['noindex'] );
+			$written[] = 'noindex';
+		}
 
 		return new WP_REST_Response(
 			array(
 				'postId'       => $post_id,
 				'written'      => $written,
-				'stored'       => RankXAI_SEO::get_own( $post_id ),
-				'pluginStored' => RankXAI_SEO::get_plugin_stored( $post_id ),
+				'stored'       => self::own_with_noindex( $post_id ),
+				'pluginStored' => self::plugin_with_noindex( $post_id ),
+				'targetPlugin' => RankXAI_Detect::target_plugin(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Read a term's search fields, ours and the SEO plugin's.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public static function handle_term_seo_get( $request ) {
+		$term_id  = (int) $request['id'];
+		$taxonomy = (string) $request['taxonomy'];
+		return new WP_REST_Response(
+			array(
+				'termId'       => $term_id,
+				'taxonomy'     => $taxonomy,
+				'rankxai'      => RankXAI_Term_SEO::get_own( $term_id ),
+				'pluginStored' => RankXAI_Term_SEO::get_plugin_stored( $term_id, $taxonomy ),
+				'targetPlugin' => RankXAI_Detect::target_plugin(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Write a term's search fields, then return what is STORED.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_term_seo_set( $request ) {
+		$term_id  = (int) $request['id'];
+		$taxonomy = (string) $request['taxonomy'];
+		$fields   = $request->get_param( 'fields' );
+		if ( ! is_array( $fields ) ) {
+			return new WP_Error( 'rankxai_bad_fields', __( '`fields` must be an object.', 'rankxai' ), array( 'status' => 400 ) );
+		}
+		$unknown = array_values( array_diff( array_keys( $fields ), RankXAI_Term_SEO::fields() ) );
+		if ( $unknown ) {
+			return new WP_Error(
+				'rankxai_unknown_field',
+				sprintf(
+					/* translators: %s: comma-separated list of field names. */
+					__( 'Unknown field(s): %s', 'rankxai' ),
+					implode( ', ', $unknown )
+				),
+				array(
+					'status' => 400,
+					'known'  => RankXAI_Term_SEO::fields(),
+				)
+			);
+		}
+		$rejected = RankXAI_Term_SEO::rejections( $fields );
+		if ( $rejected ) {
+			return new WP_Error(
+				'rankxai_invalid_field',
+				__( 'Refused, nothing was written.', 'rankxai' ),
+				array(
+					'status'   => 400,
+					'rejected' => $rejected,
+				)
+			);
+		}
+		$written = RankXAI_Term_SEO::set( $term_id, $taxonomy, $fields );
+		return new WP_REST_Response(
+			array(
+				'termId'       => $term_id,
+				'taxonomy'     => $taxonomy,
+				'written'      => $written,
+				'stored'       => RankXAI_Term_SEO::get_own( $term_id ),
+				'pluginStored' => RankXAI_Term_SEO::get_plugin_stored( $term_id, $taxonomy ),
 				'targetPlugin' => RankXAI_Detect::target_plugin(),
 			),
 			200
