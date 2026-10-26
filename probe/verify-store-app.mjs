@@ -25,7 +25,7 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { cliContainer } from './containers.mjs'
 
 const BASE = process.env.WP_BASE ?? 'http://localhost:8888'
@@ -192,6 +192,13 @@ async function main() {
     check(/<div class="wrap"><h1 class="screen-reader-text">[^<]+<\/h1><hr class="wp-header-end">/.test(mounted.html) && mounted.html.includes('<div id="rx-store"></div>'), 'the mount point inside .wrap with a screen-reader heading')
     const moduleTag = /<script\b[^>]*\bid="rankxai-store-js-module"[^>]*>/.exec(mounted.html)
     check(Boolean(moduleTag) && /type="module"/.test(moduleTag[0]) && moduleTag[0].includes(`admin-app/build/${entry}`), 'the entry is a script module, from this plugin’s own files (R4-D03)')
+    // The lazily loaded chunks import the entry by its bare file name. A `?ver=` on the tag makes the browser load
+    // it a second time under the other address: two React roots, two routers, and a blank page (live walk, run 3).
+    const entryName = entry.split('/').pop()
+    const importers = readdirSync('admin-app/build/assets').filter((f) => f.endsWith('.js') && readFileSync(`admin-app/build/assets/${f}`, 'utf8').includes(`"./${entryName}"`))
+    check(importers.length > 0, 'CONTROL — the build has chunks that import the entry by its bare file name', String(importers.length))
+    const tagSrc = /\bsrc="([^"]+)"/.exec(moduleTag?.[0] ?? '')?.[1] ?? ''
+    check(tagSrc !== '' && !tagSrc.includes('?') && tagSrc.endsWith(`/${entryName}`), 'so the entry is printed with no query string, the same address the chunks import', tagSrc)
     // WordPress prints admin script modules in the footer, before or after the classic scripts depending on the
     // version. Either is fine: a module is deferred, so it runs after the document is parsed, when every classic
     // script (React included) has run. The live browser pass proves the app mounts.

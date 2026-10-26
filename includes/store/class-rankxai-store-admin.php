@@ -84,7 +84,10 @@ class RankXAI_Store_Admin {
 		foreach ( $assets['css'] as $i => $css ) {
 			wp_enqueue_style( self::HANDLE . '-' . $i, $base . $css, array(), $assets['version'] );
 		}
-		wp_enqueue_script_module( self::HANDLE, $base . $assets['file'], array(), $assets['version'] );
+		// No version on the entry (null, not the default false): its lazily loaded chunks import it by its bare
+		// file name, so `main.js?ver=…` and `main.js` would be two modules and the app would start twice. The file
+		// name already carries a content hash, which is what a version would buy.
+		wp_enqueue_script_module( self::HANDLE, $base . $assets['file'], array(), null );
 	}
 
 	/**

@@ -235,6 +235,17 @@ canStart.length > 100
 canStart.includes("current_user_can( 'manage_options' )") && canStart.includes('rest_get_authenticated_app_password()') && canStart.includes("wp_verify_nonce( $nonce, 'wp_rest' )")
   ? ok('the session route needs an administrator, refuses an Application Password, and verifies the nonce itself')
   : bad('the session route is missing its capability, Application Password or nonce check')
+
+// The store app's chunks import its entry by the bare file name. A version on the entry module (`?ver=`, which
+// WordPress adds for any version but null, its default false included) loads it twice: two React roots, a blank page.
+const moduleCalls = [...code].flatMap(([name, src]) => [...src.matchAll(/wp_enqueue_script_module\(([^;]*)\);/g)].map((m) => ({ name, args: m[1] })))
+moduleCalls.some((c) => c.name === 'includes/store/class-rankxai-store-admin.php')
+  ? ok(`CONTROL — found the store app's module enqueue (${moduleCalls.length} in all)`)
+  : bad('CONTROL — no wp_enqueue_script_module call in the store admin class, so the check below proves nothing')
+const versioned = moduleCalls.filter((c) => !/,\s*null\s*\)?\s*$/.test(c.args.trim()))
+versioned.length === 0
+  ? ok('every script module is enqueued with a null version, so it loads once under one address')
+  : bad(`a script module is enqueued with a version: ${versioned.map((c) => `${c.name}: ${c.args.trim()}`).join('; ')}`)
 loopbackCalls.length === 1 && loopbackCalls[0] === 'wp_safe_remote_request'
   ? ok('the loopback class makes exactly one request, through wp_safe_remote_request')
   : bad(`the loopback class makes ${JSON.stringify(loopbackCalls)}; exactly one wp_safe_remote_request is allowed`)
