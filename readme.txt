@@ -4,7 +4,7 @@ Tags: woocommerce, ai shopping, seo, llms.txt, ai search
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.5.5
+Stable tag: 0.5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -331,6 +331,9 @@ filled in, and nothing runs until you enter an email address and start the check
   the plugin.
 
 == Changelog ==
+
+= 0.5.6 =
+* The header says "Connected to RankX AI" only once this plugin is connected. A site RankX AI reaches without it now reads "Receiving updates from RankX AI", so it no longer shows connected above the Connect button.
 
 = 0.5.5 =
 * Connect RankX AI from WordPress: a button in RankX AI › Settings opens RankX AI, where you sign in or create an account, choose this site, and approve it. Disconnect from the same card.

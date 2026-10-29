@@ -72,24 +72,29 @@ class RankXAI_UI {
 	}
 
 	/**
-	 * Whether a RankX AI account has sent anything to this site.
+	 * How this site is connected to RankX AI.
 	 *
-	 * The plugin never calls out, so "connected" is inferred from what has
-	 * arrived. It is worded as a fact about this site, never as a promise.
+	 * "Connected" means the plugin's own connection (Settings), the one the
+	 * Store page needs. A RankX AI account can also reach the site with an
+	 * Application Password and send updates without it; that is said as what
+	 * it is, so the header never reads "connected" above a Connect button.
 	 */
 	private static function connection_pill() {
 		$received = RankXAI_Admin::last_update_received();
-		if ( '' === $received ) {
-			echo '<span class="rankxai-pill">' . esc_html__( 'Not connected to RankX AI', 'rankxai' ) . '</span>';
+		$title    = '' === $received ? '' : sprintf(
+			/* translators: %s: a date and time. */
+			__( 'Last update received %s', 'rankxai' ),
+			$received
+		);
+		if ( RankXAI_Connection::is_connected() ) {
+			echo '<span class="rankxai-pill rankxai-pill--success"' . ( '' === $title ? '' : ' title="' . esc_attr( $title ) . '"' ) . '><span class="rankxai-dot" aria-hidden="true"></span>' . esc_html__( 'Connected to RankX AI', 'rankxai' ) . '</span>';
 			return;
 		}
-		echo '<span class="rankxai-pill rankxai-pill--success" title="' . esc_attr(
-			sprintf(
-				/* translators: %s: a date and time. */
-				__( 'Last update received %s', 'rankxai' ),
-				$received
-			)
-		) . '"><span class="rankxai-dot" aria-hidden="true"></span>' . esc_html__( 'Connected to RankX AI', 'rankxai' ) . '</span>';
+		if ( '' !== $received ) {
+			echo '<span class="rankxai-pill" title="' . esc_attr( $title ) . '">' . esc_html__( 'Receiving updates from RankX AI', 'rankxai' ) . '</span>';
+			return;
+		}
+		echo '<span class="rankxai-pill">' . esc_html__( 'Not connected to RankX AI', 'rankxai' ) . '</span>';
 	}
 
 	/**

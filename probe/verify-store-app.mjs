@@ -136,6 +136,8 @@ async function main() {
     check(/page=rankxai-store['"]/.test(settings.html), 'the RankX AI menu has a Store item on a WooCommerce site')
     const store = await page(jar, '/wp-admin/admin.php?page=rankxai-store')
     check(store.status === 200 && store.html.includes('Connect RankX AI') && store.html.includes('rankxai_connect'), 'the Store page explains and offers Connect')
+    // The header never reads connected above a Connect button (the walk on cfc, 2026-10-29): that badge is the plugin's own connection.
+    check(!store.html.includes('rankxai-pill--success') && /Not connected to RankX AI|Receiving updates from RankX AI/.test(store.html), 'and its header does not say connected before the plugin is')
     check(!store.html.includes('rx-store-config') && !store.html.includes('id="rx-store"'), 'no configuration and no mount point are printed before connecting (R4-D08)')
     // Not "no React": WooCommerce's own admin loads WordPress's React on every screen. The store app is ours.
     check(!store.html.includes('admin-app/build') && !store.html.includes('rankxai-store-js-module'), 'the store app is not loaded before connecting')
@@ -189,6 +191,9 @@ async function main() {
     check(config?.apiBase === 'https://app.rankxai.com/api/store-app' && /rankxai\/v1\/session/.test(config?.sessionUrl ?? '') && /^[0-9a-f]{10}$/.test(config?.nonce ?? '') && /page=rankxai-store$/.test(config?.pageUrl ?? '') && /\/wp-admin\/$/.test(config?.adminUrl ?? ''), 'with apiBase, sessionUrl, nonce, pageUrl and adminUrl', JSON.stringify(config))
     check('locale' in (config ?? {}), 'and the user’s locale')
     check(!mounted.html.includes(TOKEN_A), 'the site token is never in the page')
+    // The connected Store page is the store app's own shell; the plugin's header is on its other pages.
+    const settingsConnected = await page(jar, '/wp-admin/admin.php?page=rankxai-settings')
+    check(settingsConnected.html.includes('rankxai-pill--success') && settingsConnected.html.includes('Connected to RankX AI'), 'once connected, the header on the plugin pages says so')
     check(/<div class="wrap"><h1 class="screen-reader-text">[^<]+<\/h1><hr class="wp-header-end">/.test(mounted.html) && mounted.html.includes('<div id="rx-store"></div>'), 'the mount point inside .wrap with a screen-reader heading')
     const moduleTag = /<script\b[^>]*\bid="rankxai-store-js-module"[^>]*>/.exec(mounted.html)
     check(Boolean(moduleTag) && /type="module"/.test(moduleTag[0]) && moduleTag[0].includes(`admin-app/build/${entry}`), 'the entry is a script module, from this plugin’s own files (R4-D03)')
