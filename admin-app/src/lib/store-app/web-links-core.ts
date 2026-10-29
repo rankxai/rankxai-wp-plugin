@@ -11,6 +11,7 @@ export function webLinksFor(appUrl: string, projectId: string): WebLinks {
         [APP_PATHS.search]: at('/search-rankings'),
         [APP_PATHS.blog]: at('/content-studio'),
         [APP_PATHS.settings]: at('/settings/integrations'),
+        [APP_PATHS.plan]: `${base}/settings/billing`,
     };
 }
 export function webLinkForPath(links: WebLinks | null | undefined, path: string): string | null {
