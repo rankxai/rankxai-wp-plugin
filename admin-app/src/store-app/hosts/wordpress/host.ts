@@ -1,6 +1,6 @@
 import type { StoreHost } from '../../host-types';
 import { confirmLeave, hasUnsavedChanges, pushToast } from './registries';
-import { appPathFromHash, hashFromAppPath, wpAdminHref } from './hash-route';
+import { appPathFromHash, hashFromAppPath, hrefKind, wpAdminHref } from './hash-route';
 import { sessionExpiry } from './session-expiry';
 import { WP_ADMIN_SCHEME, adminLinkFor, adminTargetFromPath } from '@/lib/store-app/admin-target-core';
 export interface WordPressStoreConfig {
@@ -142,6 +142,9 @@ export const host: StoreHost = {
             return { href: wpAdminHref(config.adminUrl, path) ?? config.adminUrl, target: '_blank' };
         return { href: config.adminUrl, target: '_blank' };
     },
-    openPlanPage: (url) => void window.open(url, '_blank', 'noopener'),
+    openPlanPage: (url) => {
+        if (hrefKind(url) === 'web')
+            window.open(url, '_blank', 'noopener');
+    },
     locale: () => (config.locale ? config.locale.replace(/_/g, '-') : null),
 };

@@ -215,6 +215,9 @@ function Measured({ d }: {
                 v.notRecordedOrders > 0 ? `${fmtCount(v.notRecordedOrders, 'order has', 'orders have')} no recorded source and ${v.notRecordedOrders === 1 ? 'is' : 'are'} counted on neither side.` : null,
                 v.onHoldOrders > 0 ? `${fmtCount(v.onHoldOrders, 'order is', 'orders are')} on hold and not counted yet.` : null,
                 v.offlineOrders > 0 ? `${fmtCount(v.offlineOrders, 'order was', 'orders were')} added in WordPress or at a till and ${v.offlineOrders === 1 ? 'is' : 'are'} not counted.` : null,
+                v.otherSources.length === 0 && v.notRecordedOrders === 0 && v.onHoldOrders === 0 && v.offlineOrders === 0
+                    ? `Every online order in the last ${d.windowDays} days came from an AI assistant.`
+                    : null,
             ]
                 .filter(Boolean)
                 .join(' ')}

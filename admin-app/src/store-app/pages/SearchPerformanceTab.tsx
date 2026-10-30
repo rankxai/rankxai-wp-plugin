@@ -232,7 +232,8 @@ export function SearchPerformanceTab({ titlesHref = defaultTitlesHref }: {
             return;
         setConsentUrl(r.data.url);
         try {
-            window.open(r.data.url, '_blank');
+            if (/^https:\/\//i.test(r.data.url))
+                window.open(r.data.url, '_blank', 'noopener');
         }
         catch {
         }
