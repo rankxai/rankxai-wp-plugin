@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  phpcs:
+    name: Coding standards (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 7.4 is the `Requires PHP` floor; newer syntax would be fatal on activation.
+        php: ['7.4', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: PHPCS
+        run: composer run lint -- --report=full --report-summary
+
+  guardrails:
+    name: Guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A source scan over the shipped PHP: permission callbacks on every route,
+      # no file writes, `wp_slash` on stored input. Needs only node.
+      - run: node probe/verify-guardrails.mjs
+
+  plugin-check:
+    name: WordPress Plugin Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Plugin Check needs a plugin file to activate.
+      - id: detect
+        name: Is there a plugin to check yet?
+        run: |
+          if grep -rlE '^[[:space:]]*\*[[:space:]]*Plugin Name:' --include='*.php' . >/dev/null 2>&1; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::No plugin header found yet — Plugin Check skipped. It self-enables with the first plugin file.'
+          fi
+
+      # build-zip.mjs builds the store app from admin-app/src, which needs node.
+      - if: steps.detect.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Build both targets so either can fail here; check the WordPress.org one,
+      # since Plugin Check rejects the GitHub build's updater by design.
+      - if: steps.detect.outputs.present == 'true'
+        name: Build the release archives
+        run: |
+          node build-zip.mjs
+          node build-zip.mjs --target=wporg
+          mkdir -p build
+          unzip -q dist/rankxai-wporg.zip -d build
+          echo "--- what ships to WordPress.org ---"
+          find build/rankxai -type f | sort
+
+      - if: steps.detect.outputs.present == 'true'
+        uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: './build/rankxai'

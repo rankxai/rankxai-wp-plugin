@@ -1,0 +1,31 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Build output
+/build/
+/dist/
+*.zip
+
+# Local environment
+.env
+.env.local
+.wp-env.override.json
+
+# Tooling caches
+.phpcs-cache
+.phpunit.result.cache
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local probe output
+/probe/results/
+
+# Store app build output; build-zip.mjs adds admin-app/build to the zips.
+/admin-app/build/
+/admin-app/src/node_modules/
+/admin-app/src/dist/

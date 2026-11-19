@@ -1,0 +1,88 @@
+{
+  "_about": "One evidence set for the robots.txt grammar in TWO languages (plan 82 D82-4). lib/agent-readiness/robots-agents.ts is tested against every case here by robots-agents.test.ts; the WordPress plugin's PHP port (RankXAI_Robots) is tested against a byte-identical copy in its probe/fixtures/ by probe/verify-crawler-report.mjs. Copy with scripts/sync-plugin-fixtures.mjs; never edit the plugin's copy.",
+  "crawlers": [
+    { "token": "OAI-SearchBot", "assistant": "ChatGPT", "purpose": "search", "consequence": "ChatGPT cannot include your pages in its search results.", "registryId": "oai-searchbot" },
+    { "token": "ChatGPT-User", "assistant": "ChatGPT", "purpose": "user_fetch", "consequence": "ChatGPT cannot open your pages when a user asks it to.", "registryId": "chatgpt-user" },
+    { "token": "GPTBot", "assistant": "ChatGPT", "purpose": "training", "consequence": "OpenAI cannot use your pages to learn what your business is.", "registryId": "gptbot" },
+    { "token": "Claude-SearchBot", "assistant": "Claude", "purpose": "search", "consequence": "Claude cannot include your pages in its search results.", "registryId": "claude-searchbot" },
+    { "token": "Claude-User", "assistant": "Claude", "purpose": "user_fetch", "consequence": "Claude cannot open your pages when a user asks it to.", "registryId": "claude-user" },
+    { "token": "ClaudeBot", "assistant": "Claude", "purpose": "training", "consequence": "Anthropic cannot use your pages to learn what your business is.", "registryId": "claudebot" },
+    { "token": "PerplexityBot", "assistant": "Perplexity", "purpose": "search", "consequence": "Perplexity cannot index your pages, so it cannot cite you.", "registryId": "perplexitybot" },
+    { "token": "Perplexity-User", "assistant": "Perplexity", "purpose": "user_fetch", "consequence": "Perplexity cannot open your pages when a user asks it to.", "registryId": "perplexity-user" },
+    { "token": "Google-Extended", "assistant": "Google Gemini / AI Overviews", "purpose": "training", "consequence": "Google cannot use your pages to ground Gemini or AI Overviews.", "registryId": null },
+    { "token": "Applebot-Extended", "assistant": "Apple Intelligence", "purpose": "training", "consequence": "Apple cannot use your pages for its AI features.", "registryId": null },
+    { "token": "meta-externalagent", "assistant": "Meta AI", "purpose": "training", "consequence": "Meta cannot use your pages to learn what your business is.", "registryId": "meta-externalagent" },
+    { "token": "Amazonbot", "assistant": "Amazon Alexa", "purpose": "search", "consequence": "Alexa cannot surface your pages in answers.", "registryId": "amazonbot" },
+    { "token": "Bytespider", "assistant": "TikTok / Doubao", "purpose": "training", "consequence": "ByteDance cannot use your pages for its AI features.", "registryId": "bytespider" },
+    { "token": "CCBot", "assistant": "Common Crawl", "purpose": "training", "consequence": "Common Crawl cannot archive your pages, which most open models learn from.", "registryId": "ccbot" }
+  ],
+  "unmappedRegistryIds": {
+    "googlebot": "a search engine; robots.txt addresses it as Googlebot, which is not an AI crawler token",
+    "bingbot": "a search engine, not an AI crawler token",
+    "applebot": "a search engine; Apple's AI opt-out is the separate Applebot-Extended token",
+    "duckassistbot": "fetches on a person's behalf; DuckDuckGo documents no robots.txt token for it",
+    "mistralai-user": "fetches on a person's behalf; Mistral documents no robots.txt token for it"
+  },
+  "parse": [
+    { "name": "consecutive User-agent lines share ONE group", "robots": "User-agent: GPTBot\nUser-agent: ClaudeBot\nDisallow: /", "groups": [["gptbot", "claudebot"]] },
+    { "name": "a rule line closes the agent run", "robots": "User-agent: GPTBot\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /admin", "groups": [["gptbot"], ["claudebot"]] },
+    { "name": "a BOM does not swallow the first group", "robots": "﻿User-agent: *\nDisallow: /", "groups": [["*"]] },
+    { "name": "CRLF parses like LF", "robots": "User-agent: *\r\nDisallow: /private", "groups": [["*"]] },
+    { "name": "comments are stripped, including trailing ones", "robots": "# a comment line\nUser-agent: GPTBot # the OpenAI crawler\nDisallow: / # everything", "groups": [["gptbot"]], "firstRulePattern": "/" },
+    { "name": "unrecognised directives are reported", "robots": "User-agent: *\nCrawl-delay: 10\nSitemap: https://x.test/sitemap.xml", "groups": [["*"]], "ignoredDirectives": ["crawl-delay", "sitemap"] },
+    { "name": "a line with no colon is counted as unparsed", "robots": "User-agent: *\nthis is not a directive\nDisallow: /x", "groups": [["*"]], "unparsedLines": 1 },
+    { "name": "an empty file has no groups", "robots": "", "groups": [] }
+  ],
+  "patterns": [
+    { "name": "a bare prefix matches by prefix", "pattern": "/admin", "path": "/admin/users", "matches": true },
+    { "name": "a bare prefix does not match elsewhere", "pattern": "/admin", "path": "/public", "matches": false },
+    { "name": "an empty Disallow never matches the root", "pattern": "", "path": "/", "matches": false },
+    { "name": "an empty Disallow never matches anything", "pattern": "", "path": "/anything", "matches": false },
+    { "name": "* matches any run", "pattern": "/*.pdf", "path": "/docs/pricing.pdf", "matches": true },
+    { "name": "* is still anchored to its tail", "pattern": "/*.pdf", "path": "/docs/pricing.html", "matches": false },
+    { "name": "$ anchors the end", "pattern": "/page$", "path": "/page", "matches": true },
+    { "name": "$ refuses a longer path", "pattern": "/page$", "path": "/page/child", "matches": false },
+    { "name": "regex metacharacters are literal (parens)", "pattern": "/products/(new)", "path": "/products/(new)/x", "matches": true },
+    { "name": "regex metacharacters are literal (plus)", "pattern": "/a+b", "path": "/aaab", "matches": false },
+    { "name": "an unbalanced bracket is literal, never a block", "pattern": "/[", "path": "/anything", "matches": false }
+  ],
+  "access": [
+    { "name": "consecutive agents: the first is blocked", "robots": "User-agent: GPTBot\nUser-agent: ClaudeBot\nDisallow: /", "agent": "GPTBot", "path": "/", "access": "blocked" },
+    { "name": "consecutive agents: the second is blocked too", "robots": "User-agent: GPTBot\nUser-agent: ClaudeBot\nDisallow: /", "agent": "ClaudeBot", "path": "/", "access": "blocked" },
+    { "name": "separate groups: GPTBot blocked", "robots": "User-agent: GPTBot\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /admin", "agent": "GPTBot", "path": "/", "access": "blocked" },
+    { "name": "separate groups: ClaudeBot allowed at the root", "robots": "User-agent: GPTBot\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /admin", "agent": "ClaudeBot", "path": "/", "access": "allowed" },
+    { "name": "separate groups: ClaudeBot blocked on its own path", "robots": "User-agent: GPTBot\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /admin", "agent": "ClaudeBot", "path": "/admin", "access": "blocked" },
+    { "name": "an exact agent match beats *", "robots": "User-agent: *\nDisallow: /\nUser-agent: GPTBot\nAllow: /", "agent": "GPTBot", "path": "/", "access": "allowed" },
+    { "name": "* governs an agent not named", "robots": "User-agent: *\nDisallow: /\nUser-agent: GPTBot\nAllow: /", "agent": "PerplexityBot", "path": "/", "access": "blocked" },
+    { "name": "the longest pattern wins (disallow)", "robots": "User-agent: *\nDisallow: /docs\nAllow: /docs/public", "agent": "GPTBot", "path": "/docs/private", "access": "blocked" },
+    { "name": "the longest pattern wins (allow)", "robots": "User-agent: *\nDisallow: /docs\nAllow: /docs/public", "agent": "GPTBot", "path": "/docs/public/a", "access": "allowed" },
+    { "name": "on an equal-length tie, Allow beats Disallow", "robots": "User-agent: *\nDisallow: /\nAllow: /", "agent": "GPTBot", "path": "/", "access": "allowed" },
+    { "name": "groups naming the same agent are merged (root)", "robots": "User-agent: GPTBot\nAllow: /blog\nUser-agent: GPTBot\nDisallow: /", "agent": "GPTBot", "path": "/", "access": "blocked" },
+    { "name": "groups naming the same agent are merged (blog)", "robots": "User-agent: GPTBot\nAllow: /blog\nUser-agent: GPTBot\nDisallow: /", "agent": "GPTBot", "path": "/blog/x", "access": "allowed" },
+    { "name": "agent matching is case-insensitive", "robots": "User-agent: gptbot\nDisallow: /", "agent": "GPTBot", "path": "/", "access": "blocked" },
+    { "name": "no group at all means unaddressed, never blocked", "robots": "User-agent: Googlebot\nDisallow: /private", "agent": "GPTBot", "path": "/", "access": "unaddressed", "decidedBy": null },
+    { "name": "a group with no matching rule means allowed, and names the group", "robots": "User-agent: *\nDisallow: /admin", "agent": "GPTBot", "path": "/", "access": "allowed", "decidedBy": "*" },
+    { "name": "a blocked verdict carries the rule that produced it", "robots": "User-agent: ClaudeBot\nDisallow: /", "agent": "ClaudeBot", "path": "/", "access": "blocked", "decidedBy": "claudebot", "matchedRule": { "kind": "disallow", "pattern": "/" } },
+    { "name": "an empty file leaves a crawler unaddressed", "robots": "", "agent": "OAI-SearchBot", "path": "/", "access": "unaddressed" },
+    { "name": "training bots blocked: GPTBot", "robots": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nUser-agent: CCBot\nUser-agent: Google-Extended\nDisallow: /", "agent": "GPTBot", "path": "/", "access": "blocked" },
+    { "name": "training bots blocked: CCBot", "robots": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nUser-agent: CCBot\nUser-agent: Google-Extended\nDisallow: /", "agent": "CCBot", "path": "/", "access": "blocked" },
+    { "name": "training bots blocked: Google-Extended", "robots": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nUser-agent: CCBot\nUser-agent: Google-Extended\nDisallow: /", "agent": "Google-Extended", "path": "/", "access": "blocked" },
+    { "name": "training bots blocked: search bots still allowed", "robots": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nUser-agent: CCBot\nUser-agent: Google-Extended\nDisallow: /", "agent": "OAI-SearchBot", "path": "/", "access": "allowed" },
+    { "name": "a specific Allow survives a * blanket disallow", "robots": "User-agent: *\nDisallow: /\nUser-agent: PerplexityBot\nAllow: /", "agent": "PerplexityBot", "path": "/", "access": "allowed" },
+    { "name": "and the others are still blocked by *", "robots": "User-agent: *\nDisallow: /\nUser-agent: PerplexityBot\nAllow: /", "agent": "GPTBot", "path": "/", "access": "blocked" },
+    { "name": "a stray rule before any User-agent is attributed to *", "robots": "Disallow: /\nUser-agent: GPTBot\nAllow: /", "agent": "ClaudeBot", "path": "/", "access": "blocked", "decidedBy": "*" }
+  ],
+  "every": [
+    { "name": "a blanket disallow blocks every AI crawler through *", "robots": "User-agent: *\nDisallow: /", "everyAccess": "blocked" },
+    { "name": "an empty robots.txt leaves every crawler unaddressed", "robots": "", "everyAccess": "unaddressed" },
+    { "name": "a file naming only Googlebot leaves the AI crawlers unaddressed", "robots": "User-agent: Googlebot\nDisallow: /nope", "everyAccess": "unaddressed" }
+  ],
+  "blanket": [
+    { "name": "a BOM-prefixed blanket disallow is still a blanket", "robots": "﻿User-agent: *\nDisallow: /", "blanket": true },
+    { "name": "a stray rule before any User-agent is a blanket", "robots": "Disallow: /\nUser-agent: GPTBot\nAllow: /", "blanket": true },
+    { "name": "the plain blanket", "robots": "User-agent: *\nDisallow: /", "blanket": true },
+    { "name": "* disallowing one path is not a blanket", "robots": "User-agent: *\nDisallow: /admin", "blanket": false },
+    { "name": "an empty Disallow is not a blanket", "robots": "User-agent: *\nDisallow:", "blanket": false },
+    { "name": "an empty file is not a blanket", "robots": "", "blanket": false }
+  ]
+}
