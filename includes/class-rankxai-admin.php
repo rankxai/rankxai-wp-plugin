@@ -76,7 +76,6 @@ class RankXAI_Admin {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue' ) );
-		add_action( 'admin_page_access_denied', array( __CLASS__, 'redirect_old_address' ) );
 		add_action( 'admin_page_access_denied', array( __CLASS__, 'store_needs_woocommerce' ) );
 		add_action( 'admin_post_' . self::ACTION, array( __CLASS__, 'handle_save' ) );
 		add_action( 'admin_post_' . self::ACTION_DELETE_REDIRECT, array( __CLASS__, 'handle_delete_redirect' ) );
@@ -120,8 +119,6 @@ class RankXAI_Admin {
 			self::POSITION
 		);
 		self::$hooks[] = $top;
-		// The old Settings address resolves here, so redirect it before output.
-		add_action( 'load-' . $top, array( __CLASS__, 'redirect_old_address' ) );
 
 		$renderers = array(
 			self::PAGE          => array( 'RankXAI_Pages', 'overview' ),
@@ -167,20 +164,6 @@ class RankXAI_Admin {
 			return;
 		}
 		wp_enqueue_style( 'rankxai-admin', plugins_url( 'assets/admin.css', RANKXAI_PLUGIN_FILE ), array(), RANKXAI_VERSION );
-	}
-
-	/**
-	 * Send the old Settings → RankX AI address to the new Settings page.
-	 */
-	public static function redirect_old_address() {
-		global $pagenow;
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only page check.
-		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
-		if ( 'options-general.php' !== $pagenow || self::PAGE !== $page || ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		wp_safe_redirect( self::page_url( self::PAGE_SETTINGS ) );
-		exit;
 	}
 
 	/**
@@ -281,11 +264,13 @@ class RankXAI_Admin {
 		}
 
 		$keep_data = isset( $_POST['rankxai_keep_data'] );
+		$personal  = isset( $_POST['rankxai_share_personal_data'] );
 
 		// A submission that chose no post type keeps what is stored.
 		RankXAI_Twins::save_settings( $twins_on, $post_types ? $post_types : null );
 		RankXAI_Generate::save_state( $documents );
 		update_option( 'rankxai_keep_data', $keep_data ? 1 : 0, false );
+		update_option( RankXAI_Access_Scope::OPTION_PERSONAL_DATA, $personal ? 1 : 0, false );
 
 		wp_safe_redirect( add_query_arg( 'rankxai-saved', '1', self::page_url( self::PAGE_SETTINGS ) ) );
 		exit;

@@ -1,4 +1,4 @@
-=== RankX AI – AI Shopping & SEO for WooCommerce ===
+=== RankX AI – AI Shopping & SEO ===
 Contributors: rankxai
 Tags: woocommerce, ai shopping, seo, llms.txt, ai search
 Requires at least: 6.0
@@ -57,9 +57,9 @@ Not until you connect a RankX AI account. Before that it only asks your own site
 
 = What does connecting give RankX AI access to? =
 
-Connecting asks you to approve, on WordPress's own screen, an Application Password for your user account. RankX AI uses it, through the WordPress and WooCommerce REST APIs and this plugin's routes, to read your products, pages, posts, categories and media, and to make the changes you ask for: product details and images, search titles and descriptions, structured data, blog drafts, redirects and llms.txt. It can also read your site settings and installed plugins, and change the site title, tagline, timezone and date format when you ask.
+Connecting asks you to approve, on WordPress's own screen, an Application Password for your user account. This plugin limits that password to an allow list: your posts, pages, media and product content, product categories and tags, this plugin's own routes, redirects, a short list of general settings (title, tagline, time zone, date and time formats, posts per page, comment defaults), webhooks for product changes sent to RankX AI, and reading your site's structure. Every other request is refused, and the password cannot post unfiltered HTML, so what it writes is filtered like a non-administrator's.
 
-Customer and order data stays off unless you switch it on in RankX AI for this store. The plugin itself refuses RankX AI's password anything it never needs: creating, changing or deleting users, reading or creating Application Passwords, installing or changing plugins and themes, issuing refunds, deleting anything permanently, batch requests, and changing your site's address. Every change is recorded in your RankX AI account, and product fixes can be undone from the store app.
+It can never change users, plugins, themes, templates or styles, issue refunds, read or create Application Passwords, or delete anything permanently. Orders, refunds, customers, the user list, product reviews and full comment details stay off until you tick "Let RankX AI read orders, customers, users and comments" in RankX AI › Settings. Every change is recorded in your RankX AI account, and product fixes can be undone.
 
 To stop it, click **Disconnect** in RankX AI › Settings or deactivate the plugin: both remove the Application Password and RankX AI's webhooks.
 

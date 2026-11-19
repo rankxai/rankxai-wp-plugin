@@ -1,9 +1,10 @@
 <?php
 /**
- * Limits on what RankX AI's Application Password may do.
+ * What RankX AI's Application Password may do on this site.
  *
- * The password could otherwise do anything its administrator can, so actions
- * RankX AI never needs are refused for that password only.
+ * Connecting creates an Application Password for the approving administrator.
+ * For that password only, every REST request is refused unless it is on the
+ * list below, and the password cannot post unfiltered HTML.
  *
  * @package RankXAI
  */
@@ -15,11 +16,54 @@ defined( 'ABSPATH' ) || exit;
  */
 class RankXAI_Access_Scope {
 
+	/** The site owner's switch for customer, order, user and comment data. Off by default. */
+	const OPTION_PERSONAL_DATA = 'rankxai_share_personal_data';
+
+	/** Site settings RankX AI may change. */
+	const WRITABLE_SETTINGS = array( 'title', 'description', 'timezone', 'date_format', 'time_format', 'start_of_week', 'posts_per_page', 'default_comment_status', 'default_ping_status' );
+
+	/** Post types that hold site structure or design rather than content. */
+	const EXCLUDED_POST_TYPES = array( 'wp_template', 'wp_template_part', 'wp_global_styles', 'wp_navigation', 'wp_font_family', 'wp_font_face', 'wp_block', 'nav_menu_item' );
+
+	/** Taxonomies that hold site structure rather than content. */
+	const EXCLUDED_TAXONOMIES = array( 'nav_menu', 'wp_theme', 'wp_template_part_area', 'wp_pattern_category' );
+
+	/**
+	 * Cached answer for this request.
+	 *
+	 * @var bool|null
+	 */
+	private static $ours = null;
+
 	/**
 	 * Hook in.
 	 */
 	public static function init() {
 		add_filter( 'rest_pre_dispatch', array( __CLASS__, 'enforce' ), 10, 3 );
+		add_filter( 'map_meta_cap', array( __CLASS__, 'no_unfiltered_html' ), 10, 2 );
+	}
+
+	/**
+	 * Whether the site owner lets RankX AI read customer, order, user and comment data.
+	 *
+	 * @return bool
+	 */
+	public static function personal_data_allowed() {
+		return (bool) get_option( self::OPTION_PERSONAL_DATA );
+	}
+
+	/**
+	 * RankX AI's password never has `unfiltered_html`, so what it writes is filtered like a non-administrator's.
+	 *
+	 * @param string[] $caps Primitive capabilities.
+	 * @param string   $cap  Capability being checked.
+	 * @return string[]
+	 */
+	public static function no_unfiltered_html( $caps, $cap ) {
+		if ( 'unfiltered_html' === $cap && self::is_rankxai_password() ) {
+			$caps[] = 'do_not_allow';
+		}
+		return $caps;
 	}
 
 	/**
@@ -51,36 +95,168 @@ class RankXAI_Access_Scope {
 	 */
 	public static function refusal( $method, $route, $request ) {
 		$method = strtoupper( (string) $method );
-		$route  = strtolower( '/' . ltrim( (string) $route, '/' ) );
-		$write  = 'GET' !== $method && 'HEAD' !== $method;
+		$route  = strtolower( '/' . trim( (string) $route, '/' ) );
+		$read   = in_array( $method, array( 'GET', 'HEAD', 'OPTIONS' ), true );
 
 		if ( false !== strpos( $route, 'application-passwords' ) ) {
 			return __( 'RankX AI cannot read or create Application Passwords.', 'rankxai' );
 		}
-		if ( ! $write ) {
-			return '';
+		if ( self::is_personal( $method, $route, $request ) && ! self::personal_data_allowed() ) {
+			return __( 'Customer, order, user and comment data is off for RankX AI on this site. The site owner can allow it in RankX AI › Settings.', 'rankxai' );
 		}
-		// A batch carries other requests inside it, which this check cannot see.
-		if ( preg_match( '#/batch(/v\d+)?$#', $route ) ) {
-			return __( 'RankX AI does not send batch requests.', 'rankxai' );
-		}
-		if ( preg_match( '#^/wp/v2/(plugins|themes)(/|$)#', $route ) ) {
-			return __( 'RankX AI cannot install, activate or change plugins and themes.', 'rankxai' );
-		}
-		// A WooCommerce customer is a WordPress user.
-		if ( preg_match( '#^/wp/v2/users(/|$)#', $route ) || preg_match( '#^/wc/v\d+/customers(/|$)#', $route ) ) {
-			return __( 'RankX AI cannot create, change or delete users.', 'rankxai' );
-		}
-		if ( preg_match( '#(^|/)refunds(/|$)#', $route ) ) {
-			return __( 'RankX AI cannot issue refunds.', 'rankxai' );
-		}
-		if ( 'DELETE' === $method && rest_sanitize_boolean( $request->get_param( 'force' ) ) ) {
+		if ( 'DELETE' === $method && rest_sanitize_boolean( $request->get_param( 'force' ) ) && ! preg_match( '#^/wc/v\d+/webhooks/\d+$#', $route ) ) {
 			return __( 'RankX AI only moves things to the trash; it cannot delete them permanently.', 'rankxai' );
 		}
-		if ( preg_match( '#^/wp/v2/settings/?$#', $route ) && ( null !== $request->get_param( 'siteurl' ) || null !== $request->get_param( 'home' ) ) ) {
-			return __( 'RankX AI cannot change the site address.', 'rankxai' );
+		if ( self::allowed( $method, $route, $read, $request ) ) {
+			return '';
 		}
-		return '';
+		return __( 'RankX AI’s connection is not allowed to use this part of the site.', 'rankxai' );
+	}
+
+	/**
+	 * Whether a request reads personal data: orders, refunds, customers, the user list, product reviews, or comments in full.
+	 *
+	 * @param string          $method  HTTP method.
+	 * @param string          $route   Normalised route.
+	 * @param WP_REST_Request $request Request.
+	 * @return bool
+	 */
+	private static function is_personal( $method, $route, $request ) {
+		if ( preg_match( '#^/wc/v\d+/(orders|refunds|customers|products/reviews)(/|$)#', $route ) ) {
+			return true;
+		}
+		if ( preg_match( '#^/wp/v2/users(/(?!me$)[^/]+)?$#', $route ) ) {
+			return true;
+		}
+		return (bool) preg_match( '#^/wp/v2/comments(/|$)#', $route ) && 'edit' === $request->get_param( 'context' );
+	}
+
+	/**
+	 * The allow list.
+	 *
+	 * @param string          $method  HTTP method.
+	 * @param string          $route   Normalised route.
+	 * @param bool            $read    Whether the method only reads.
+	 * @param WP_REST_Request $request Request.
+	 * @return bool
+	 */
+	private static function allowed( $method, $route, $read, $request ) {
+		// This plugin's own routes check their own capabilities.
+		if ( preg_match( '#^/rankxai/v1(/|$)#', $route ) ) {
+			return true;
+		}
+		// The Redirection plugin's API, used only when that plugin is the site's redirect manager.
+		if ( preg_match( '#^/redirection/v1/(redirect|group|bulk/redirect/delete)(/|$)#', $route ) ) {
+			return true;
+		}
+		if ( $read && self::readable( $route ) ) {
+			return true;
+		}
+		if ( preg_match( '#^/wp/v2/settings$#', $route ) ) {
+			return $read || self::only_params( $request, self::WRITABLE_SETTINGS );
+		}
+		if ( preg_match( '#^/wp/v2/comments/\d+$#', $route ) ) {
+			return $read || ( 'DELETE' !== $method && self::only_params( $request, array( 'status' ) ) );
+		}
+		if ( self::content_route( $route ) ) {
+			return true;
+		}
+		if ( preg_match( '#^/wc/v\d+/products(/|$)#', $route ) && ! preg_match( '#/batch$#', $route ) ) {
+			return true;
+		}
+		if ( preg_match( '#^/wc/v\d+/webhooks(/(\d+))?$#', $route, $m ) ) {
+			return $read || self::own_webhook( $method, isset( $m[2] ) ? (int) $m[2] : 0, $request );
+		}
+		return false;
+	}
+
+	/**
+	 * Read-only routes: discovery, site structure and store settings.
+	 *
+	 * @param string $route Normalised route.
+	 * @return bool
+	 */
+	private static function readable( $route ) {
+		$patterns = array(
+			'#^/$#',
+			'#^/[a-z0-9-]+/v\d+$#',
+			'#^/wp/v2/(types|taxonomies|statuses|search|settings|plugins|themes|menus|menu-items|widgets|comments|users|users/me)(/|$)#',
+			'#^/wc/v\d+/(system_status|settings|coupons|orders|refunds|customers)(/|$)#',
+			'#^/wp-abilities/v1/abilities$#',
+		);
+		foreach ( $patterns as $pattern ) {
+			if ( preg_match( $pattern, $route ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Whether a route is a post type's or taxonomy's own route, for content rather than site structure.
+	 *
+	 * @param string $route Normalised route.
+	 * @return bool
+	 */
+	private static function content_route( $route ) {
+		if ( ! preg_match( '#^/wp/v2/([a-z0-9_-]+)(?:/\d+(?:/(?:revisions|autosaves)(?:/\d+)?)?)?$#', $route, $m ) ) {
+			return false;
+		}
+		$bases = array();
+		foreach ( get_post_types( array( 'show_in_rest' => true ), 'objects' ) as $type ) {
+			if ( ! in_array( $type->name, self::EXCLUDED_POST_TYPES, true ) ) {
+				$bases[] = $type->rest_base ? $type->rest_base : $type->name;
+			}
+		}
+		foreach ( get_taxonomies( array( 'show_in_rest' => true ), 'objects' ) as $taxonomy ) {
+			if ( ! in_array( $taxonomy->name, self::EXCLUDED_TAXONOMIES, true ) ) {
+				$bases[] = $taxonomy->rest_base ? $taxonomy->rest_base : $taxonomy->name;
+			}
+		}
+		return in_array( $m[1], array_map( 'strtolower', $bases ), true );
+	}
+
+	/**
+	 * Whether a request carries no parameters other than the allowed ones.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @param string[]        $allowed Allowed parameter names.
+	 * @return bool
+	 */
+	private static function only_params( $request, $allowed ) {
+		$sent = array_merge( array_keys( (array) $request->get_json_params() ), array_keys( (array) $request->get_body_params() ) );
+		$sent = array_diff( $sent, array( '_locale', '_method', 'context' ) );
+		return array() === array_diff( $sent, $allowed );
+	}
+
+	/**
+	 * A webhook write is allowed only for product topics delivering to RankX AI, and only on RankX AI's own webhooks.
+	 *
+	 * @param string          $method  HTTP method.
+	 * @param int             $id      Webhook ID, or 0 when creating.
+	 * @param WP_REST_Request $request Request.
+	 * @return bool
+	 */
+	private static function own_webhook( $method, $id, $request ) {
+		$ours = RankXAI_App_Client::APP_ORIGIN . '/api/webhooks/woocommerce';
+		if ( $id > 0 ) {
+			$existing = function_exists( 'wc_get_webhook' ) ? wc_get_webhook( $id ) : null;
+			if ( ! $existing || 0 !== strpos( (string) $existing->get_delivery_url(), $ours ) ) {
+				return false;
+			}
+			if ( 'DELETE' === $method ) {
+				return true;
+			}
+		}
+		$url   = $request->get_param( 'delivery_url' );
+		$topic = $request->get_param( 'topic' );
+		if ( null !== $url && 0 !== strpos( (string) $url, $ours ) ) {
+			return false;
+		}
+		if ( null !== $topic && 0 !== strpos( (string) $topic, 'product.' ) ) {
+			return false;
+		}
+		return $id > 0 || ( null !== $url && null !== $topic );
 	}
 
 	/**
@@ -89,6 +265,9 @@ class RankXAI_Access_Scope {
 	 * @return bool
 	 */
 	private static function is_rankxai_password() {
+		if ( null !== self::$ours ) {
+			return self::$ours;
+		}
 		if ( ! function_exists( 'rest_get_authenticated_app_password' ) ) {
 			return false;
 		}
@@ -96,7 +275,8 @@ class RankXAI_Access_Scope {
 		if ( ! $uuid ) {
 			return false;
 		}
-		$item = WP_Application_Passwords::get_user_application_password( get_current_user_id(), $uuid );
-		return is_array( $item ) && isset( $item['app_id'] ) && RankXAI_Connection::APP_ID === $item['app_id'];
+		$item       = WP_Application_Passwords::get_user_application_password( get_current_user_id(), $uuid );
+		self::$ours = is_array( $item ) && isset( $item['app_id'] ) && RankXAI_Connection::APP_ID === $item['app_id'];
+		return self::$ours;
 	}
 }

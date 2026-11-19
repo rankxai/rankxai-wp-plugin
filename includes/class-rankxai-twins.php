@@ -464,6 +464,10 @@ class RankXAI_Twins {
 	 * @return void
 	 */
 	private static function serve( $post, $is_md_url ) {
+		// Without our headers the copy would go out as HTML, so leave the normal page to WordPress.
+		if ( headers_sent() ) {
+			return;
+		}
 		$markdown = self::markdown_for( $post );
 
 		self::prevent_page_cache();
@@ -835,6 +839,9 @@ class RankXAI_Twins {
 		}
 		$xml .= '</urlset>' . "\n";
 
+		if ( headers_sent() ) {
+			return;
+		}
 		self::prevent_page_cache();
 
 		if ( ! headers_sent() ) {

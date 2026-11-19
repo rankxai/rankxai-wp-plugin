@@ -1,4 +1,4 @@
-# RankX AI – AI Shopping & SEO for WooCommerce
+# RankX AI – AI Shopping & SEO
 
 The WordPress plugin for [RankX AI](https://rankxai.com). On a WooCommerce store it shows what AI
 shopping answers (ChatGPT, Google's AI Mode) need from your products and, connected to a RankX AI

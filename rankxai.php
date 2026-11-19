@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       RankX AI – AI Shopping & SEO for WooCommerce
+ * Plugin Name:       RankX AI – AI Shopping & SEO
  * Plugin URI:        https://rankxai.com/docs/integrations/wordpress
  * Description:       See what your products are missing for AI shopping answers, publish llms.txt for AI crawlers, and connect your store to RankX AI.
  * Version:           0.1.0

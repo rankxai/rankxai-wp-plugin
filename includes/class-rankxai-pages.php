@@ -294,6 +294,7 @@ class RankXAI_Pages {
 
 		self::settings_twins();
 		self::settings_documents();
+		self::settings_personal_data();
 		self::settings_keep_data();
 
 		echo '<div><button type="submit" class="rankxai-button rankxai-button--primary">' . esc_html__( 'Save settings', 'rankxai' ) . '</button></div>';
@@ -389,7 +390,24 @@ class RankXAI_Pages {
 	}
 
 	/**
-	 * What deleting the plugin removes.
+	 * Whether RankX AI may read customer, order, user and comment data.
+	 */
+	private static function settings_personal_data() {
+		RankXAI_UI::card_open(
+			array(
+				'title'    => __( 'Customer and order data', 'rankxai' ),
+				'subtitle' => __( 'What RankX AI may read about the people who use this site, once connected.', 'rankxai' ),
+			)
+		);
+		echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html__( 'Access', 'rankxai' ) . '</div><div>';
+		echo '<label class="rankxai-check"><input type="checkbox" name="rankxai_share_personal_data" value="1" ' . checked( RankXAI_Access_Scope::personal_data_allowed(), true, false ) . ' /> <span>' . esc_html__( 'Let RankX AI read orders, customers, users and comments', 'rankxai' ) . '</span></label>';
+		echo '<p class="rankxai-field__hint">' . esc_html__( 'Off by default. While it is off, this site refuses RankX AI any request for orders, refunds, customers, the user list, product reviews or full comment details. Turn it on to use features such as revenue from AI shopping in RankX AI.', 'rankxai' ) . '</p>';
+		echo '</div></div>';
+		RankXAI_UI::card_close();
+	}
+
+	/**
+	 * Whether deleting the plugin keeps its settings and data.
 	 */
 	private static function settings_keep_data() {
 		RankXAI_UI::card_open(
