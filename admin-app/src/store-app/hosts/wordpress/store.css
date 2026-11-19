@@ -277,6 +277,7 @@
 #rx-store .rx-link {
 	color: var(--rx-foreground);
 	cursor: pointer;
+	overflow-wrap: anywhere;
 	text-decoration: underline;
 	text-decoration-color: var(--rx-ring);
 	text-underline-offset: 2px;
