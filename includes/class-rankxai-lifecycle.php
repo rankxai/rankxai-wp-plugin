@@ -48,6 +48,7 @@ class RankXAI_Lifecycle {
 			RankXAI_Twins::OPTION_SETTINGS   => array(),
 			RankXAI_Fill::OPTION             => array( 'features' => array() ),
 			RankXAI_Fill::OPTION_FLUSH       => 0,
+			RankXAI_Fill::OPTION_ALLOWED     => 0,
 			RankXAI_Crawlers::OPTION_ENABLED => 0,
 		);
 		foreach ( $defaults as $name => $default ) {

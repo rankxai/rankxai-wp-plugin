@@ -294,6 +294,7 @@ class RankXAI_Pages {
 
 		self::settings_twins();
 		self::settings_documents();
+		self::settings_fill();
 		self::settings_personal_data();
 		self::settings_keep_data();
 
@@ -386,6 +387,46 @@ class RankXAI_Pages {
 			echo '</div></div>';
 		}
 
+		RankXAI_UI::card_close();
+	}
+
+	/**
+	 * Whether RankX AI may add SEO tags the site is missing, and which are on now.
+	 */
+	private static function settings_fill() {
+		RankXAI_UI::card_open(
+			array(
+				'title'    => __( 'Missing SEO tags', 'rankxai' ),
+				'subtitle' => __( 'For a site with no SEO plugin, once connected to RankX AI.', 'rankxai' ),
+			)
+		);
+		echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html__( 'Access', 'rankxai' ) . '</div><div>';
+		echo '<label class="rankxai-check"><input type="checkbox" name="rankxai_fill_allowed" value="1" ' . checked( RankXAI_Fill::allowed(), true, false ) . ' /> <span>' . esc_html__( 'Let RankX AI add missing SEO tags', 'rankxai' ) . '</span></label>';
+		echo '<p class="rankxai-field__hint">' . esc_html__( 'Off by default. When it is on, RankX AI checks your pages and can switch on a meta description, Open Graph and Twitter tags, WordPress’s own sitemap and breadcrumbs, only where nothing on your site prints them. Nothing is added while an SEO plugin is active. Turning this off removes them straight away.', 'rankxai' ) . '</p>';
+		echo '</div></div>';
+
+		$labels = array(
+			'meta_description' => __( 'Meta description', 'rankxai' ),
+			'open_graph'       => __( 'Open Graph tags', 'rankxai' ),
+			'twitter_card'     => __( 'Twitter tags', 'rankxai' ),
+			'sitemap'          => __( 'Sitemap', 'rankxai' ),
+			'breadcrumbs'      => __( 'Breadcrumbs', 'rankxai' ),
+		);
+		$on     = array();
+		foreach ( RankXAI_Fill::switches() as $feature => $value ) {
+			if ( $value && isset( $labels[ $feature ] ) ) {
+				$on[] = $labels[ $feature ];
+			}
+		}
+		echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html__( 'On now', 'rankxai' ) . '</div><div>';
+		if ( ! $on ) {
+			echo '<p class="rankxai-field__hint">' . esc_html__( 'None.', 'rankxai' ) . '</p>';
+		} elseif ( RankXAI_Fill::blocked_by() ) {
+			echo '<p class="rankxai-field__hint">' . esc_html__( 'None: an SEO plugin is active, so nothing is added.', 'rankxai' ) . '</p>';
+		} else {
+			echo '<p class="rankxai-field__hint">' . esc_html( implode( ', ', $on ) ) . '</p>';
+		}
+		echo '</div></div>';
 		RankXAI_UI::card_close();
 	}
 

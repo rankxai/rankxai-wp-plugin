@@ -2,8 +2,9 @@
 /**
  * Switches for filling SEO features the site does not output.
  *
- * Each feature is switched on remotely only when nothing prints it. Any known SEO
- * plugin being active stops every fill at once.
+ * Nothing is printed unless the site owner allows it in Settings. RankX AI then
+ * switches on only what nothing else prints. Any known SEO plugin being active
+ * stops every fill at once.
  *
  * @package RankXAI
  */
@@ -24,6 +25,11 @@ class RankXAI_Fill {
 	 * Set when the sitemap switch changes, cleared once rewrite rules are flushed.
 	 */
 	const OPTION_FLUSH = 'rankxai_fill_flush';
+
+	/**
+	 * The site owner's switch, set only from the Settings page. Off by default.
+	 */
+	const OPTION_ALLOWED = 'rankxai_fill_allowed';
 
 	/**
 	 * Every feature this plugin can fill.
@@ -47,6 +53,28 @@ class RankXAI_Fill {
 			$out[ $feature ] = ! empty( $stored[ $feature ] );
 		}
 		return $out;
+	}
+
+	/**
+	 * Whether the site owner lets RankX AI add missing SEO tags.
+	 *
+	 * @return bool
+	 */
+	public static function allowed() {
+		return (bool) get_option( self::OPTION_ALLOWED );
+	}
+
+	/**
+	 * Save the site owner's choice. Turning it off also switches every fill off.
+	 *
+	 * @param bool $allowed Allowed.
+	 * @return void
+	 */
+	public static function set_allowed( $allowed ) {
+		update_option( self::OPTION_ALLOWED, $allowed ? 1 : 0, true );
+		if ( ! $allowed && in_array( true, self::switches(), true ) ) {
+			self::save( array() );
+		}
 	}
 
 	/**
@@ -95,7 +123,7 @@ class RankXAI_Fill {
 	 */
 	public static function on( $feature ) {
 		$switches = self::switches();
-		if ( empty( $switches[ $feature ] ) ) {
+		if ( empty( $switches[ $feature ] ) || ! self::allowed() ) {
 			return false;
 		}
 		if ( self::blocked_by() ) {
@@ -106,7 +134,7 @@ class RankXAI_Fill {
 		 *
 		 * Return false to stop it, for example from an SEO plugin we do not detect.
 		 *
-		 * @param bool   $on      True when switched on and nothing blocks it.
+		 * @param bool   $on      True when allowed, switched on and nothing blocks it.
 		 * @param string $feature meta_description | open_graph | twitter_card | sitemap | breadcrumbs.
 		 */
 		return (bool) apply_filters( 'rankxai_fill_' . $feature, true, $feature );

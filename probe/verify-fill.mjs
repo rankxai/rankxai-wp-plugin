@@ -66,6 +66,7 @@ async function main() {
   const uuid = wp('user', 'application-password', 'list', 'admin', `--name=${MARK}`, '--field=uuid')
   const originalActive = wp('plugin', 'list', '--status=active', '--field=name').split(/\r?\n/).filter((n) => ALL.includes(n))
   const before = await api('/rankxai/v1/fill')
+  const allowedBefore = wpQuiet('option', 'get', 'rankxai_fill_allowed') ?? '0'
 
   try {
     console.log('\n== the route ==')
@@ -76,6 +77,18 @@ async function main() {
     check(notBool.status === 400, 'a non-boolean is refused (400)')
     const anon = await http(`${BASE}/?rest_route=${encodeURIComponent('/rankxai/v1/fill')}`)
     check(anon.status === 401 || anon.status === 403, `anonymous access is refused (${anon.status})`)
+
+    console.log("\n== the site owner's switch, off by default ==")
+    wp('eval', 'RankXAI_Fill::set_allowed( false );')
+    const closed = await api('/rankxai/v1/fill')
+    check(closed.json?.allowed === false, 'GET /fill reports allowed: false')
+    const refused = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { open_graph: true } }) })
+    check(refused.status === 403 && refused.json?.code === 'rankxai_fill_not_allowed', `switching a fill on is refused while it is off (${refused.status})`)
+    const offOk = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { open_graph: false } }) })
+    check(offOk.status === 200, 'switching a fill off is still accepted')
+    wp('eval', 'RankXAI_Fill::set_allowed( true );')
+    const opened = await api('/rankxai/v1/fill')
+    check(opened.json?.allowed === true, 'allowed from Settings: GET /fill reports allowed: true')
 
     console.log('\n== no SEO plugin, fills off: nothing new is printed ==')
     only([])
@@ -123,12 +136,23 @@ async function main() {
     // The probe mu-plugin honours rankxai_probe_fill_off by returning false from rankxai_fill_open_graph.
     check(!optOut.ours.includes('og:title') && optOut.ours.includes('twitter:card'), 'rankxai_fill_open_graph returning false stops Open Graph, and only Open Graph')
     wp('eval', "delete_option('rankxai_probe_fill_off');")
+
+    console.log('\n== the site owner turns it off: the tags go at once ==')
+    const reOn = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { open_graph: true, twitter_card: true } }) })
+    check(reOn.status === 200 && (await head(urlA)).ogTitles === 1, 'Open Graph is printed before')
+    wp('eval', 'RankXAI_Fill::set_allowed( false );')
+    const after = await api('/rankxai/v1/fill')
+    check(after.json?.allowed === false && Object.values(after.json?.features ?? { x: true }).every((v) => v === false), 'every switch is off')
+    const gone = await head(urlA)
+    check(gone.ours === '' && gone.ogTitles === 0, 'and nothing of ours is printed')
   } catch (e) {
     check(false, `the probe threw: ${e.stack ?? e.message}`)
   } finally {
     for (const id of created) wpQuiet('post', 'delete', String(id), '--force')
     wpQuiet('term', 'delete', 'category', ...wp('term', 'list', 'category', `--search=${MARK}`, '--field=term_id').split(/\r?\n/).filter(Boolean))
+    wpQuiet('eval', "update_option( 'rankxai_fill_allowed', 1, true );")
     if (before.json?.features) await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: before.json.features }) })
+    wpQuiet('eval', `update_option( 'rankxai_fill_allowed', ${Number(allowedBefore) ? 1 : 0}, true );`)
     wpQuiet('user', 'application-password', 'delete', 'admin', uuid)
     only(originalActive)
   }

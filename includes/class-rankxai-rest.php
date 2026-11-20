@@ -1002,6 +1002,7 @@ class RankXAI_REST {
 	public static function handle_fill_get() {
 		return new WP_REST_Response(
 			array(
+				'allowed'        => RankXAI_Fill::allowed(),
 				'features'       => RankXAI_Fill::switches(),
 				'supported'      => RankXAI_Fill::features(),
 				'blockedBy'      => RankXAI_Fill::blocked_by(),
@@ -1038,6 +1039,9 @@ class RankXAI_REST {
 			if ( ! is_bool( $value ) ) {
 				return new WP_Error( 'rankxai_fill_bad_features', __( 'Each feature must be true or false.', 'rankxai' ), array( 'status' => 400 ) );
 			}
+		}
+		if ( ! RankXAI_Fill::allowed() && in_array( true, $features, true ) ) {
+			return new WP_Error( 'rankxai_fill_not_allowed', __( 'The site owner has not allowed RankX AI to add missing SEO tags. They can allow it in RankX AI › Settings.', 'rankxai' ), array( 'status' => 403 ) );
 		}
 		// Features not named keep their current value.
 		RankXAI_Fill::save( array_merge( RankXAI_Fill::switches(), $features ) );
