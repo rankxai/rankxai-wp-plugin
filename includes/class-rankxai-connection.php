@@ -87,6 +87,11 @@ class RankXAI_Connection {
 			'/connection',
 			array(
 				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'handle_get' ),
+					'permission_callback' => array( __CLASS__, 'can_manage' ),
+				),
+				array(
 					'methods'             => WP_REST_Server::EDITABLE,
 					'callback'            => array( __CLASS__, 'handle_put' ),
 					'permission_callback' => array( __CLASS__, 'can_manage' ),
@@ -110,12 +115,29 @@ class RankXAI_Connection {
 	}
 
 	/**
-	 * Store a site token sent by RankX AI.
+	 * Whether the site holds a token, and whether this request uses RankX AI's own Application Password.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public static function handle_get() {
+		return rest_ensure_response(
+			array(
+				'connected'       => self::is_connected(),
+				'rankxaiPassword' => RankXAI_Access_Scope::is_rankxai_password(),
+			)
+		);
+	}
+
+	/**
+	 * Store a site token sent by RankX AI, only over the Application Password approved for RankX AI.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function handle_put( $request ) {
+		if ( ! RankXAI_Access_Scope::is_rankxai_password() ) {
+			return self::error( 'rankxai_password_required', __( 'Connect from RankX AI › Settings on this site, so WordPress can approve RankX AI’s own Application Password.', 'rankxai' ), 403 );
+		}
 		$body = $request->get_json_params();
 		if ( ! is_array( $body ) ) {
 			return self::error( 'rankxai_bad_body', __( 'The body must be an object.', 'rankxai' ), 400 );

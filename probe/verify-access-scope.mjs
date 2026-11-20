@@ -5,6 +5,9 @@
  * Run: npx wp-env start, then node probe/verify-access-scope.mjs
  */
 import { execFileSync } from 'node:child_process'
+import { rmSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { cliContainer } from './containers.mjs'
 
 const BASE = process.env.WP_BASE ?? 'http://localhost:8888'
@@ -48,6 +51,21 @@ async function call(pw, method, route, body, query = '') {
 }
 const refused = (r) => r.status === 403 && r.code === 'rankxai_not_allowed'
 
+// XML-RPC answers 200 with a fault on a refused login.
+async function xmlrpc(pw) {
+  const body = `<?xml version="1.0"?><methodCall><methodName>wp.getUsersBlogs</methodName><params><param><value><string>admin</string></value></param><param><value><string>${pw}</string></value></param></params></methodCall>`
+  const res = await fetch(`${BASE}/xmlrpc.php`, { method: 'POST', headers: { 'Content-Type': 'text/xml' }, body })
+  const text = await res.text()
+  return { status: res.status, fault: text.includes('<fault>'), text }
+}
+
+// A private post type that is in the REST API, for the content check.
+const PRIVATE_TYPE = join(dirname(fileURLToPath(import.meta.url)), 'mu-plugins', 'rankxai-scope-private-type.php')
+writeFileSync(
+  PRIVATE_TYPE,
+  "<?php\nadd_action( 'init', function () {\n\tregister_post_type( 'rxprobe_private', array( 'public' => false, 'show_ui' => true, 'show_in_rest' => true, 'rest_base' => 'rxprobe-private', 'label' => 'Probe' ) );\n} );\n",
+)
+
 const title = wp('option', 'get', 'blogname')
 const created = []
 try {
@@ -71,6 +89,19 @@ try {
   check('a route another plugin registered', refused(await call(ours, 'GET', '/wp-site-health/v1/tests/background-updates')))
   check('a webhook to another address', refused(await call(ours, 'POST', '/wc/v3/webhooks', { topic: 'product.updated', delivery_url: 'https://evil.example/hook' })))
   check('an order webhook', refused(await call(ours, 'POST', '/wc/v3/webhooks', { topic: 'order.created', delivery_url: 'https://app.rankxai.com/api/webhooks/woocommerce' })))
+  check('the site address sent in the query string', refused(await call(ours, 'POST', '/wp/v2/settings', null, '&url=https%3A%2F%2Fexample.com')))
+  check('the admin email sent in the query string', refused(await call(ours, 'POST', '/wp/v2/settings', { title: 'x' }, '&email=x%40example.com')))
+  const commentId = wp('comment', 'list', '--number=1', '--field=comment_ID') || wp('comment', 'create', '--comment_post_ID=1', '--comment_content=Probe', '--porcelain')
+  check("a comment's text sent in the query string", refused(await call(ours, 'POST', `/wp/v2/comments/${commentId}`, { status: 'approved' }, '&content=changed')))
+  check('a private post type', refused(await call(ours, 'GET', '/wp/v2/rxprobe-private')))
+  check('a Redirection group change', refused(await call(ours, 'POST', '/redirection/v1/group', { name: 'x', moduleId: 1 })))
+  check('a regex redirect', refused(await call(ours, 'POST', '/redirection/v1/redirect', { url: '/a.*', regex: true, match_type: 'url', action_type: 'url', action_data: { url: '/b' }, group_id: 1 })))
+  check('a redirect to another site', refused(await call(ours, 'POST', '/redirection/v1/redirect', { url: '/a', match_type: 'url', action_type: 'url', action_data: { url: 'https://evil.example/' }, group_id: 1 })))
+  check('a redirect to //host', refused(await call(ours, 'POST', '/redirection/v1/redirect', { url: '/a', match_type: 'url', action_type: 'url', action_data: { url: '//evil.example/' }, group_id: 1 })))
+  const rpc = await xmlrpc(ours)
+  check('XML-RPC', rpc.fault && !rpc.text.includes('isAdmin'), rpc.text.slice(0, 120))
+  const putOther = await call(other, 'PUT', '/rankxai/v1/connection', { token: 'x' })
+  check('another password cannot place the site token', putOther.status === 403 && putOther.code === 'rankxai_password_required', `${putOther.status} ${putOther.code}`)
 
   console.log('Personal data, switch off (the default)')
   check('orders are refused', refused(await call(ours, 'GET', '/wc/v3/orders')))
@@ -95,7 +126,12 @@ try {
   check('move to trash', (await call(ours, 'DELETE', `/wp/v2/posts/${post.json?.id}`)).status === 200)
   check('read plugins', (await call(ours, 'GET', '/wp/v2/plugins')).status === 200)
   check('read the site root', (await call(ours, 'GET', '/')).status === 200)
-  check('change the site title', (await call(ours, 'POST', '/wp/v2/settings', { title: `${title} (probe)` })).status === 200)
+  check('change the site title, with a cache-buster in the query', (await call(ours, 'POST', '/wp/v2/settings', { title: `${title} (probe)` }, '&_rxcb=probe')).status === 200)
+  check('a plain redirect between two paths is let through', !refused(await call(ours, 'POST', '/redirection/v1/redirect', { url: '/old-probe', match_type: 'url', action_type: 'url', regex: false, action_data: { url: '/new-probe' }, group_id: 1 })))
+  const mine = await call(ours, 'GET', '/rankxai/v1/connection')
+  check('the plugin knows its own password', mine.status === 200 && mine.json?.rankxaiPassword === true, JSON.stringify(mine.json))
+  const putOurs = await call(ours, 'PUT', '/rankxai/v1/connection', { token: 'x' })
+  check('its own password reaches the token check', putOurs.status === 400 && putOurs.code === 'rankxai_bad_token', `${putOurs.status} ${putOurs.code}`)
   check('read products', (await call(ours, 'GET', '/wc/v3/products')).status === 200)
   check("use the plugin's own routes", (await call(ours, 'GET', '/rankxai/v1/manifest')).status === 200)
 
@@ -106,7 +142,13 @@ try {
   if (p2.json?.id) created.push(p2.json.id)
   const stored2 = p2.json?.id ? wp('post', 'get', String(p2.json.id), '--field=post_content') : ''
   check("and keeps the administrator's unfiltered_html", stored2.includes('<script'), stored2.slice(0, 80))
+  check('another password reads the private post type', (await call(other, 'GET', '/wp/v2/rxprobe-private')).status === 200)
+  const rpcOther = await xmlrpc(other)
+  check('another password still works over XML-RPC', !rpcOther.fault && rpcOther.text.includes('isAdmin'), rpcOther.text.slice(0, 120))
+  const theirs = await call(other, 'GET', '/rankxai/v1/connection')
+  check('and the plugin says it is not RankX AI’s', theirs.status === 200 && theirs.json?.rankxaiPassword === false, JSON.stringify(theirs.json))
 } finally {
+  rmSync(PRIVATE_TYPE, { force: true })
   wp('option', 'update', 'blogname', title)
   for (const id of created) wpSoft('post', 'delete', String(id), '--force')
   for (const name of ['scope-probe-rankxai', 'scope-probe-other']) {

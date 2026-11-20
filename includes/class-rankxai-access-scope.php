@@ -41,6 +41,22 @@ class RankXAI_Access_Scope {
 	public static function init() {
 		add_filter( 'rest_pre_dispatch', array( __CLASS__, 'enforce' ), 10, 3 );
 		add_filter( 'map_meta_cap', array( __CLASS__, 'no_unfiltered_html' ), 10, 2 );
+		add_filter( 'wp_authenticate_application_password_errors', array( __CLASS__, 'rest_only' ), 10, 3 );
+	}
+
+	/**
+	 * RankX AI's password works only through the REST API, where the allow list applies, never through XML-RPC.
+	 *
+	 * @param WP_Error $error Errors so far.
+	 * @param WP_User  $user  User.
+	 * @param array    $item  The Application Password being used.
+	 * @return WP_Error
+	 */
+	public static function rest_only( $error, $user, $item ) {
+		if ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST && is_array( $item ) && isset( $item['app_id'] ) && RankXAI_Connection::APP_ID === $item['app_id'] ) {
+			$error->add( 'rankxai_rest_only', __( 'RankX AI’s Application Password only works through the REST API.', 'rankxai' ) );
+		}
+		return $error;
 	}
 
 	/**
@@ -145,8 +161,14 @@ class RankXAI_Access_Scope {
 		if ( preg_match( '#^/rankxai/v1(/|$)#', $route ) ) {
 			return true;
 		}
-		// The Redirection plugin's API, used only when that plugin is the site's redirect manager.
-		if ( preg_match( '#^/redirection/v1/(redirect|group|bulk/redirect/delete)(/|$)#', $route ) ) {
+		// The Redirection plugin's API: list, add a plain redirect between two paths on this site, remove one.
+		if ( preg_match( '#^/redirection/v1/(redirect|group)$#', $route ) && $read ) {
+			return true;
+		}
+		if ( '/redirection/v1/redirect' === $route && 'POST' === $method ) {
+			return self::plain_redirect( $request );
+		}
+		if ( '/redirection/v1/bulk/redirect/delete' === $route && 'POST' === $method ) {
 			return true;
 		}
 		if ( $read && self::readable( $route ) ) {
@@ -193,7 +215,7 @@ class RankXAI_Access_Scope {
 	}
 
 	/**
-	 * Whether a route is a post type's or taxonomy's own route, for content rather than site structure.
+	 * Whether a route belongs to a public post type or taxonomy, for content rather than site structure.
 	 *
 	 * @param string $route Normalised route.
 	 * @return bool
@@ -204,12 +226,12 @@ class RankXAI_Access_Scope {
 		}
 		$bases = array();
 		foreach ( get_post_types( array( 'show_in_rest' => true ), 'objects' ) as $type ) {
-			if ( ! in_array( $type->name, self::EXCLUDED_POST_TYPES, true ) ) {
+			if ( is_post_type_viewable( $type ) && ! in_array( $type->name, self::EXCLUDED_POST_TYPES, true ) ) {
 				$bases[] = $type->rest_base ? $type->rest_base : $type->name;
 			}
 		}
 		foreach ( get_taxonomies( array( 'show_in_rest' => true ), 'objects' ) as $taxonomy ) {
-			if ( ! in_array( $taxonomy->name, self::EXCLUDED_TAXONOMIES, true ) ) {
+			if ( is_taxonomy_viewable( $taxonomy ) && ! in_array( $taxonomy->name, self::EXCLUDED_TAXONOMIES, true ) ) {
 				$bases[] = $taxonomy->rest_base ? $taxonomy->rest_base : $taxonomy->name;
 			}
 		}
@@ -217,16 +239,36 @@ class RankXAI_Access_Scope {
 	}
 
 	/**
-	 * Whether a request carries no parameters other than the allowed ones.
+	 * Whether a request carries no parameters other than the allowed ones, wherever they were sent.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @param string[]        $allowed Allowed parameter names.
 	 * @return bool
 	 */
 	private static function only_params( $request, $allowed ) {
-		$sent = array_merge( array_keys( (array) $request->get_json_params() ), array_keys( (array) $request->get_body_params() ) );
-		$sent = array_diff( $sent, array( '_locale', '_method', 'context' ) );
+		$sent = array();
+		foreach ( array( $request->get_query_params(), $request->get_body_params(), $request->get_json_params(), $request->get_file_params() ) as $params ) {
+			$sent = array_merge( $sent, array_keys( (array) $params ) );
+		}
+		$sent = array_diff( $sent, array( 'rest_route', '_locale', '_method', '_fields', '_envelope', '_embed', '_wpnonce', '_rxcb', 'context' ) );
 		return array() === array_diff( $sent, $allowed );
+	}
+
+	/**
+	 * A Redirection rule is allowed only as a plain redirect from one path on this site to another.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return bool
+	 */
+	private static function plain_redirect( $request ) {
+		$data = $request->get_param( 'action_data' );
+		$to   = is_array( $data ) && isset( $data['url'] ) ? $data['url'] : null;
+		$path = '#^/(?![/\\\\])#';
+		return ! rest_sanitize_boolean( $request->get_param( 'regex' ) )
+			&& in_array( $request->get_param( 'match_type' ), array( null, 'url' ), true )
+			&& 'url' === $request->get_param( 'action_type' )
+			&& is_string( $request->get_param( 'url' ) ) && preg_match( $path, $request->get_param( 'url' ) )
+			&& is_string( $to ) && preg_match( $path, $to );
 	}
 
 	/**
@@ -264,7 +306,7 @@ class RankXAI_Access_Scope {
 	 *
 	 * @return bool
 	 */
-	private static function is_rankxai_password() {
+	public static function is_rankxai_password() {
 		if ( null !== self::$ours ) {
 			return self::$ours;
 		}

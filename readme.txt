@@ -57,9 +57,17 @@ Not until you connect a RankX AI account. Before that it only asks your own site
 
 = What does connecting give RankX AI access to? =
 
-Connecting asks you to approve, on WordPress's own screen, an Application Password for your user account. This plugin limits that password to an allow list: your posts, pages, media and product content, product categories and tags, this plugin's own routes, redirects, a short list of general settings (title, tagline, time zone, date and time formats, posts per page, comment defaults), webhooks for product changes sent to RankX AI, and reading your site's structure. Every other request is refused, and the password cannot post unfiltered HTML, so what it writes is filtered like a non-administrator's.
+Connecting asks you to approve, on WordPress's own screen, an Application Password for your user account. This plugin limits that password to the REST API (XML-RPC refuses it) and to an allow list:
 
-It can never change users, plugins, themes, templates or styles, issue refunds, read or create Application Passwords, or delete anything permanently. Orders, refunds, customers, the user list, product reviews and full comment details stay off until you tick "Let RankX AI read orders, customers, users and comments" in RankX AI › Settings. Every change is recorded in your RankX AI account, and product fixes can be undone.
+* Posts, pages, media, products, and other public post types and taxonomies: create, edit, move to the trash.
+* This plugin's own routes, and plain redirects from one path on your site to another in the Redirection plugin.
+* General settings: title, tagline, time zone, date and time formats, week start, posts per page, comment defaults.
+* Webhooks for product changes, sent to RankX AI.
+* Reading your site's structure, coupons, and WooCommerce's settings and system status.
+
+Everything else is refused, and it cannot post unfiltered HTML.
+
+It can never change users, plugins, themes, templates or styles, issue refunds, read or create Application Passwords, or permanently delete content (it can remove a redirect). Orders, refunds, customers, the user list, product reviews and full comment details stay off until you tick "Let RankX AI read orders, customers, users and comments" in RankX AI › Settings. Every change is recorded in your RankX AI account, and product fixes can be undone.
 
 To stop it, click **Disconnect** in RankX AI › Settings or deactivate the plugin: both remove the Application Password and RankX AI's webhooks.
 
@@ -90,7 +98,7 @@ In `admin-app/src`, with its build tools pinned in `package.json`. `npm install 
 * **Images.** The store app shows images from `https://assets.rankxai.com` (images made for you) and, in AI shopping results, product images from the stores and image hosts those answers link to.
 * **Product changes.** On a store, RankX AI adds WooCommerce webhooks so that WooCommerce sends a product's details to `https://app.rankxai.com` when it is created, updated, deleted or restored. They are removed when you disconnect.
 * **Disconnect.** Disconnecting or deactivating tells `https://app.rankxai.com/api/store-app/wp/connection`, then removes the token, the Application Password and the webhooks.
-* **What RankX AI stores on this site.** Through this plugin's routes, RankX AI saves the changes you approve (search titles and descriptions, structured data, redirects, llms.txt and agents.md, a short block of business facts for the markdown copies), the Overview's AI visibility summary, and the AI crawlers' published address ranges for the crawler counts. It is all data; nothing is run as code.
+* **What RankX AI stores on this site.** Through this plugin's routes, RankX AI saves the changes you approve (search titles and descriptions, structured data, redirects, llms.txt, agents.md and ai.txt, a short block of business facts for the markdown copies), the Overview's AI visibility summary, and the AI crawlers' published address ranges for the crawler counts. It is all data; nothing is run as code.
 
 = rankxai.com, only if you click it =
 
@@ -113,10 +121,10 @@ The plugin sends no analytics, sets no cookies and collects nothing about your v
 == Screenshots ==
 
 1. The product check: what AI shopping answers need from your products, and the products to fix first.
-2. The Overview on a store: the products first, then what AI assistants can see on the site.
-3. The store app in wp-admin: the questions shoppers ask AI assistants, and which products the answers show.
+2. The Overview on a store: products first, then what AI assistants can see.
+3. The store app: the questions shoppers ask AI assistants, and which products the answers show.
 4. A product's own page: what to fix and where, and how often AI answers named it.
-5. Settings: markdown copies, llms.txt and agents.md, all on your own site.
+5. Settings: markdown copies, llms.txt and agents.md.
 6. AI crawlers: which assistants may read the site, and which crawlers visit.
 
 == Credits ==
