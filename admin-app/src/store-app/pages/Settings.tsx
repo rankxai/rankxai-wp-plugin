@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MARKETS_SCOPE_LINE } from '@/lib/shopify-app/language-notice-core';
 import { answerMarketNote } from '@/lib/ai/local-answer-markets';
+import { shoppingMarketNote } from '@/lib/shopping/shopping-market-note';
 import { SUPPORT_EMAIL } from './support-email';
 import { APP_PATHS } from '@/lib/shopify-app/app-routes-core';
 import { api, toastSuccess } from '../api';
@@ -137,7 +138,9 @@ function SettingsForm({ s, error, setError, onSaved }: {
     const initial = { brandName: s.store.brandName ?? '', countryCode: s.market.countryCode ?? '', languageCode: s.market.languageCode ?? '' };
     const [form, setForm] = useState(initial);
     const [busy, setBusy] = useState(false);
-    const marketNote = answerMarketNote(form.countryCode, s.options.countries.find((c) => c.code === form.countryCode)?.name ?? null);
+    const countryName = s.options.countries.find((c) => c.code === form.countryCode)?.name ?? null;
+    const marketNote = answerMarketNote(form.countryCode, countryName);
+    const shoppingNote = shoppingMarketNote(form.countryCode, countryName);
     async function save() {
         const body: Record<string, string> = {};
         if (form.brandName.trim() !== (s.store.brandName ?? ''))
@@ -187,6 +190,7 @@ function SettingsForm({ s, error, setError, onSaved }: {
           </UI.Select>
           
           {marketNote ? <UI.Paragraph>{marketNote}</UI.Paragraph> : null}
+          {shoppingNote ? <UI.Paragraph>{shoppingNote}</UI.Paragraph> : null}
           
           {platform === 'shopify' ? <UI.Text color="subdued">{MARKETS_SCOPE_LINE}</UI.Text> : null}
           <UI.Select label="Language" details="Sets the language we ask questions in. Articles are written in English or German." name="languageCode" value={form.languageCode} disabled={busy || undefined} onChange={(e) => { const value = e.currentTarget.value; setForm((f) => ({ ...f, languageCode: value })); }}>

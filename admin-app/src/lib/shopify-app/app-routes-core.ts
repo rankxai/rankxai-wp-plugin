@@ -1,4 +1,4 @@
-export const AI_ORDERS_ENABLED = false;
+export const AI_ORDERS_ENABLED = true;
 const ALL_AI_VISIBILITY_TABS = [
     { id: 'shopping', label: 'Shopper questions' },
     { id: 'store', label: 'What AI says about you' },
