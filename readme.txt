@@ -1,6 +1,6 @@
 === RankX AI – AI Shopping & SEO ===
 Contributors: rankxai
-Tags: woocommerce, ai shopping, seo, llms.txt, ai search
+Tags: woocommerce, ai shopping, seo, ai crawlers, ai search
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -23,6 +23,7 @@ Shoppers now ask ChatGPT, Gemini and Google's AI Mode what to buy. The answers l
 * **robots.txt, per AI assistant.** Whether each assistant may read your site, the line that decides it, and the change to make. Two Site Health tests report the same.
 * **Site checks.** Broken internal links, pages nothing links to, and images with no alt text, checked in the background. It changes nothing.
 * **View as AI**, under any post, page or product: the copy an assistant is given, and whether the words you wrote are in the HTML your server sends.
+* **Missing SEO tags.** With no SEO plugin, tick them in Settings: a meta description from your excerpt, Open Graph and Twitter tags, WordPress's sitemap, breadcrumbs.
 
 Pages marked `noindex` (cart, checkout, account) and a store in WooCommerce's "Coming soon" mode get no copy and are left out of llms.txt.
 
@@ -33,7 +34,7 @@ Pages marked `noindex` (cart, checkout, account) and a store in WooCommerce's "C
 * Which of your products ChatGPT, Google's AI Mode and other assistants show for the questions shoppers ask, and which stores they show instead.
 * Product details fixed one at a time or in bulk, each shown before it is changed, with Undo afterwards.
 * Product images, search titles and descriptions, and blog articles written for your store. Nothing is published until you approve it.
-* Search titles, descriptions and structured data written through your SEO plugin. With no SEO plugin, and only if you allow it in Settings, RankX AI can switch on the tags your site is missing, which this plugin prints.
+* Search titles, descriptions and structured data written through your SEO plugin, and which missing tags it would tick in Settings.
 * Redirects added in the Redirection plugin or Rank Math, or kept by this plugin for addresses that would otherwise show "not found".
 
 Anything that uses credits shows its price before you confirm. The plugin never prints a second title or description: it writes into your SEO plugin's own fields.
@@ -61,14 +62,12 @@ Connecting asks you to approve, on WordPress's own screen, an Application Passwo
 
 * Posts, pages, media, products, and other public post types and taxonomies: create, edit, move to the trash.
 * This plugin's own routes, and the Redirection plugin's redirects: list them, add one from a path on your site to another, remove one.
-* Comments: approve, hold, mark as spam or move to the trash.
-* General settings: title, tagline, time zone, date and time formats, week start, posts per page, comment defaults.
 * Webhooks for product changes, sent to RankX AI.
 * Reading your site's structure (including the lists of plugins, themes, menus and widgets), coupons, and WooCommerce's settings and system status.
 
 Everything else is refused, and it cannot post unfiltered HTML.
 
-It can never change users, plugins, themes, templates or styles, issue refunds, read or create Application Passwords, or permanently delete content (it can remove a redirect). Orders, refunds, customers, the user list, product reviews and full comment details stay off until you tick "Let RankX AI read orders, customers, users and comments" in RankX AI › Settings. Every change is recorded in your RankX AI account, and product fixes can be undone.
+It can never change your site's settings or this plugin's switches, users, plugins, themes, templates or styles, issue refunds, read or create Application Passwords, or permanently delete content (it can remove a redirect). Orders, refunds, customers, the user list, product reviews and full comment details stay off until you tick "Let RankX AI read orders, customers, users and comments" in RankX AI › Settings. Every change is recorded in your RankX AI account, and product fixes can be undone.
 
 To stop it, click **Disconnect** in RankX AI › Settings or deactivate the plugin: both remove the Application Password and RankX AI's webhooks.
 
@@ -95,7 +94,7 @@ In `admin-app/src`, with its build tools pinned in `package.json`. `npm install 
 * **Images.** The store app shows images from `https://assets.rankxai.com` (images made for you) and, in AI shopping results, product images from the stores and image hosts those answers link to.
 * **Product changes.** On a store, RankX AI adds WooCommerce webhooks so that WooCommerce sends a product's details to `https://app.rankxai.com` when it is created, updated, deleted or restored. They are removed when you disconnect.
 * **Disconnect.** Disconnecting or deactivating tells `https://app.rankxai.com/api/store-app/wp/connection`, then removes the token, the Application Password and the webhooks.
-* **What RankX AI stores on this site.** Through this plugin's routes, RankX AI saves the changes you approve (search titles and descriptions, structured data, redirects, llms.txt, agents.md and ai.txt, a short block of business facts for the markdown copies), which missing SEO tags to print if you allow it, the Overview's AI visibility summary, and the AI crawlers' published address ranges for the crawler counts. It is all data; nothing is run as code.
+* **What RankX AI stores on this site.** Through this plugin's routes, RankX AI saves the changes you approve (search titles and descriptions, structured data, redirects, llms.txt, agents.md and ai.txt, a short block of business facts for the markdown copies), the Overview's AI visibility summary, and the AI crawlers' published address ranges for the crawler counts. It is all data; nothing is run as code.
 
 = rankxai.com, only if you click it =
 

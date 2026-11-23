@@ -73,8 +73,16 @@ async function apiJson(route, init) {
   }
 }
 
+/** The switch is the site owner's, so it is set on the site; only the context block goes over REST. */
 async function setTwins(patch) {
-  return apiJson('/rankxai/v1/twins', { method: 'PUT', body: JSON.stringify(patch) })
+  if (patch.enabled !== undefined) {
+    await wpCapture(['eval', `RankXAI_Twins::save_settings( ${patch.enabled ? 'true' : 'false'}, null );`])
+  }
+  if (patch.context !== undefined) {
+    const put = await apiJson('/rankxai/v1/twins', { method: 'PUT', body: JSON.stringify({ context: patch.context }) })
+    if (put.status !== 200) return put
+  }
+  return apiJson('/rankxai/v1/twins')
 }
 
 const CONTEXT = [
@@ -175,10 +183,15 @@ async function run() {
     ? ok('OFF — /agents.md serves the stored document')
     : bad(`OFF — /agents.md served source=${docOff.source} status=${docOff.status}`)
 
+  const remote = await apiJson('/rankxai/v1/twins', { method: 'PUT', body: JSON.stringify({ enabled: true }) })
+  remote.status === 403 && remote.json?.code === 'rankxai_twins_site_only'
+    ? ok('REMOTE — the switch cannot be turned on over REST')
+    : bad(`REMOTE — PUT enabled answered ${remote.status} ${JSON.stringify(remote.json ?? remote.text)}`)
+
   const on = await setTwins({ enabled: true, context: CONTEXT })
   on.status === 200 && on.json?.enabled === true
-    ? ok('ON — the site accepted the switch and reports it')
-    : bad(`ON — PUT answered ${on.status} ${JSON.stringify(on.json ?? on.text)}`)
+    ? ok('ON — the site owner switched it on, and the site reports it')
+    : bad(`ON — answered ${on.status} ${JSON.stringify(on.json ?? on.text)}`)
   typeof on.json?.eligibleCount === 'number' && on.json.eligibleCount > 0
     ? ok(`ON — ${on.json.eligibleCount} pages reported eligible`)
     : bad(`ON — eligibleCount was ${on.json?.eligibleCount}`)
@@ -224,9 +237,9 @@ async function run() {
   has(/no-store/, md.cache) ? ok('ON — Cache-Control: no-store keeps it out of a page cache') : bad(`ON — Cache-Control was "${md.cache}"`)
   md.source === 'markdown-twin' ? ok('ON — X-RankXAI-Source names the twin') : bad(`ON — source was "${md.source}"`)
 
-  // ?format=md is a hint on the HTML URL, which is the indexed page, so it must not send noindex.
-  !has(/noindex/, shapes.query.robots)
-    ? ok('ON — ?format=md does not noindex the page’s own URL')
+  // ?format=md is its own address, so it is noindexed like the .md copy.
+  has(/noindex/, shapes.query.robots)
+    ? ok('ON — ?format=md carries noindex, like the .md copy')
     : bad(`ON — the query shape emitted X-Robots-Tag: ${shapes.query.robots}`)
 
   const negotiated = await raw(`${FIX.path}/`, { headers: { Accept: 'text/markdown' } })

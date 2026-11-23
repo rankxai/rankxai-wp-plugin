@@ -265,14 +265,17 @@ class RankXAI_Admin {
 
 		$keep_data = isset( $_POST['rankxai_keep_data'] );
 		$personal  = isset( $_POST['rankxai_share_personal_data'] );
-		$fill      = isset( $_POST['rankxai_fill_allowed'] );
+		$fill      = array();
+		foreach ( RankXAI_Fill::features() as $feature ) {
+			$fill[ $feature ] = isset( $_POST['rankxai_fill'][ $feature ] );
+		}
 
 		// A submission that chose no post type keeps what is stored.
 		RankXAI_Twins::save_settings( $twins_on, $post_types ? $post_types : null );
 		RankXAI_Generate::save_state( $documents );
 		update_option( 'rankxai_keep_data', $keep_data ? 1 : 0, false );
 		update_option( RankXAI_Access_Scope::OPTION_PERSONAL_DATA, $personal ? 1 : 0, false );
-		RankXAI_Fill::set_allowed( $fill );
+		RankXAI_Fill::save( $fill );
 
 		wp_safe_redirect( add_query_arg( 'rankxai-saved', '1', self::page_url( self::PAGE_SETTINGS ) ) );
 		exit;

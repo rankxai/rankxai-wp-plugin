@@ -391,40 +391,32 @@ class RankXAI_Pages {
 	}
 
 	/**
-	 * Whether RankX AI may add SEO tags the site is missing, and which are on now.
+	 * The SEO tags this plugin can add when nothing else on the site prints them.
 	 */
 	private static function settings_fill() {
 		RankXAI_UI::card_open(
 			array(
 				'title'    => __( 'Missing SEO tags', 'rankxai' ),
-				'subtitle' => __( 'For a site with no SEO plugin, once connected to RankX AI.', 'rankxai' ),
+				'subtitle' => __( 'For a site with no SEO plugin. Works without a RankX AI account.', 'rankxai' ),
 			)
 		);
-		echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html__( 'Access', 'rankxai' ) . '</div><div>';
-		echo '<label class="rankxai-check"><input type="checkbox" name="rankxai_fill_allowed" value="1" ' . checked( RankXAI_Fill::allowed(), true, false ) . ' /> <span>' . esc_html__( 'Let RankX AI add missing SEO tags', 'rankxai' ) . '</span></label>';
-		echo '<p class="rankxai-field__hint">' . esc_html__( 'Off by default. When it is on, RankX AI checks your pages and can switch on a meta description, Open Graph and Twitter tags, WordPress’s own sitemap and breadcrumbs, only where nothing on your site prints them. Nothing is added while an SEO plugin is active. Turning this off removes them straight away.', 'rankxai' ) . '</p>';
-		echo '</div></div>';
-
-		$labels = array(
-			'meta_description' => __( 'Meta description', 'rankxai' ),
-			'open_graph'       => __( 'Open Graph tags', 'rankxai' ),
-			'twitter_card'     => __( 'Twitter tags', 'rankxai' ),
-			'sitemap'          => __( 'Sitemap', 'rankxai' ),
-			'breadcrumbs'      => __( 'Breadcrumbs', 'rankxai' ),
+		$labels   = array(
+			'meta_description' => array( __( 'Meta description', 'rankxai' ), __( 'From the excerpt you wrote. A page with no excerpt gets none.', 'rankxai' ) ),
+			'open_graph'       => array( __( 'Open Graph tags', 'rankxai' ), __( 'Title, excerpt, address and featured image, for link previews.', 'rankxai' ) ),
+			'twitter_card'     => array( __( 'Twitter tags', 'rankxai' ), __( 'The same details, for link previews on X.', 'rankxai' ) ),
+			'sitemap'          => array( __( 'Sitemap', 'rankxai' ), __( 'Turns on the sitemap WordPress itself provides, at /wp-sitemap.xml.', 'rankxai' ) ),
+			'breadcrumbs'      => array( __( 'Breadcrumbs', 'rankxai' ), __( 'Structured data from a page’s parents or a post’s first category.', 'rankxai' ) ),
 		);
-		$on     = array();
-		foreach ( RankXAI_Fill::switches() as $feature => $value ) {
-			if ( $value && isset( $labels[ $feature ] ) ) {
-				$on[] = $labels[ $feature ];
-			}
+		$switches = RankXAI_Fill::switches();
+		echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html__( 'Add', 'rankxai' ) . '</div><div>';
+		foreach ( $labels as $feature => $label ) {
+			echo '<label class="rankxai-check"><input type="checkbox" name="rankxai_fill[' . esc_attr( $feature ) . ']" value="1" ' . checked( ! empty( $switches[ $feature ] ), true, false ) . ' /> <span>' . esc_html( $label[0] ) . '</span></label>';
+			echo '<p class="rankxai-field__hint">' . esc_html( $label[1] ) . '</p>';
 		}
-		echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html__( 'On now', 'rankxai' ) . '</div><div>';
-		if ( ! $on ) {
-			echo '<p class="rankxai-field__hint">' . esc_html__( 'None.', 'rankxai' ) . '</p>';
-		} elseif ( RankXAI_Fill::blocked_by() ) {
-			echo '<p class="rankxai-field__hint">' . esc_html__( 'None: an SEO plugin is active, so nothing is added.', 'rankxai' ) . '</p>';
+		if ( RankXAI_Fill::blocked_by() ) {
+			echo '<p class="rankxai-field__hint">' . esc_html__( 'An SEO plugin is active, so nothing is added. Use that plugin’s own settings instead.', 'rankxai' ) . '</p>';
 		} else {
-			echo '<p class="rankxai-field__hint">' . esc_html( implode( ', ', $on ) ) . '</p>';
+			echo '<p class="rankxai-field__hint">' . esc_html__( 'Off by default. Each tag is added only while no SEO plugin is active, and stops the moment one is.', 'rankxai' ) . '</p>';
 		}
 		echo '</div></div>';
 		RankXAI_UI::card_close();

@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       RankX AI – AI Shopping & SEO
  * Plugin URI:        https://rankxai.com/docs/integrations/wordpress
- * Description:       See what your products are missing for AI shopping answers, publish llms.txt for AI crawlers, and connect your store to RankX AI.
+ * Description:       See what your products are missing for AI shopping answers, see which AI crawlers read your pages, and connect your store to RankX AI.
  * Version:           0.1.0
  * Requires at least: 6.0
  * Requires PHP:      7.4

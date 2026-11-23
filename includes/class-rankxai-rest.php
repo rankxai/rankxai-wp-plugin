@@ -271,21 +271,14 @@ class RankXAI_REST {
 			)
 		);
 
-		// Gap fills are site-wide head output, so `manage_options`.
+		// Read-only: the switches are changed only in Settings on the site.
 		register_rest_route(
 			self::NAMESPACE_V1,
 			'/fill',
 			array(
-				array(
-					'methods'             => WP_REST_Server::READABLE,
-					'callback'            => array( __CLASS__, 'handle_fill_get' ),
-					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
-				),
-				array(
-					'methods'             => WP_REST_Server::EDITABLE,
-					'callback'            => array( __CLASS__, 'handle_fill_put' ),
-					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
-				),
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'handle_fill_get' ),
+				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
 			)
 		);
 
@@ -1002,7 +995,7 @@ class RankXAI_REST {
 	public static function handle_fill_get() {
 		return new WP_REST_Response(
 			array(
-				'allowed'        => RankXAI_Fill::allowed(),
+				'siteControlled' => true,
 				'features'       => RankXAI_Fill::switches(),
 				'supported'      => RankXAI_Fill::features(),
 				'blockedBy'      => RankXAI_Fill::blocked_by(),
@@ -1010,42 +1003,6 @@ class RankXAI_REST {
 			),
 			200
 		);
-	}
-
-	/**
-	 * Update the fill switches. An unknown feature refuses the whole request.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public static function handle_fill_put( $request ) {
-		$features = $request->get_param( 'features' );
-		if ( ! is_array( $features ) ) {
-			return new WP_Error( 'rankxai_fill_bad_features', __( '`features` must be an object of feature => true/false.', 'rankxai' ), array( 'status' => 400 ) );
-		}
-		$unknown = array_diff( array_keys( $features ), RankXAI_Fill::features() );
-		if ( $unknown ) {
-			return new WP_Error(
-				'rankxai_fill_unknown_feature',
-				sprintf(
-					/* translators: %s: comma-separated feature names. */
-					__( 'Unknown feature(s): %s', 'rankxai' ),
-					implode( ', ', $unknown )
-				),
-				array( 'status' => 400 )
-			);
-		}
-		foreach ( $features as $value ) {
-			if ( ! is_bool( $value ) ) {
-				return new WP_Error( 'rankxai_fill_bad_features', __( 'Each feature must be true or false.', 'rankxai' ), array( 'status' => 400 ) );
-			}
-		}
-		if ( ! RankXAI_Fill::allowed() && in_array( true, $features, true ) ) {
-			return new WP_Error( 'rankxai_fill_not_allowed', __( 'The site owner has not allowed RankX AI to add missing SEO tags. They can allow it in RankX AI › Settings.', 'rankxai' ), array( 'status' => 403 ) );
-		}
-		// Features not named keep their current value.
-		RankXAI_Fill::save( array_merge( RankXAI_Fill::switches(), $features ) );
-		return self::handle_fill_get();
 	}
 
 	/**
@@ -1199,64 +1156,36 @@ class RankXAI_REST {
 	}
 
 	/**
-	 * Write the markdown-twin settings and the site context block.
+	 * Write the site context block appended to the markdown copies.
 	 *
-	 * Every field is optional; an omitted field is left alone, never cleared.
+	 * Switching the copies on or off, and choosing their post types, is done in
+	 * Settings on the site, never from here.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function handle_twins_put( $request ) {
-		$enabled = null;
-		if ( null !== $request->get_param( 'enabled' ) ) {
-			$raw = $request->get_param( 'enabled' );
-			if ( ! is_bool( $raw ) ) {
-				return new WP_Error( 'rankxai_twins_bad_enabled', __( '`enabled` must be true or false.', 'rankxai' ), array( 'status' => 400 ) );
-			}
-			$enabled = $raw;
+		if ( null !== $request->get_param( 'enabled' ) || null !== $request->get_param( 'postTypes' ) ) {
+			return new WP_Error( 'rankxai_twins_site_only', __( 'Markdown copies are switched on in RankX AI › Settings on the site.', 'rankxai' ), array( 'status' => 403 ) );
 		}
 
-		$post_types = null;
-		if ( null !== $request->get_param( 'postTypes' ) ) {
-			$raw = $request->get_param( 'postTypes' );
-			if ( ! is_array( $raw ) ) {
-				return new WP_Error( 'rankxai_twins_bad_types', __( '`postTypes` must be an array.', 'rankxai' ), array( 'status' => 400 ) );
-			}
-			$post_types = $raw;
+		$context = $request->get_param( 'context' );
+		if ( ! is_string( $context ) ) {
+			return new WP_Error( 'rankxai_twins_bad_context', __( '`context` must be a string.', 'rankxai' ), array( 'status' => 400 ) );
 		}
-
-		$context = null;
-		if ( null !== $request->get_param( 'context' ) ) {
-			$context = $request->get_param( 'context' );
-			if ( ! is_string( $context ) ) {
-				return new WP_Error( 'rankxai_twins_bad_context', __( '`context` must be a string.', 'rankxai' ), array( 'status' => 400 ) );
-			}
-			if ( strlen( $context ) > RankXAI_Twins::MAX_CONTEXT_BYTES ) {
-				return new WP_Error(
-					'rankxai_twins_context_too_large',
-					sprintf(
-						/* translators: %d: maximum size in bytes. */
-						__( 'That context block is larger than the %d bytes this site will store.', 'rankxai' ),
-						RankXAI_Twins::MAX_CONTEXT_BYTES
-					),
-					array( 'status' => 413 )
-				);
-			}
-		}
-
-		// Everything is validated before anything is written.
-		if ( null !== $enabled || null !== $post_types ) {
-			$current = RankXAI_Twins::settings();
-			RankXAI_Twins::save_settings(
-				null === $enabled ? $current['enabled'] : $enabled,
-				$post_types
+		if ( strlen( $context ) > RankXAI_Twins::MAX_CONTEXT_BYTES ) {
+			return new WP_Error(
+				'rankxai_twins_context_too_large',
+				sprintf(
+					/* translators: %d: maximum size in bytes. */
+					__( 'That context block is larger than the %d bytes this site will store.', 'rankxai' ),
+					RankXAI_Twins::MAX_CONTEXT_BYTES
+				),
+				array( 'status' => 413 )
 			);
 		}
 
-		if ( null !== $context ) {
-			RankXAI_Twins::save_context( $context );
-		}
-
+		RankXAI_Twins::save_context( $context );
 		return self::handle_twins_get();
 	}
 

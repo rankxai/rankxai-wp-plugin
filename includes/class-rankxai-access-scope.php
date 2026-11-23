@@ -19,9 +19,6 @@ class RankXAI_Access_Scope {
 	/** The site owner's switch for customer, order, user and comment data. Off by default. */
 	const OPTION_PERSONAL_DATA = 'rankxai_share_personal_data';
 
-	/** Site settings RankX AI may change. */
-	const WRITABLE_SETTINGS = array( 'title', 'description', 'timezone', 'date_format', 'time_format', 'start_of_week', 'posts_per_page', 'default_comment_status', 'default_ping_status' );
-
 	/** Post types that hold site structure or design rather than content. */
 	const EXCLUDED_POST_TYPES = array( 'wp_template', 'wp_template_part', 'wp_global_styles', 'wp_navigation', 'wp_font_family', 'wp_font_face', 'wp_block', 'nav_menu_item' );
 
@@ -174,12 +171,6 @@ class RankXAI_Access_Scope {
 		if ( $read && self::readable( $route ) ) {
 			return true;
 		}
-		if ( preg_match( '#^/wp/v2/settings$#', $route ) ) {
-			return $read || self::only_params( $request, self::WRITABLE_SETTINGS );
-		}
-		if ( preg_match( '#^/wp/v2/comments/\d+$#', $route ) ) {
-			return $read || ( 'DELETE' !== $method && self::only_params( $request, array( 'status' ) ) );
-		}
 		if ( self::content_route( $route ) ) {
 			return true;
 		}
@@ -236,22 +227,6 @@ class RankXAI_Access_Scope {
 			}
 		}
 		return in_array( $m[1], array_map( 'strtolower', $bases ), true );
-	}
-
-	/**
-	 * Whether a request carries no parameters other than the allowed ones, wherever they were sent.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @param string[]        $allowed Allowed parameter names.
-	 * @return bool
-	 */
-	private static function only_params( $request, $allowed ) {
-		$sent = array();
-		foreach ( array( $request->get_query_params(), $request->get_body_params(), $request->get_json_params(), $request->get_file_params() ) as $params ) {
-			$sent = array_merge( $sent, array_keys( (array) $params ) );
-		}
-		$sent = array_diff( $sent, array( 'rest_route', '_locale', '_method', '_fields', '_envelope', '_embed', '_wpnonce', '_rxcb', 'context' ) );
-		return array() === array_diff( $sent, $allowed );
 	}
 
 	/**

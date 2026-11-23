@@ -57,6 +57,12 @@ async function head(url) {
   }
 }
 
+/** The switches are the site owner's: set them on the site, never over REST. */
+function setFill(features) {
+  const pairs = Object.entries(features).map(([k, v]) => `'${k}' => ${v ? 'true' : 'false'}`).join(', ')
+  wp('eval', `RankXAI_Fill::save( array_merge( RankXAI_Fill::switches(), array( ${pairs} ) ) );`)
+}
+
 const MARK = `fill-probe-${Date.now()}`
 const created = []
 
@@ -66,33 +72,22 @@ async function main() {
   const uuid = wp('user', 'application-password', 'list', 'admin', `--name=${MARK}`, '--field=uuid')
   const originalActive = wp('plugin', 'list', '--status=active', '--field=name').split(/\r?\n/).filter((n) => ALL.includes(n))
   const before = await api('/rankxai/v1/fill')
-  const allowedBefore = wpQuiet('option', 'get', 'rankxai_fill_allowed') ?? '0'
 
   try {
     console.log('\n== the route ==')
     check(before.status === 200 && Array.isArray(before.json?.supported) && before.json.supported.length === 5, 'GET /fill lists the five features')
-    const bad = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { invented: true } }) })
-    check(bad.status === 400, 'an unknown feature is refused (400)')
-    const notBool = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { open_graph: 'yes' } }) })
-    check(notBool.status === 400, 'a non-boolean is refused (400)')
+    check(before.json?.siteControlled === true && !('allowed' in (before.json ?? {})), 'GET /fill says the switches are set on the site')
+    const remote = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { open_graph: true } }) })
+    check(remote.status === 404, `a remote switch-on is refused: the route is read-only (${remote.status})`)
     const anon = await http(`${BASE}/?rest_route=${encodeURIComponent('/rankxai/v1/fill')}`)
     check(anon.status === 401 || anon.status === 403, `anonymous access is refused (${anon.status})`)
-
-    console.log("\n== the site owner's switch, off by default ==")
-    wp('eval', 'RankXAI_Fill::set_allowed( false );')
-    const closed = await api('/rankxai/v1/fill')
-    check(closed.json?.allowed === false, 'GET /fill reports allowed: false')
-    const refused = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { open_graph: true } }) })
-    check(refused.status === 403 && refused.json?.code === 'rankxai_fill_not_allowed', `switching a fill on is refused while it is off (${refused.status})`)
-    const offOk = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { open_graph: false } }) })
-    check(offOk.status === 200, 'switching a fill off is still accepted')
-    wp('eval', 'RankXAI_Fill::set_allowed( true );')
-    const opened = await api('/rankxai/v1/fill')
-    check(opened.json?.allowed === true, 'allowed from Settings: GET /fill reports allowed: true')
+    wpQuiet('option', 'update', 'rankxai_fill_allowed', '1')
+    wpQuiet('eval', 'RankXAI_Lifecycle::ensure_options();')
+    check(wpQuiet('option', 'get', 'rankxai_fill_allowed') === null, 'the retired allow switch is removed on update')
 
     console.log('\n== no SEO plugin, fills off: nothing new is printed ==')
     only([])
-    await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { meta_description: false, open_graph: false, twitter_card: false, sitemap: false, breadcrumbs: false } }) })
+    setFill({ meta_description: false, open_graph: false, twitter_card: false, sitemap: false, breadcrumbs: false })
     const cat = wp('term', 'create', 'category', `Cat ${MARK}`, '--porcelain')
     const withExcerpt = Number(wp('post', 'create', '--post_status=publish', `--post_title=Excerpted ${MARK}`, `--post_excerpt=A hand-written summary ${MARK}.`, `--post_category=${cat}`, '--porcelain'))
     const noExcerpt = Number(wp('post', 'create', '--post_status=publish', `--post_title=Bare ${MARK}`, '--post_content=Body text that must never become a description.', '--porcelain'))
@@ -103,8 +98,9 @@ async function main() {
     check(off.descriptions === 0 && off.ogTitles === 0, 'with every fill off, no description or og:title appears')
 
     console.log('\n== no SEO plugin, fills on ==')
-    const put = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { meta_description: true, open_graph: true, twitter_card: true, sitemap: true, breadcrumbs: true } }) })
-    check(put.status === 200 && put.json?.features?.open_graph === true && put.json.blockedBy.length === 0, 'switched on, nothing blocking')
+    setFill({ meta_description: true, open_graph: true, twitter_card: true, sitemap: true, breadcrumbs: true })
+    const put = await api('/rankxai/v1/fill')
+    check(put.status === 200 && put.json?.features?.open_graph === true && put.json.blockedBy.length === 0, 'switched on in Settings, nothing blocking')
     const on = await head(urlA)
     check(on.descriptions === 1 && on.ours.includes(`A hand-written summary ${MARK}.`), 'meta description = the hand-written excerpt, once')
     check(on.ogTitles === 1 && on.ours.includes(`Excerpted ${MARK}`) && /og:url/.test(on.ours) && /og:type" content="article"/.test(on.ours) && /og:site_name/.test(on.ours), 'Open Graph from WordPress’s own data, once')
@@ -138,11 +134,11 @@ async function main() {
     wp('eval', "delete_option('rankxai_probe_fill_off');")
 
     console.log('\n== the site owner turns it off: the tags go at once ==')
-    const reOn = await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: { open_graph: true, twitter_card: true } }) })
-    check(reOn.status === 200 && (await head(urlA)).ogTitles === 1, 'Open Graph is printed before')
-    wp('eval', 'RankXAI_Fill::set_allowed( false );')
+    setFill({ open_graph: true, twitter_card: true })
+    check((await head(urlA)).ogTitles === 1, 'Open Graph is printed before')
+    setFill({ meta_description: false, open_graph: false, twitter_card: false, sitemap: false, breadcrumbs: false })
     const after = await api('/rankxai/v1/fill')
-    check(after.json?.allowed === false && Object.values(after.json?.features ?? { x: true }).every((v) => v === false), 'every switch is off')
+    check(Object.values(after.json?.features ?? { x: true }).every((v) => v === false), 'every switch is off')
     const gone = await head(urlA)
     check(gone.ours === '' && gone.ogTitles === 0, 'and nothing of ours is printed')
   } catch (e) {
@@ -150,9 +146,7 @@ async function main() {
   } finally {
     for (const id of created) wpQuiet('post', 'delete', String(id), '--force')
     wpQuiet('term', 'delete', 'category', ...wp('term', 'list', 'category', `--search=${MARK}`, '--field=term_id').split(/\r?\n/).filter(Boolean))
-    wpQuiet('eval', "update_option( 'rankxai_fill_allowed', 1, true );")
-    if (before.json?.features) await api('/rankxai/v1/fill', { method: 'PUT', body: JSON.stringify({ features: before.json.features }) })
-    wpQuiet('eval', `update_option( 'rankxai_fill_allowed', ${Number(allowedBefore) ? 1 : 0}, true );`)
+    if (before.json?.features) { try { setFill(before.json.features) } catch { /* the checks above report it */ } }
     wpQuiet('user', 'application-password', 'delete', 'admin', uuid)
     only(originalActive)
   }
