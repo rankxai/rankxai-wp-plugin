@@ -37,6 +37,7 @@ class RankXAI_Lifecycle {
 	public static function deactivate() {
 		RankXAI_Connection::on_deactivate();
 		RankXAI_Scan::on_deactivate();
+		wp_clear_scheduled_hook( 'rankxai_product_check_batch' );
 	}
 
 	/**

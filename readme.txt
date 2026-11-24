@@ -16,7 +16,7 @@ Shoppers now ask ChatGPT, Gemini and Google's AI Mode what to buy. The answers l
 
 = Free, with no account =
 
-* **Product check.** Checks your products for what AI shopping answers use: barcode (GTIN, UPC, EAN or ISBN), brand, main image and its alt text, a real description, a category and a price. It lists the products to fix first and where to fix each. It runs on your site; nothing is sent anywhere.
+* **Product check.** Checks your products for what AI shopping answers use: barcode (GTIN, UPC, EAN or ISBN), brand, main image and its alt text, a real description, a category and a price. It checks every published product, lists each one with something missing and says where to fix it. It runs on your site; nothing is sent anywhere.
 * **Markdown copies of products and pages.** A plain-text copy of each page at its own address (`/product/blue-mug.md`), so an AI crawler reads your words, not your theme. Product copies start with price, availability, SKU, barcode, brand and categories. Copies carry `noindex`. Off until you switch them on.
 * **llms.txt and agents.md**, generated from your site and served from its root address. Nothing is written to your server, and a real file or another plugin's llms.txt always wins. Off until you switch them on.
 * **AI crawler visits.** Counts which AI crawlers (GPTBot, ClaudeBot, PerplexityBot and others) read which pages, per day. Off until you switch it on. No IP address or browser details are stored, and counts are deleted after 35 days.
@@ -39,6 +39,10 @@ Pages marked `noindex` (cart, checkout, account) and a store in WooCommerce's "C
 
 Anything that uses credits shows its price before you confirm. The plugin never prints a second title or description: it writes into your SEO plugin's own fields.
 
+= Source code and build =
+
+The store app ships compiled, in `admin-app/build`. Its source and build tools are public: https://github.com/rankxai/rankxai-wp-plugin, folder `admin-app/src`. To build it, run `npm install && npm run build` in that folder; it writes `dist/wordpress`, which is `admin-app/build`.
+
 == Installation ==
 
 1. Install from Plugins › Add New and activate it.
@@ -58,26 +62,17 @@ Not until you connect a RankX AI account. Before that it only asks your own site
 
 = What does connecting give RankX AI access to? =
 
-Connecting asks you to approve, on WordPress's own screen, an Application Password for your user account. This plugin limits that password to the REST API (XML-RPC refuses it) and to an allow list:
+You approve it on a RankX AI screen in wp-admin. That creates a user called "RankX AI" with its own role, and RankX AI signs in as that user with an Application Password only it holds, never as you.
 
-* Posts, pages, media, products, and other public post types and taxonomies: create, edit, move to the trash.
-* This plugin's own routes, and the Redirection plugin's redirects: list them, add one from a path on your site to another, remove one.
-* Webhooks for product changes, sent to RankX AI.
-* Reading your site's structure (including the lists of plugins, themes, menus and widgets), coupons, and WooCommerce's settings and system status.
+The role can create and edit posts, pages, media and products and their categories and tags, move them to the trash, add and remove redirects, and read WooCommerce's settings and system status. It cannot install or change plugins or themes, manage users, change site settings, or sign in to wp-admin. Content it creates is credited to you.
 
-Everything else is refused, and it cannot post unfiltered HTML.
+The plugin also limits the password to the REST API (XML-RPC refuses it) and to an allow list: public post types and taxonomies, this plugin's own routes, plain redirects, and webhooks for product changes sent to RankX AI. It cannot post unfiltered HTML, issue refunds, read or create Application Passwords, or permanently delete content. Orders, refunds, customers, the user list, product reviews and full comment details stay off until you tick "Let RankX AI read orders, customers, users and comments" in RankX AI › Settings. Every change is recorded in your RankX AI account, and product fixes can be undone.
 
-It can never change your site's settings or this plugin's switches, users, plugins, themes, templates or styles, issue refunds, read or create Application Passwords, or permanently delete content (it can remove a redirect). Orders, refunds, customers, the user list, product reviews and full comment details stay off until you tick "Let RankX AI read orders, customers, users and comments" in RankX AI › Settings. Every change is recorded in your RankX AI account, and product fixes can be undone.
-
-To stop it, click **Disconnect** in RankX AI › Settings or deactivate the plugin: both remove the Application Password and RankX AI's webhooks.
+To stop it, click **Disconnect** in RankX AI › Settings or deactivate the plugin: both remove the RankX AI user, its Application Password and RankX AI's webhooks.
 
 = What happens if I uninstall it? =
 
-The connection, its Application Password and its webhooks are always removed. Unless you tick "Keep RankX AI's settings and data" in RankX AI › Settings, its settings, counts, check results and cached copies are removed too. Values it wrote into your SEO plugin stay there.
-
-= Where is the source of the store app? =
-
-In `admin-app/src`, with its build tools pinned in `package.json`. `npm install && npm run build` there writes `dist/wordpress`, which the plugin ships as `admin-app/build`. Repository: https://github.com/rankxai/rankxai-wp-plugin
+The connection, the RankX AI user, its Application Password and its webhooks are always removed. Unless you tick "Keep RankX AI's settings and data" in RankX AI › Settings, its settings, counts, check results and cached copies are removed too. Values it wrote into your SEO plugin stay there.
 
 = Which WordPress version do I need? =
 
@@ -93,7 +88,7 @@ In `admin-app/src`, with its build tools pinned in `package.json`. `npm install 
 * **The Store page.** When an administrator opens RankX AI › Store or a product's RankX AI panel, the plugin asks `https://app.rankxai.com/api/store-app/wp/session` for a ten-minute session, sending the site and wp-admin addresses, the administrator's user ID and display name, and the site's RankX AI token. The store app (included in the plugin) then calls `https://app.rankxai.com/api/store-app` from the browser as each screen needs: products, AI shopping results, the changes you approve, images and articles. If the store app hits an error, it sends the message, where in its code it happened and the page address to `https://app.rankxai.com/api/store-app/client-error`, at most three a page.
 * **Images.** The store app shows images from `https://assets.rankxai.com` (images made for you) and, in AI shopping results, product images from the stores and image hosts those answers link to.
 * **Product changes.** On a store, RankX AI adds WooCommerce webhooks so that WooCommerce sends a product's details to `https://app.rankxai.com` when it is created, updated, deleted or restored. They are removed when you disconnect.
-* **Disconnect.** Disconnecting or deactivating tells `https://app.rankxai.com/api/store-app/wp/connection`, then removes the token, the Application Password and the webhooks.
+* **Disconnect.** Disconnecting or deactivating tells `https://app.rankxai.com/api/store-app/wp/connection`, then removes the token, the RankX AI user, its Application Password and the webhooks.
 * **What RankX AI stores on this site.** Through this plugin's routes, RankX AI saves the changes you approve (search titles and descriptions, structured data, redirects, llms.txt, agents.md and ai.txt, a short block of business facts for the markdown copies), the Overview's AI visibility summary, and the AI crawlers' published address ranges for the crawler counts. It is all data; nothing is run as code.
 
 = rankxai.com, only if you click it =
@@ -116,7 +111,7 @@ The plugin sends no analytics, sets no cookies and collects nothing about your v
 
 == Screenshots ==
 
-1. The product check and the products to fix first.
+1. The product check and every product with something missing.
 2. The Overview on a store.
 3. The store app: shopper questions and the products AI answers show.
 4. A product's page: what to fix, and how often AI answers named it.

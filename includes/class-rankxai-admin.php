@@ -143,6 +143,9 @@ class RankXAI_Admin {
 			self::$hooks[] = $view;
 			add_action( 'load-' . $view, array( 'RankXAI_View_As_AI', 'guard' ) );
 		}
+
+		// Hidden page where an administrator approves RankX AI's connection user.
+		add_submenu_page( '', __( 'Connect RankX AI', 'rankxai' ), __( 'Connect RankX AI', 'rankxai' ), 'manage_options', RankXAI_Connector::PAGE, array( 'RankXAI_Connector', 'render' ) );
 	}
 
 	/**

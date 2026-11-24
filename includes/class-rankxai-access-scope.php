@@ -2,9 +2,9 @@
 /**
  * What RankX AI's Application Password may do on this site.
  *
- * Connecting creates an Application Password for the approving administrator.
- * For that password only, every REST request is refused unless it is on the
- * list below, and the password cannot post unfiltered HTML.
+ * Connecting creates a RankX AI user with its own limited role, and an
+ * Application Password for it. For that password, every REST request is also
+ * refused unless it is on the list below, and it cannot post unfiltered HTML.
  *
  * @package RankXAI
  */
@@ -178,7 +178,7 @@ class RankXAI_Access_Scope {
 			return true;
 		}
 		if ( preg_match( '#^/wc/v\d+/webhooks(/(\d+))?$#', $route, $m ) ) {
-			return $read || self::own_webhook( $method, isset( $m[2] ) ? (int) $m[2] : 0, $request );
+			return self::own_webhook( $method, isset( $m[2] ) ? (int) $m[2] : 0, $request );
 		}
 		return false;
 	}
@@ -261,7 +261,7 @@ class RankXAI_Access_Scope {
 			if ( ! $existing || 0 !== strpos( (string) $existing->get_delivery_url(), $ours ) ) {
 				return false;
 			}
-			if ( 'DELETE' === $method ) {
+			if ( 'DELETE' === $method || 'GET' === $method || 'HEAD' === $method ) {
 				return true;
 			}
 		}
@@ -271,6 +271,9 @@ class RankXAI_Access_Scope {
 			return false;
 		}
 		if ( null !== $topic && 0 !== strpos( (string) $topic, 'product.' ) ) {
+			return false;
+		}
+		if ( 'POST' !== $method && $id <= 0 ) {
 			return false;
 		}
 		return $id > 0 || ( null !== $url && null !== $topic );

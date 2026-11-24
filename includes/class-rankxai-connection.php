@@ -3,7 +3,7 @@
  * The connection to a RankX AI account, made from wp-admin.
  *
  * A site token is accepted only with a one-time state this site issued.
- * Disconnecting removes the token and RankX AI's Application Passwords.
+ * Disconnecting removes the token, RankX AI's Application Passwords and its user.
  *
  * @package RankXAI
  */
@@ -106,12 +106,12 @@ class RankXAI_Connection {
 	}
 
 	/**
-	 * Only an administrator may change the connection.
+	 * An administrator, or RankX AI's own user.
 	 *
 	 * @return bool
 	 */
 	public static function can_manage() {
-		return current_user_can( 'manage_options' );
+		return RankXAI_Connector::can_manage();
 	}
 
 	/**
@@ -171,7 +171,7 @@ class RankXAI_Connection {
 			'app_url'       => $app,
 			'is_store'      => ! empty( $body['isStore'] ),
 			'connected_at'  => gmdate( 'c' ),
-			'connected_by'  => get_current_user_id(),
+			'connected_by'  => RankXAI_Connector::is_connector( get_current_user_id() ) ? RankXAI_Connector::owner_id() : get_current_user_id(),
 		);
 		update_option( self::OPTION, $link, false );
 		RankXAI_Session_Cache::clear_all();
@@ -267,7 +267,7 @@ class RankXAI_Connection {
 	}
 
 	/**
-	 * Tell RankX AI, then remove the token, its Application Passwords and webhooks.
+	 * Tell RankX AI, then remove the token, its Application Passwords, its user and webhooks.
 	 *
 	 * @param string $reason 'disconnected', 'deactivated' or 'uninstalled'.
 	 * @return int How many Application Passwords were removed.
@@ -282,6 +282,8 @@ class RankXAI_Connection {
 		RankXAI_Session_Cache::clear_all();
 		$removed = self::remove_app_passwords();
 		self::remove_webhooks();
+		RankXAI_Connector::remove_user();
+		delete_option( RankXAI_Connector::OPTION_APPROVER );
 		return $removed;
 	}
 

@@ -60,6 +60,7 @@ require_once __DIR__ . '/includes/class-rankxai-rest.php';
 require_once __DIR__ . '/includes/class-rankxai-app-client.php';
 require_once __DIR__ . '/includes/class-rankxai-session-cache.php';
 require_once __DIR__ . '/includes/class-rankxai-connection.php';
+require_once __DIR__ . '/includes/class-rankxai-connector.php';
 require_once __DIR__ . '/includes/class-rankxai-lifecycle.php';
 require_once __DIR__ . '/includes/class-rankxai-access-scope.php';
 
@@ -79,6 +80,7 @@ RankXAI_Redirect_Requests::init();
 RankXAI_Site_Health::init();
 RankXAI_Scan::init();
 RankXAI_Connection::init();
+RankXAI_Connector::init();
 RankXAI_Lifecycle::init();
 RankXAI_Access_Scope::init();
 

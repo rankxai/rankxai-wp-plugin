@@ -115,7 +115,7 @@ class RankXAI_REST {
 	 * @return bool
 	 */
 	public static function can_manage_documents() {
-		return current_user_can( 'manage_options' );
+		return RankXAI_Connector::can_manage();
 	}
 
 	/**
