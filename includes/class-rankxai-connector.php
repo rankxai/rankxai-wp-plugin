@@ -34,6 +34,9 @@ class RankXAI_Connector {
 	/** The approval form. */
 	const ACTION = 'rankxai_authorize';
 
+	/** How long an opened approval screen stays usable. */
+	const REQUEST_TTL = 30 * MINUTE_IN_SECONDS;
+
 	/** Redirection plugin actions the connector may use: list, add and delete redirects. */
 	const REDIRECTION_CAPS = array( 'redirection_cap_redirect_manage', 'redirection_cap_redirect_add', 'redirection_cap_redirect_delete' );
 
@@ -230,7 +233,7 @@ class RankXAI_Connector {
 	/**
 	 * The approval request from the query string, or a WP_Error.
 	 *
-	 * @param array $source $_GET or $_POST.
+	 * @param array $source $_GET, or a request kept by the screen.
 	 * @return array|WP_Error
 	 */
 	private static function request( $source ) {
@@ -253,6 +256,16 @@ class RankXAI_Connector {
 			'success_url' => $success,
 			'reject_url'  => '' !== $reject ? $reject : $success,
 		);
+	}
+
+	/**
+	 * Where an opened approval screen keeps its request, for the administrator who opened it.
+	 *
+	 * @param string $key Random key from the form.
+	 * @return string
+	 */
+	private static function request_key( $key ) {
+		return 'rankxai_authorize_' . get_current_user_id() . '_' . md5( $key );
 	}
 
 	/**
@@ -298,12 +311,13 @@ class RankXAI_Connector {
 		if ( $existing > 0 ) {
 			echo '<p>' . esc_html__( 'RankX AI is already connected. Approving again replaces its password.', 'rankxai' ) . '</p>';
 		}
+		// The request stays on the server and the form posts only its key: many hosting firewalls refuse a form that posts a web address.
+		$key = wp_generate_password( 24, false );
+		set_transient( self::request_key( $key ), $req, self::REQUEST_TTL );
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::ACTION ) . '" />';
-		wp_nonce_field( self::ACTION );
-		foreach ( array( 'app_id', 'app_name', 'success_url', 'reject_url' ) as $key ) {
-			echo '<input type="hidden" name="' . esc_attr( $key ) . '" value="' . esc_attr( $req[ $key ] ) . '" />';
-		}
+		echo '<input type="hidden" name="request" value="' . esc_attr( $key ) . '" />';
+		wp_nonce_field( self::ACTION, '_wpnonce', false );
 		echo '<p><button type="submit" name="decision" value="approve" class="button button-primary">' . esc_html__( 'Approve', 'rankxai' ) . '</button> ';
 		echo '<button type="submit" name="decision" value="reject" class="button">' . esc_html__( 'Don’t connect', 'rankxai' ) . '</button></p>';
 		echo '</form></div>';
@@ -317,7 +331,15 @@ class RankXAI_Connector {
 			wp_die( esc_html__( 'You do not have permission to connect this site.', 'rankxai' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( self::ACTION );
-		$req = self::request( $_POST );
+		$key    = isset( $_POST['request'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', sanitize_text_field( wp_unslash( $_POST['request'] ) ) ) : '';
+		$stored = '' !== $key ? get_transient( self::request_key( $key ) ) : false;
+		if ( '' !== $key ) {
+			delete_transient( self::request_key( $key ) );
+		}
+		if ( ! is_array( $stored ) ) {
+			wp_die( esc_html__( 'This approval has expired. Start again from RankX AI.', 'rankxai' ), '', array( 'response' => 400 ) );
+		}
+		$req = self::request( $stored );
 		if ( is_wp_error( $req ) ) {
 			wp_die( esc_html( $req->get_error_message() ), '', array( 'response' => 400 ) );
 		}

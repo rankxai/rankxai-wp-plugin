@@ -47,7 +47,7 @@ async function openApproval(cookie, overrides) {
 async function decide(cookie, html, decision) {
   const field = (name) => (html.match(new RegExp(`name="${name}" value="([^"]*)"`)) ?? [])[1]
   const body = new URLSearchParams({ action: 'rankxai_authorize', decision })
-  for (const k of ['_wpnonce', '_wp_http_referer', 'app_id', 'app_name', 'success_url', 'reject_url']) {
+  for (const k of ['_wpnonce', 'request']) {
     const v = field(k)
     if (v !== undefined) body.set(k, v.replace(/&amp;/g, '&').replace(/&#038;/g, '&'))
   }
@@ -104,13 +104,14 @@ try {
   const badApp = await openApproval(cookie, { app_id: '00000000-0000-0000-0000-000000000000' })
   check('another application id is refused', badApp.html.includes('only approves RankX AI'))
   const page = await openApproval(cookie)
+  check('the form posts no web address (hosting firewalls refuse one)', !/<form[\s\S]*name="(success_url|reject_url|_wp_http_referer)"[\s\S]*<\/form>/.test(page.html) && page.html.includes('name="request"'))
   check('the screen lists what the user cannot do', page.html.includes('install, change or remove plugins or themes') && page.html.includes('change site settings'))
 
   const rejected = await decide(cookie, page.html, 'reject')
   check('Don’t connect returns success=false', rejected.location.startsWith(RETURN) && rejected.location.includes('success=false'), rejected.location)
   check('rejecting creates no user', !wpSoft('user', 'get', 'rankxai', '--field=ID'))
 
-  const approved = await decide(cookie, page.html, 'approve')
+  const approved = await decide(cookie, (await openApproval(cookie)).html, 'approve')
   const back = new URL(approved.location || 'https://none.invalid/')
   creds = { user: back.searchParams.get('user_login'), password: back.searchParams.get('password') }
   check('approving returns to RankX AI', back.origin === 'https://app.rankxai.com' && back.searchParams.get('state') === 'probe', approved.location.slice(0, 60))
@@ -179,6 +180,10 @@ try {
   check('still cannot create a user', denied(await call('POST', '/wp/v2/users', { username: 'y', email: 'y@example.com', password: 'y' })))
   wp('option', 'delete', 'rankxai_share_personal_data')
   check('orders refused again when switched off', denied(await call('GET', '/wc/v3/orders')))
+
+  const used = await decide(cookie, (await openApproval(cookie)).html, 'reject')
+  const reused = await decide(cookie, (await openApproval(cookie)).html.replace(/name="request" value="[^"]*"/, 'name="request" value="notakey"'), 'approve')
+  check('an unknown or used request key is refused', reused.status === 400 && used.location.includes('success=false'), `${reused.status}`)
 
   console.log('Signing in')
   wp('user', 'update', creds.user, '--user_pass=Connector-probe-1', '--skip-email')
