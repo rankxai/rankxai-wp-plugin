@@ -15,6 +15,19 @@ const env = { ...process.env, MSYS_NO_PATHCONV: '1' }
 const wp = (...args) => execFileSync('docker', ['exec', '-u', '33', cliContainer(), 'wp', ...args], { encoding: 'utf8', env }).trim()
 const wpSoft = (...args) => { try { return wp(...args) } catch { return null } }
 
+// A slow wp-cli step outlasts Apache's keep-alive, and the next request then meets a
+// closed socket (ECONNRESET). Retry a transport error only, never an HTTP status.
+const fetchOnce = globalThis.fetch
+globalThis.fetch = async function fetchRetrying(url, init, attempt = 0) {
+  try {
+    return await fetchOnce(url, init)
+  } catch (e) {
+    if (attempt >= 2) throw e
+    await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
+    return fetchRetrying(url, init, attempt + 1)
+  }
+}
+
 let pass = 0
 let fail = 0
 const check = (label, ok, detail = '') => {
