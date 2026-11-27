@@ -188,8 +188,6 @@ async function run() {
   has(/This is the stored document/, docOff.body) && docOff.source === 'virtual-route'
     ? ok('OFF — switched on, /agents.md serves the stored document')
     : bad(`OFF — /agents.md served source=${docOff.source} status=${docOff.status}`)
-  if (docsBefore === null) await wpExec(['option', 'delete', 'rankxai_documents_local'])
-  else await wpExec(['option', 'update', 'rankxai_documents_local', JSON.stringify(docsBefore), '--format=json'])
 
   const remote = await apiJson('/rankxai/v1/twins', { method: 'PUT', body: JSON.stringify({ enabled: true }) })
   remote.status === 403 && remote.json?.code === 'rankxai_twins_site_only'
@@ -215,6 +213,9 @@ async function run() {
   has(/This is the stored document/, docOn.body) && docOn.source === 'virtual-route'
     ? ok('ON — /agents.md STILL serves the stored document, not a twin of the page slugged "agents"')
     : bad(`ON — /agents.md was taken over: source=${docOn.source} body=${docOn.body.slice(0, 60)}`)
+  // The document switch goes back to what the rig had.
+  if (docsBefore === null) await wpExec(['option', 'delete', 'rankxai_documents_local'])
+  else await wpExec(['option', 'update', 'rankxai_documents_local', JSON.stringify(docsBefore), '--format=json'])
 
   const shapes = {
     suffix: await raw(`${FIX.path}.md`),
