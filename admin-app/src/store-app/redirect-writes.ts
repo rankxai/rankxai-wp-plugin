@@ -8,7 +8,7 @@ export type RedirectWriteResult = WriteResult & {
 export const redirectsWrittenLocally = (): boolean => !!host.redirects;
 function fromLocal(r: LocalRedirectResult): ApiResult<RedirectWriteResult> {
     if (!r.ok)
-        return { ok: false, status: 409, data: null, error: r.message, code: 'refused', remedy: null, field: r.field ?? null };
+        return { ok: false, status: 409, data: null, error: r.message, code: 'refused', remedy: null, field: null };
     return {
         ok: true,
         status: 200,
