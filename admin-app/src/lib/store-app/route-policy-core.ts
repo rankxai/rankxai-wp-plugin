@@ -91,6 +91,7 @@ export const STORE_APP_ROUTE_POLICY: Record<string, WooSupport> = {
     "GET fixes/redirect-suggestions": { routeClass: 'read', woo: 'ready' },
     "POST fixes/redirect-suggestions/:id/apply": { routeClass: 'write', woo: 'ready' },
     "POST fixes/redirect-suggestions/:id/dismiss": { routeClass: 'write', woo: 'ready' },
+    "POST fixes/redirect-suggestions/:id/resolved": { routeClass: 'write', woo: 'ready' },
     "GET fixes/redirects/export": { routeClass: 'read', woo: 'ready' },
     "POST fixes/redirects/import": { routeClass: 'write', woo: 'ready' },
     "GET templates": { routeClass: 'read', woo: 'ready' },

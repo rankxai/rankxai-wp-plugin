@@ -38,6 +38,7 @@ class RankXAI_Lifecycle {
 		RankXAI_Connection::on_deactivate();
 		RankXAI_Scan::on_deactivate();
 		wp_clear_scheduled_hook( 'rankxai_product_check_batch' );
+		wp_clear_scheduled_hook( 'rankxai_send_product_events' );
 	}
 
 	/**
@@ -47,6 +48,12 @@ class RankXAI_Lifecycle {
 		$autoloaded = wp_load_alloptions();
 		if ( array_key_exists( RankXAI_Fill::OPTION_ALLOWED, $autoloaded ) ) {
 			delete_option( RankXAI_Fill::OPTION_ALLOWED );
+		}
+		// The crawler ranges now ship with the plugin.
+		foreach ( RankXAI_Crawlers::OBSOLETE_OPTIONS as $obsolete ) {
+			if ( false !== get_option( $obsolete, false ) ) {
+				delete_option( $obsolete );
+			}
 		}
 		$defaults = array(
 			RankXAI_Twins::OPTION_SETTINGS   => array(),

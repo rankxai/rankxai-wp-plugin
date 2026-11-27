@@ -10,6 +10,7 @@ import { AdminLink, ErrorBanner, PricedButton, act, fieldError, usePageError, ty
 import { BatchProgress, useBatch } from '../components/BatchProgress';
 import { useModal, type WriteResult } from '../components/FixModals';
 import { SkeletonSection, StatusBadge } from '../components/Status';
+import { addRedirect, removeRedirect, type RedirectWriteResult } from '../redirect-writes';
 import * as UI from '../ui';
 type Action = {
     kind: 'seo';
@@ -84,7 +85,9 @@ export function SearchFixes({ load, group, setError, focusProductId = null }: {
     const [busy, setBusy] = useState<string | null>(null);
     const [drafts, setDrafts] = useState<Record<string, Draft>>({});
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    const [done, setDone] = useState<Record<string, WriteResult>>({});
+    const [done, setDone] = useState<Record<string, WriteResult & {
+        localId?: string | null;
+    }>>({});
     const [picked, setEditing] = useState<FixItem | null>(null);
     const [expanded, setExpanded] = useState(false);
     const editor = useModal('fix');
@@ -130,11 +133,11 @@ export function SearchFixes({ load, group, setError, focusProductId = null }: {
         const call = a.kind === 'seo'
             ? () => api<WriteResult>('fixes/seo', { method: 'POST', body: { objectType: a.objectType, objectId: a.objectId, seoTitle: draft.seoTitle, seoDescription: draft.seoDescription, label: item.objectLabel } })
             : a.kind === 'redirect'
-                ? () => api<WriteResult>('fixes/redirects', { method: 'POST', body: { path: a.path, target: draft.target } })
+                ? () => addRedirect(a.path, draft.target ?? '')
                 : null;
         if (!call)
             return;
-        const r = await act(call, (b) => setBusy(b ? item.key : null), setModalError);
+        const r = await act<WriteResult | RedirectWriteResult>(call, (b) => setBusy(b ? item.key : null), setModalError);
         if (r.ok && r.data) {
             setDone((all) => ({ ...all, [item.key]: r.data! }));
             toggle(item.key, false);
@@ -160,9 +163,10 @@ export function SearchFixes({ load, group, setError, focusProductId = null }: {
     }
     async function undo(key: string) {
         const changeId = done[key]?.changeId;
-        if (!changeId)
+        const localId = done[key]?.localId;
+        if (!changeId && !localId)
             return;
-        const r = await act(() => api(`changes/${changeId}/undo`, { method: 'POST' }), (b) => setBusy(b ? `undo:${key}` : null), setError);
+        const r = await act(() => (localId ? removeRedirect(localId) : api(`changes/${changeId}/undo`, { method: 'POST' })), (b) => setBusy(b ? `undo:${key}` : null), setError);
         if (r.ok) {
             setDone((all) => {
                 const next = { ...all };
@@ -256,7 +260,7 @@ export function SearchFixes({ load, group, setError, focusProductId = null }: {
                     <UI.TableCell>
                       {result ? (<UI.Stack direction="inline" gap="small-200" alignItems="center">
                           <StatusBadge status={result.verified ? 'saved' : 'saved_unconfirmed'}/>
-                          {result.changeId ? (<UI.Button variant="tertiary" disabled={busy !== null || undefined} loading={busy === `undo:${i.key}` || undefined} onClick={() => void undo(i.key)}>
+                          {result.changeId || result.localId ? (<UI.Button variant="tertiary" disabled={busy !== null || undefined} loading={busy === `undo:${i.key}` || undefined} onClick={() => void undo(i.key)}>
                               Undo
                             </UI.Button>) : null}
                         </UI.Stack>) : i.action.kind === 'shopify_admin' ? (<AdminLink path={i.action.adminPath}>{i.action.label}</AdminLink>) : (<UI.Button onClick={() => {

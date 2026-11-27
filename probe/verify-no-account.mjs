@@ -317,8 +317,8 @@ async function run() {
     : bad(`FRESH — llms.txt=${freshLlms.status} agents.md=${freshAgents.status}; activation published a URL`)
 
   const freshState = wpEval('<?php echo wp_json_encode( RankXAI_Generate::stored_state() );')
-  freshState === '{"llms_txt":false,"agents_md":false}'
-    ? ok('FRESH — generation reports OFF for every supported document')
+  freshState === '{"llms_txt":false,"agents_md":false,"ai_txt":false}'
+    ? ok('FRESH — every root document, ai.txt included, is switched OFF')
     : bad(`FRESH — stored_state() was ${freshState}`)
 
   const unsupported = wpEval("<?php echo RankXAI_Generate::is_local( 'ai_txt' ) ? 'yes' : 'no';")
@@ -336,12 +336,12 @@ async function run() {
   has(/Markdown copies/, screen) && has(/Root documents/, screen)
     ? ok('SCREEN — the settings page renders both sections')
     : bad('SCREEN — a section is missing from the rendered page')
-  has(/name="rankxai_generate\[llms_txt\]"/, screen) && has(/name="rankxai_generate\[agents_md\]"/, screen)
-    ? ok('SCREEN — a generation control for each supported document')
-    : bad('SCREEN — a generation checkbox is missing')
-  !has(/name="rankxai_generate\[ai_txt\]"/, screen) && has(/ai\.txt/, screen)
-    ? ok('SCREEN — ai.txt is listed with its state and NO control, rather than silently omitted')
-    : bad('SCREEN — ai.txt is either missing entirely or wrongly offers a control')
+  has(/name="rankxai_generate\[llms_txt\]"/, screen) && has(/name="rankxai_generate\[agents_md\]"/, screen) && has(/name="rankxai_generate\[ai_txt\]"/, screen)
+    ? ok('SCREEN — a "Serve it" switch for every root document, ai.txt included')
+    : bad('SCREEN — a switch is missing')
+  has(/Serve it at \/ai\.txt/, screen) && has(/Serve it at \/llms\.txt/, screen)
+    ? ok('SCREEN — each switch names the address it publishes')
+    : bad('SCREEN — a switch does not name its address')
   has(/Nothing is being served at this address/, screen)
     ? ok('SCREEN — and it states, per document, what is actually live')
     : bad('SCREEN — no per-document state sentence')
@@ -363,7 +363,7 @@ async function run() {
     ? ok('FORM — a submission without a valid nonce is refused')
     : bad(`FORM — a bad nonce was accepted (${noNonce.slice(0, 120)})`)
   const afterBadNonce = wpEval('<?php echo wp_json_encode( RankXAI_Generate::stored_state() );')
-  afterBadNonce === '{"llms_txt":false,"agents_md":false}'
+  afterBadNonce === '{"llms_txt":false,"agents_md":false,"ai_txt":false}'
     ? ok('FORM — and it stored nothing')
     : bad(`FORM — a refused submission still wrote ${afterBadNonce}`)
 
@@ -373,7 +373,7 @@ async function run() {
     : bad(`FORM — a subscriber saved settings (${asSubscriber.slice(0, 160)})`)
   // A refusal only counts if nothing was written.
   const afterSubscriber = wpEval('<?php echo wp_json_encode( RankXAI_Generate::stored_state() );')
-  afterSubscriber === '{"llms_txt":false,"agents_md":false}'
+  afterSubscriber === '{"llms_txt":false,"agents_md":false,"ai_txt":false}'
     ? ok('FORM — and the subscriber wrote nothing')
     : bad(`FORM — a refused subscriber still wrote ${afterSubscriber}`)
 
@@ -391,7 +391,7 @@ async function run() {
     : bad(`FORM — no confirmation marker in ${saved.slice(0, 160)}`)
 
   const savedState = wpEval('<?php echo wp_json_encode( RankXAI_Generate::stored_state() );')
-  savedState === '{"llms_txt":true,"agents_md":true}'
+  savedState === '{"llms_txt":true,"agents_md":true,"ai_txt":false}'
     ? ok('FORM — both documents are now generated locally')
     : bad(`FORM — stored_state() was ${savedState}`)
 
@@ -573,6 +573,29 @@ echo $generated;
   llmsOff.status === 404 && agentsOff.status === 404
     ? ok('OFF — both addresses go back to 404, leaving them to whatever else would serve them')
     : bad(`OFF — llms=${llmsOff.status} agents=${agentsOff.status}`)
+
+  // ---- RANKX AI CANNOT PUBLISH A ROOT DOCUMENT THE OWNER HAS NOT SWITCHED ON
+  const pushedOff = await apiJson('/rankxai/v1/documents/ai_txt', {
+    method: 'PUT',
+    body: JSON.stringify({ content: '# ai.txt pushed while switched off\n' }),
+  })
+  pushedOff.status === 200 && pushedOff.json?.stored === true && pushedOff.json?.switchedOn === false && pushedOff.json?.serving === false
+    ? ok('SWITCH — a document RankX AI publishes is stored, and reported as switched off and not serving')
+    : bad(`SWITCH — PUT answered ${pushedOff.status} ${JSON.stringify(pushedOff.json)}`)
+  const aiOff = await raw('/ai.txt')
+  aiOff.status === 404
+    ? ok('SWITCH — and /ai.txt is NOT served: only the site owner publishes a root document')
+    : bad(`SWITCH — /ai.txt answered ${aiOff.status} while switched off`)
+  const switchedOn = submitForm({ twinsOn: false, postTypes: ['post', 'page'], generate: { ai_txt: true } })
+  const aiOn = await raw('/ai.txt')
+  has(/^saved:/, switchedOn) && aiOn.status === 200 && has(/pushed while switched off/, aiOn.body)
+    ? ok('SWITCH — once the owner ticks "Serve it at /ai.txt", the stored document is served')
+    : bad(`SWITCH — after ticking it: ${aiOn.status}`)
+  submitForm({ twinsOn: false, postTypes: ['post', 'page'], generate: {} })
+  ;(await raw('/ai.txt')).status === 404
+    ? ok('SWITCH — and unticking it stops it again')
+    : bad('SWITCH — /ai.txt still served after unticking')
+  await apiJson('/rankxai/v1/documents/ai_txt', { method: 'DELETE' })
 
   // ---- THE LOG ------------------------------------------------------------
   //

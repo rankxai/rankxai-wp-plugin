@@ -17,7 +17,7 @@ class RankXAI_App_Client {
 	const APP_ORIGIN = 'https://app.rankxai.com';
 
 	/** The paths it may call. */
-	const PATHS = array( '/api/store-app/wp/session', '/api/store-app/wp/connection' );
+	const PATHS = array( '/api/store-app/wp/session', '/api/store-app/wp/connection', '/api/store-app/wp/product-events' );
 
 	/**
 	 * Call RankX AI with the site token.

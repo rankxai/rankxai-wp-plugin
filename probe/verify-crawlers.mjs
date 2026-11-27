@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Checks AI crawler visit counting: the switch, what is counted, the pushed
- * address ranges, permissions, the daily cap, retention and uninstall.
+ * Checks AI crawler visit counting: the switch, what is counted, the address
+ * ranges included with the plugin, permissions, the daily cap, retention and uninstall.
  *
  * Run:  node probe/verify-crawlers.mjs      (wp-env must be running)
  */
@@ -64,7 +64,6 @@ async function visit(path, agent, extra = {}) {
 }
 
 const readCounts = async (query = '') => api('/rankxai/v1/crawlers', { method: 'GET' }, AUTH, query)
-const pushConfig = (body, auth = AUTH) => api('/rankxai/v1/crawlers/config', { method: 'PUT', body: JSON.stringify(body) }, auth)
 
 function rowsFor(json, bot, path) {
   return (json?.rows ?? []).filter((r) => r.bot === bot && (path === undefined || r.path === path))
@@ -197,74 +196,38 @@ async function run() {
     c = await readCounts()
     check(hitsOf(rowsFor(c.json, 'bytespider')) === 1, 'a crawler whose operator publishes no ranges is still counted with the default list')
 
-    // ── D  configuration ──────────────────────────────────────────────────
-    console.log('\n== D  configuration pushed by RankX AI ==')
-    check(c.json?.config?.version === '' && c.json?.config?.prefixes === 0, 'CONTROL — nothing has been pushed yet')
-    const REFUSALS = [
-      [{}, 'an empty body'],
-      [{ version: 'v1', bots: [] }, 'no crawlers'],
-      [{ version: 'bad version!', bots: [{ id: 'gptbot', tokens: ['GPTBot'] }] }, 'a malformed version'],
-      [{ version: 'v1', bots: [{ id: 'GPT Bot', tokens: ['GPTBot'] }] }, 'a malformed id'],
-      [{ version: 'v1', bots: [{ id: 'gptbot', tokens: [] }] }, 'a crawler with no tokens'],
-      [{ version: 'v1', bots: [{ id: 'gptbot', tokens: ['GPT\nBot'] }] }, 'a token with a control character'],
-      [{ version: 'v1', bots: [{ id: 'gptbot', tokens: ['GPTBot'], prefixes: ['300.1.1.1/24'] }] }, 'an invalid IPv4 range'],
-      [{ version: 'v1', bots: [{ id: 'gptbot', tokens: ['GPTBot'], prefixes: ['2001:db8::/129'] }] }, 'an IPv6 prefix length over 128'],
-      [{ version: 'v1', bots: [{ id: 'gptbot', tokens: ['GPTBot'], prefixes: ['10.0.0.1'] }] }, 'a range with no prefix length'],
-      [{ version: 'v1', bots: [{ id: 'gptbot', tokens: ['GPTBot'] }, { id: 'gptbot', tokens: ['x'] }] }, 'a duplicate id'],
-      [{ version: 'v1', bots: [{ id: 'gptbot', tokens: ['GPTBot'] }], proxies: ['nope'] }, 'an invalid proxy range'],
-      [{ version: 'v1', bots: [{ id: 'gptbot', tokens: ['GPTBot'], prefixes: Array.from({ length: 8001 }, (_, i) => `10.${i >> 8 & 255}.${i & 255}.0/24`) }] }, 'more than 8,000 ranges'],
-    ]
-    for (const [body, label] of REFUSALS) {
-      const r = await pushConfig(body)
-      check(r.status === 400, `refused 400: ${label}`)
-    }
-    check((await readCounts()).json?.config?.version === '', 'and none of those stored anything')
-
-    const ALL4 = '0.0.0.0/0'
-    const ALL6 = '::/0'
-    const good = {
-      version: `probe-${MARK}`,
-      bots: [
-        { id: 'gptbot', tokens: ['GPTBot'], prefixes: [ALL4, ALL6] },
-        { id: 'claudebot', tokens: ['ClaudeBot'], prefixes: ['203.0.113.0/24'] },
-        { id: 'probebot', tokens: ['RxProbeBot'] },
-      ],
-      proxies: [],
-    }
-    const pushed = await pushConfig(good)
-    check(pushed.status === 200 && pushed.json?.version === good.version && pushed.json?.bots === 3 && pushed.json?.prefixes === 3,
-      `a valid push is stored and summarised (${JSON.stringify(pushed.json)})`)
-
-    await visit(`/${MARK}-range`, GPTBOT)
-    await visit(`/${MARK}-range`, CLAUDEBOT)
-    await visit(`/${MARK}-range`, CLAUDEBOT, { headers: { 'CF-Connecting-IP': '203.0.113.9' } })
+    // ── D  address ranges, shipped with the plugin ─────────────────────────
+    console.log('\n== D  published address ranges, included with the plugin ==')
+    const cfg = c.json?.config ?? {}
+    check(/^[0-9a-f]{12}$/.test(cfg.version ?? '') && /^\d{4}-\d{2}-\d{2}$/.test(cfg.updated ?? '') && cfg.prefixes > 100 && cfg.proxies > 0,
+      `the ranges come from the plugin itself, no account needed (${JSON.stringify(cfg)})`)
+    const noPush = await api('/rankxai/v1/crawlers/config', { method: 'PUT', body: JSON.stringify({ version: 'v1', bots: [{ id: 'gptbot', tokens: ['GPTBot'], prefixes: ['0.0.0.0/0'] }] }) })
+    check(noPush.status === 404, `nothing can push crawler ranges any more (${noPush.status})`)
+    const inRange = (remote, cf = '') => evalPhp(`$_SERVER["REMOTE_ADDR"] = "${remote}"; ${cf ? `$_SERVER["HTTP_CF_CONNECTING_IP"] = "${cf}";` : 'unset( $_SERVER["HTTP_CF_CONNECTING_IP"] );'} echo RankXAI_Crawlers::address_in_range( "gptbot" ) ? "in" : "out";`)
+    const gptAddr = evalPhp('$r = RankXAI_Crawlers::ranges(); echo explode( "/", $r["bots"]["gptbot"][0] )[0];')
+    const cfAddr = evalPhp('$r = RankXAI_Crawlers::ranges(); foreach ( $r["proxies"] as $p ) { if ( false === strpos( $p, ":" ) ) { echo explode( "/", $p )[0]; break; } }')
+    check(inRange(gptAddr) === 'in', `an address in OpenAI's published GPTBot range is confirmed (${gptAddr})`)
+    check(inRange('198.51.100.7') === 'out', 'CONTROL — an address outside it is not')
+    check(inRange('198.51.100.7', gptAddr) === 'out', 'CF-Connecting-IP is ignored when the connection is not from Cloudflare')
+    check(inRange(cfAddr, gptAddr) === 'in', `from a Cloudflare address (${cfAddr}), the forwarded address is checked`)
+    check(inRange(cfAddr, 'not-an-ip') === 'out', 'a forwarded value that is not an address is not')
+    wp('option', 'update', 'rankxai_crawler_tokens', '{"bots":{"probebot":["RxProbeBot"]}}', '--format=json')
+    wp('option', 'update', 'rankxai_crawler_ranges', '{"bots":{"gptbot":["0.0.0.0/0"]}}', '--format=json')
+    evalPhp('RankXAI_Lifecycle::ensure_options();')
+    check(wpSoft('option', 'get', 'rankxai_crawler_tokens') === null && wpSoft('option', 'get', 'rankxai_crawler_ranges') === null,
+      'a list stored by an earlier version is removed on upgrade')
     await visit(`/${MARK}-range`, 'Mozilla/5.0 (compatible; RxProbeBot/1.0)')
-    await visit(`/${MARK}-range`, BYTESPIDER)
     c = await readCounts()
-    check(rowsFor(c.json, 'gptbot', `/${MARK}-range`)[0]?.inRange === true, 'an address inside a pushed range is counted in range')
-    check(rowsFor(c.json, 'claudebot', `/${MARK}-range`).every((r) => r.inRange === false) && hitsOf(rowsFor(c.json, 'claudebot', `/${MARK}-range`)) === 2,
-      'outside the range it is not — and CF-Connecting-IP is IGNORED with no trusted proxy')
-    check(hitsOf(rowsFor(c.json, 'probebot', `/${MARK}-range`)) === 1, 'a crawler added by the push is counted')
-    check(rowsFor(c.json, 'bytespider', `/${MARK}-range`).length === 0, 'a crawler the push left out is no longer counted — the pushed list replaces the default')
+    check(rowsFor(c.json, 'probebot', `/${MARK}-range`).length === 0, 'and a crawler only that list named is no longer counted')
+    evalPhp(`RankXAI_Crawlers::count( gmdate( "Y-m-d" ), "gptbot", true, 200, "/${MARK}-range" );`)
 
-    await pushConfig({ ...good, proxies: [ALL4, ALL6] })
-    await visit(`/${MARK}-cf`, CLAUDEBOT, { headers: { 'CF-Connecting-IP': '203.0.113.9' } })
-    await visit(`/${MARK}-cf`, CLAUDEBOT, { headers: { 'CF-Connecting-IP': '198.51.100.1' } })
-    await visit(`/${MARK}-cf`, CLAUDEBOT, { headers: { 'CF-Connecting-IP': 'not-an-ip' } })
-    c = await readCounts()
-    const cf = rowsFor(c.json, 'claudebot', `/${MARK}-cf`)
-    check(cf.find((r) => r.inRange)?.hits === 1, 'from a trusted proxy, a forwarded address in range is counted in range')
-    check(hitsOf(cf.filter((r) => !r.inRange)) === 2, 'a forwarded address out of range, or not an address at all, is not')
-
-    // ── E  who may read and push ──────────────────────────────────────────
+    // ── E  who may read ──────────────────────────────────────────
     console.log('\n== E  permissions ==')
     check((await readCounts.call(null)).status === 200, 'CONTROL — the administrator reads')
     const edRead = await api('/rankxai/v1/crawlers', { method: 'GET' }, EDITOR)
-    const edPush = await pushConfig(good, EDITOR)
     const anonRead = await api('/rankxai/v1/crawlers', { method: 'GET' }, '')
-    const anonPush = await pushConfig(good, '')
-    check(edRead.status === 403 && edPush.status === 403, `an editor is refused (${edRead.status}, ${edPush.status})`)
-    check(anonRead.status === 401 && anonPush.status === 401, `an anonymous request is refused (${anonRead.status}, ${anonPush.status})`)
+    check(edRead.status === 403, `an editor is refused (${edRead.status})`)
+    check(anonRead.status === 401, `an anonymous request is refused (${anonRead.status})`)
     const noSwitch = await api('/rankxai/v1/crawlers', { method: 'PUT', body: JSON.stringify({ enabled: false }) })
     check(noSwitch.status === 404 && (await readCounts()).json?.enabled === true, `there is no remote switch (${noSwitch.status})`)
     const badSince = await readCounts('&since=yesterday')
@@ -278,8 +241,7 @@ async function run() {
     const perUpd = cost.updateMs / 500
     console.log(`        measured: a new address ${perNew.toFixed(3)} ms per visit (insert + cap check), a repeat visit ${perUpd.toFixed(3)} ms (one upsert), over ${cost.inserted} and 500 writes`)
     check(perUpd < 20 && perNew < 40, 'a counted visit costs milliseconds, not more')
-    await visit(`/${MARK}-over-cap`, 'Mozilla/5.0 (compatible; RxProbeBot/1.0)')
-    await visit(`/${MARK}-over-cap-2`, 'Mozilla/5.0 (compatible; RxProbeBot/1.0)')
+    evalPhp(`$d = gmdate("Y-m-d"); RankXAI_Crawlers::count($d, "probebot", false, 404, "/${MARK}-over-cap"); RankXAI_Crawlers::count($d, "probebot", false, 404, "/${MARK}-over-cap-2");`)
     const all = []
     for (let off = 0; ; off += 2000) {
       const page = await readCounts(`&offset=${off}&limit=2000`)

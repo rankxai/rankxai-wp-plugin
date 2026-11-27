@@ -37,8 +37,8 @@ class RankXAI_Connector {
 	/** How long an opened approval screen stays usable. */
 	const REQUEST_TTL = 30 * MINUTE_IN_SECONDS;
 
-	/** Redirection plugin actions the connector may use: list, add and delete redirects. */
-	const REDIRECTION_CAPS = array( 'redirection_cap_redirect_manage', 'redirection_cap_redirect_add', 'redirection_cap_redirect_delete' );
+	/** Redirection plugin actions the connector may use: listing redirects only. */
+	const REDIRECTION_CAPS = array( 'redirection_cap_redirect_manage' );
 
 	/**
 	 * Hooks.
@@ -408,7 +408,8 @@ class RankXAI_Connector {
 	}
 
 	/**
-	 * WooCommerce: the connector may read store settings and system status, and manage its own product webhooks.
+	 * WooCommerce: the connector may read store settings and system status. It cannot
+	 * change settings or webhooks: this plugin reports product changes itself.
 	 *
 	 * @param bool   $permission Permission so far.
 	 * @param string $context    'read', 'create', 'edit', 'delete' or 'batch'.
@@ -423,12 +424,12 @@ class RankXAI_Connector {
 		if ( in_array( $type, array( 'settings', 'system_status' ), true ) ) {
 			return 'read' === $context;
 		}
-		// The Application Password's allow list limits webhooks to RankX AI's own product webhooks.
-		return 'webhooks' === $type;
+		return $permission;
 	}
 
 	/**
-	 * The Redirection plugin: the connector may list, add and delete redirects.
+	 * The Redirection plugin: the connector may list redirects. Only the site's
+	 * administrator adds or removes one, in wp-admin.
 	 *
 	 * @param string $cap      Capability Redirection will check.
 	 * @param string $cap_name The Redirection action.

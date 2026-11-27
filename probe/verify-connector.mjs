@@ -146,17 +146,7 @@ try {
   if (product.json?.id) cleanup.push(['post', product.json.id])
   check('read store system status', ok(await call('GET', '/wc/v3/system_status', null, '&_fields=environment')))
   check('read store settings', ok(await call('GET', '/wc/v3/settings/general')))
-  const hook = await call('POST', '/wc/v3/webhooks', { topic: 'product.updated', delivery_url: 'https://app.rankxai.com/api/webhooks/woocommerce?probe=1', status: 'paused' })
-  check('create its own product webhook', hook.status === 201, `${hook.status} ${hook.code ?? ''}`)
-  if (hook.json?.id) {
-    check('read its own webhook', ok(await call('GET', `/wc/v3/webhooks/${hook.json.id}`)))
-    check('delete its own webhook', ok(await call('DELETE', `/wc/v3/webhooks/${hook.json.id}`, null, '&force=true')))
-  }
   check('list redirects (Redirection)', ok(await call('GET', '/redirection/v1/redirect')))
-  const red = await call('POST', '/redirection/v1/redirect', { url: '/connector-probe-old', action_data: { url: '/connector-probe-new' }, action_type: 'url', match_type: 'url', group_id: 1, regex: false })
-  check('add a plain redirect (Redirection)', ok(red), `${red.status} ${red.code ?? ''}`)
-  const redId = (red.json?.items ?? []).find((i) => i.url === '/connector-probe-old')?.id
-  if (redId) check('delete it (Redirection)', ok(await call('POST', '/redirection/v1/bulk/redirect/delete', { items: [redId] })))
 
   console.log('What the user cannot do')
   check('read site settings', denied(await call('GET', '/wp/v2/settings')))
@@ -170,6 +160,10 @@ try {
   check('list users while the switch is off', denied(await call('GET', '/wp/v2/users')))
   check('change store settings', denied(await call('PUT', '/wc/v3/settings/general/woocommerce_store_city', { value: 'x' })))
   check('list every webhook', denied(await call('GET', '/wc/v3/webhooks')))
+  check('create a product webhook, even to RankX AI', denied(await call('POST', '/wc/v3/webhooks', { topic: 'product.updated', delivery_url: 'https://app.rankxai.com/api/webhooks/woocommerce?probe=1', status: 'paused' })))
+  check('add a redirect (Redirection)', denied(await call('POST', '/redirection/v1/redirect', { url: '/connector-probe-old', action_data: { url: '/connector-probe-new' }, action_type: 'url', match_type: 'url', group_id: 1, regex: false })))
+  check('delete redirects (Redirection)', denied(await call('POST', '/redirection/v1/bulk/redirect/delete', { items: [1] })))
+  check('add a redirect through the plugin', (await call('POST', '/rankxai/v1/admin/redirects', { from: '/connector-probe-old', to: '/' })).status === 403)
   check('change Redirection settings', denied(await call('POST', '/redirection/v1/setting', { expire_redirect: 1 })))
   check('delete a post permanently', denied(await call('DELETE', `/wp/v2/posts/${post.json?.id}`, null, '&force=true')))
 

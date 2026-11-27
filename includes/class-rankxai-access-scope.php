@@ -117,10 +117,10 @@ class RankXAI_Access_Scope {
 		if ( self::is_personal( $method, $route, $request ) && ! self::personal_data_allowed() ) {
 			return __( 'Customer, order, user and comment data is off for RankX AI on this site. The site owner can allow it in RankX AI › Settings.', 'rankxai' );
 		}
-		if ( 'DELETE' === $method && rest_sanitize_boolean( $request->get_param( 'force' ) ) && ! preg_match( '#^/wc/v\d+/webhooks/\d+$#', $route ) ) {
+		if ( 'DELETE' === $method && rest_sanitize_boolean( $request->get_param( 'force' ) ) ) {
 			return __( 'RankX AI only moves things to the trash; it cannot delete them permanently.', 'rankxai' );
 		}
-		if ( self::allowed( $method, $route, $read, $request ) ) {
+		if ( self::allowed( $route, $read ) ) {
 			return '';
 		}
 		return __( 'RankX AI’s connection is not allowed to use this part of the site.', 'rankxai' );
@@ -147,25 +147,17 @@ class RankXAI_Access_Scope {
 	/**
 	 * The allow list.
 	 *
-	 * @param string          $method  HTTP method.
-	 * @param string          $route   Normalised route.
-	 * @param bool            $read    Whether the method only reads.
-	 * @param WP_REST_Request $request Request.
+	 * @param string $route Normalised route.
+	 * @param bool   $read  Whether the method only reads.
 	 * @return bool
 	 */
-	private static function allowed( $method, $route, $read, $request ) {
+	private static function allowed( $route, $read ) {
 		// This plugin's own routes check their own capabilities.
 		if ( preg_match( '#^/rankxai/v1(/|$)#', $route ) ) {
 			return true;
 		}
-		// The Redirection plugin's API: list, add a plain redirect between two paths on this site, remove one.
+		// The Redirection plugin's API: reading only. Redirects are changed by the site's administrator, in wp-admin.
 		if ( preg_match( '#^/redirection/v1/(redirect|group)$#', $route ) && $read ) {
-			return true;
-		}
-		if ( '/redirection/v1/redirect' === $route && 'POST' === $method ) {
-			return self::plain_redirect( $request );
-		}
-		if ( '/redirection/v1/bulk/redirect/delete' === $route && 'POST' === $method ) {
 			return true;
 		}
 		if ( $read && self::readable( $route ) ) {
@@ -176,9 +168,6 @@ class RankXAI_Access_Scope {
 		}
 		if ( preg_match( '#^/wc/v\d+/products(/|$)#', $route ) && ! preg_match( '#/batch$#', $route ) ) {
 			return true;
-		}
-		if ( preg_match( '#^/wc/v\d+/webhooks(/(\d+))?$#', $route, $m ) ) {
-			return self::own_webhook( $method, isset( $m[2] ) ? (int) $m[2] : 0, $request );
 		}
 		return false;
 	}
@@ -227,56 +216,6 @@ class RankXAI_Access_Scope {
 			}
 		}
 		return in_array( $m[1], array_map( 'strtolower', $bases ), true );
-	}
-
-	/**
-	 * A Redirection rule is allowed only as a plain redirect from one path on this site to another.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return bool
-	 */
-	private static function plain_redirect( $request ) {
-		$data = $request->get_param( 'action_data' );
-		$to   = is_array( $data ) && isset( $data['url'] ) ? $data['url'] : null;
-		$path = '#^/(?![/\\\\])#';
-		return ! rest_sanitize_boolean( $request->get_param( 'regex' ) )
-			&& in_array( $request->get_param( 'match_type' ), array( null, 'url' ), true )
-			&& 'url' === $request->get_param( 'action_type' )
-			&& is_string( $request->get_param( 'url' ) ) && preg_match( $path, $request->get_param( 'url' ) )
-			&& is_string( $to ) && preg_match( $path, $to );
-	}
-
-	/**
-	 * A webhook write is allowed only for product topics delivering to RankX AI, and only on RankX AI's own webhooks.
-	 *
-	 * @param string          $method  HTTP method.
-	 * @param int             $id      Webhook ID, or 0 when creating.
-	 * @param WP_REST_Request $request Request.
-	 * @return bool
-	 */
-	private static function own_webhook( $method, $id, $request ) {
-		$ours = RankXAI_App_Client::APP_ORIGIN . '/api/webhooks/woocommerce';
-		if ( $id > 0 ) {
-			$existing = function_exists( 'wc_get_webhook' ) ? wc_get_webhook( $id ) : null;
-			if ( ! $existing || 0 !== strpos( (string) $existing->get_delivery_url(), $ours ) ) {
-				return false;
-			}
-			if ( 'DELETE' === $method || 'GET' === $method || 'HEAD' === $method ) {
-				return true;
-			}
-		}
-		$url   = $request->get_param( 'delivery_url' );
-		$topic = $request->get_param( 'topic' );
-		if ( null !== $url && 0 !== strpos( (string) $url, $ours ) ) {
-			return false;
-		}
-		if ( null !== $topic && 0 !== strpos( (string) $topic, 'product.' ) ) {
-			return false;
-		}
-		if ( 'POST' !== $method && $id <= 0 ) {
-			return false;
-		}
-		return $id > 0 || ( null !== $url && null !== $topic );
 	}
 
 	/**

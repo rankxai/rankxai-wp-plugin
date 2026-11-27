@@ -46,7 +46,7 @@ const WRITER = '__writer__';
 let seq = 0;
 const newKey = () => `s${++seq}`;
 const shownPoint = (k: string) => k.replace(/\s*\[[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]/gi, '').trim();
-export function BlogPlanPage({ briefId }: {
+export function BlogOutlinePage({ briefId }: {
     briefId: string;
 }) {
     const load = useLoad<{

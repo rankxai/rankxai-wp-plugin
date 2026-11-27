@@ -136,10 +136,6 @@ function treeFor(target, store) {
     // The icons are only shown by the updater; the directory has its own.
     if (target === 'wporg') {
       for (const file of [UPDATER, ...UPDATER_ICONS]) execFileSync('git', ['update-index', '--force-remove', file], { env })
-      // The store app's source and build tools live in the public repository, linked from the readme.
-      const source = execFileSync('git', ['ls-files', '-z', STORE_SRC], { env, encoding: 'utf8' }).split('\0').filter(Boolean)
-      if (!source.length) throw new Error(`${STORE_SRC} is not in the tree`)
-      for (const file of source) execFileSync('git', ['update-index', '--force-remove', file], { env })
     }
     return execFileSync('git', ['write-tree'], { env, encoding: 'utf8' }).trim()
   } finally {
@@ -215,12 +211,11 @@ for (const file of PHP_WITH_BLOCKS) {
   }
 }
 
-// Both targets carry the store app's build and asset map. Only the github build carries its source;
-// the WordPress.org build points to the public repository in the readme instead.
-const storeNeeded = [`${SLUG}/${ASSET_MAP}`, `${SLUG}/${store.entry}`]
-if (TARGET === 'github') storeNeeded.push(`${SLUG}/${STORE_SRC}/package.json`, `${SLUG}/${STORE_SRC}/${STORE_ENTRY}`)
+// Both targets carry the store app's build, its asset map AND its source with the build tools'
+// configuration (guideline 4: the source is in the plugin, as well as in the public repository).
+const storeNeeded = [`${SLUG}/${ASSET_MAP}`, `${SLUG}/${store.entry}`, `${SLUG}/${STORE_SRC}/package.json`, `${SLUG}/${STORE_SRC}/${STORE_ENTRY}`]
 const storeMissing = storeNeeded.filter((n) => !names.includes(n))
-const leaked = names.filter((n) => n.includes('/.vite/') || n.includes('/node_modules/') || n.startsWith(`${SLUG}/${STORE_SRC}/dist/`) || (TARGET === 'wporg' && n.startsWith(`${SLUG}/${STORE_SRC}/`)))
+const leaked = names.filter((n) => n.includes('/.vite/') || n.includes('/node_modules/') || n.startsWith(`${SLUG}/${STORE_SRC}/dist/`))
 if (storeMissing.length || leaked.length) {
   console.error(`${TARGET} build: store app ${storeMissing.length ? `missing ${storeMissing.join(', ')}` : ''}${leaked.length ? ` carries ${leaked.slice(0, 3).join(', ')}` : ''}`)
   process.exit(1)

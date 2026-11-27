@@ -153,6 +153,11 @@ class RankXAI_Documents {
 			);
 		}
 
+		// Served only once the site owner switches it on in Settings.
+		if ( ! RankXAI_Generate::switched_on( $slug ) ) {
+			return $none;
+		}
+
 		$stored = self::get( $slug );
 		if ( null !== $stored && '' !== $stored['content'] ) {
 			return array(

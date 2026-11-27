@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * Checks redirects in the plugin's own store and through Rank Math, the 404-only
- * rule, cache purges, the settings screen and uninstall.
+ * rule, cache purges, the settings screen and uninstall; that the connection can
+ * only read redirects; and that the site's administrator, signed in to wp-admin,
+ * adds and removes them through the browser-only routes.
  *
  * Run:  node probe/verify-redirects.mjs      (wp-env must be running)
  */
@@ -63,9 +65,35 @@ async function follow(path) {
   return { status: res.status, location: res.headers.get('location') ?? '', by: res.headers.get('x-redirect-by') ?? '' }
 }
 
-const create = (body) => api('/rankxai/v1/redirects', { method: 'POST', body: JSON.stringify(body) })
+const b64 = (v) => Buffer.from(JSON.stringify(v)).toString('base64')
+/** A fixture redirect, written through the plugin's own PHP: no remote route writes one any more. */
+function create(body) {
+  const out = JSON.parse(evalPhp(`$b = json_decode( base64_decode( '${b64(body)}' ), true ); $r = RankXAI_Redirects::create( $b['backend'], $b['from'], $b['to'], (int) $b['code'] ); $p = '' === $r['error'] ? RankXAI_Redirects::purge( RankXAI_Redirects::normalise( $b['from'] ) ) : array(); echo wp_json_encode( array( 'item' => $r['item'], 'error' => $r['error'], 'purged' => $p ) );`))
+  return { status: out.error === '' ? 200 : 409, json: { item: out.item, code: out.error ? `rankxai_redirect_${out.error}` : null, purged: out.purged } }
+}
 const list = (from = '') => api('/rankxai/v1/redirects', { method: 'GET' }, AUTH, from ? `&from=${encodeURIComponent(from)}` : '')
-const remove = (backend, id) => api(`/rankxai/v1/redirects/${backend}/${id}`, { method: 'DELETE' })
+/** Remove a fixture through the plugin's own PHP, as `create`. */
+function remove(backend, id) {
+  const out = JSON.parse(evalPhp(`$r = RankXAI_Redirects::delete( '${backend}', '${id}' ); $p = '' === $r['error'] && '' !== $r['from'] ? RankXAI_Redirects::purge( $r['from'] ) : array(); echo wp_json_encode( array( 'from' => $r['from'], 'error' => $r['error'], 'purged' => $p, 'remaining' => '' === $r['from'] ? array() : RankXAI_Redirects::items( $r['from'] )['items'] ) );`))
+  return { status: out.error === '' ? 200 : out.error === 'not_found' ? 404 : 409, json: out }
+}
+
+/** A cookie-signed-in browser call to a plugin route, with the REST nonce a wp-admin page carries. */
+async function browser(cookie, route, body, nonce) {
+  const res = await http(`${BASE}/?rest_route=${encodeURIComponent(route)}`, {
+    method: 'POST',
+    headers: { Cookie: cookie, 'Content-Type': 'application/json', ...(nonce ? { 'X-WP-Nonce': nonce } : {}) },
+    body: JSON.stringify(body),
+  })
+  let json = null
+  try { json = await res.json() } catch { json = null }
+  return { status: res.status, json }
+}
+/** The REST nonce wp-admin hands a signed-in user. */
+async function restNonce(cookie) {
+  const res = await http(`${BASE}/wp-admin/admin-ajax.php?action=rest-nonce`, { headers: { Cookie: cookie } })
+  return (await res.text()).trim()
+}
 
 const RM_CONFIG = 'echo json_encode(array("skip" => get_option("rank_math_registration_skip"), "modules" => get_option("rank_math_modules")));'
 
@@ -127,24 +155,6 @@ async function run() {
     const dup = await create({ backend: 'own_store', from, to: '/', code: 301 })
     check(dup.status === 409 && dup.json?.code === 'rankxai_redirect_exists', 'a second redirect for the same source is refused 409')
 
-    const SHAPES = [
-      ['//evil.example/x', 'protocol-relative source'],
-      ['http://evil.example/x', 'absolute source'],
-      ['/has space', 'source with a space'],
-      ['/q?x=1', 'source with a query'],
-      [`/${String.fromCharCode(92)}evil`, 'source with a backslash'],
-    ]
-    for (const [bad0, label] of SHAPES) {
-      const r = await create({ backend: 'own_store', from: bad0, to: '/', code: 301 })
-      check(r.status === 400, `refused 400: ${label}`)
-    }
-    const badTo = await create({ backend: 'own_store', from: `/${MARK}-x`, to: 'https://evil.example/', code: 301 })
-    check(badTo.status === 400, 'refused 400: an absolute target (targets are root-relative only)')
-    const badCode = await create({ backend: 'own_store', from: `/${MARK}-x`, to: '/', code: 307 })
-    check(badCode.status === 400, 'refused 400: a status other than 301/302')
-    const badBackend = await create({ backend: 'redirection', from: `/${MARK}-x`, to: '/', code: 301 })
-    check(badBackend.status === 400, 'refused 400: the Redirection plugin is never written through this route')
-
     const asEditor = await api('/rankxai/v1/redirects', { method: 'GET' }, EDITOR)
     check(asEditor.status === 403, `an editor is refused (${asEditor.status})`)
     const anon = await api('/rankxai/v1/redirects', { method: 'GET' }, '')
@@ -155,8 +165,18 @@ async function run() {
     check(Array.isArray(c1.json?.purged) && c1.json.purged.includes('litespeed'), `create reported the cache it asked (${JSON.stringify(c1.json?.purged)})`)
     const purgedOnCreate = JSON.parse(wpSoft('option', 'get', 'rankxai_probe_purged', '--format=json') ?? '[]')
     check(purgedOnCreate.some((u) => u.endsWith(from)), `the purge named the source URL (${purgedOnCreate.at(-1)})`)
-    const p1 = await api('/rankxai/v1/redirects/purge', { method: 'POST', body: JSON.stringify({ path: '/anything' }) })
-    check(p1.status === 200 && p1.json?.purged?.includes('litespeed'), 'the purge-only route works for a redirect written elsewhere')
+
+    // ── I  the connection reads redirects and never changes one ───────────
+    console.log('\n== I  the connection cannot change redirects ==')
+    check(st0.json?.writes === 'site_admin', `GET /redirects says only the site's administrator changes them (${st0.json?.writes})`)
+    const remoteCreate = await api('/rankxai/v1/redirects', { method: 'POST', body: JSON.stringify({ backend: 'own_store', from: `/${MARK}-remote`, to: '/', code: 301 }) })
+    const remoteDelete = await api(`/rankxai/v1/redirects/own_store/${id}`, { method: 'DELETE' })
+    const remotePurge = await api('/rankxai/v1/redirects/purge', { method: 'POST', body: JSON.stringify({ path: '/anything' }) })
+    check(remoteCreate.status === 404 && remoteDelete.status === 404 && remotePurge.status === 404,
+      `no remote route adds, removes or purges (${remoteCreate.status}, ${remoteDelete.status}, ${remotePurge.status})`)
+    const viaPassword = await api('/rankxai/v1/admin/redirects', { method: 'POST', body: JSON.stringify({ from: `/${MARK}-remote`, to: '/sample-page/' }) })
+    check(viaPassword.status === 403 && viaPassword.json?.code === 'rankxai_browser_only', `an administrator's Application Password is refused the browser-only route (${viaPassword.status} ${viaPassword.json?.code})`)
+    check((await list(`/${MARK}-remote`)).json?.items?.length === 0, 'and nothing was added')
 
     // ── A (cont.)  delete ─────────────────────────────────────────────────
     const d1 = await remove('own_store', id)
@@ -272,6 +292,46 @@ async function run() {
     const real = await adminPost(jar, { action: 'rankxai_delete_redirect', rankxai_redirect_id: ownId, _wpnonce: nonce })
     check(real.status === 302 && (real.location ?? '').includes('rankxai-redirect-removed=1'), `Remove redirects back with a notice (${real.status})`)
     check((await list(`/${MARK}-screen`)).json?.items?.length === 0, 'and the redirect is gone')
+
+    // ── J  the site's administrator, in wp-admin ──────────────────────────
+    console.log("\n== J  the site's administrator adds and removes redirects in the browser ==")
+    wpSoft('plugin', 'deactivate', 'seo-by-rank-math', 'redirection')
+    const adminJar = await login('admin', 'password')
+    const adminNonce = await restNonce(adminJar)
+    check(/^[a-f0-9]{10}$/.test(adminNonce), 'CONTROL — wp-admin hands the administrator a REST nonce')
+    const localFrom = `/${MARK}-local`
+    const noNonce = await browser(adminJar, '/rankxai/v1/admin/redirects', { from: localFrom, to: '/sample-page/' }, '')
+    check(noNonce.status === 401 || noNonce.status === 403, `a cookie without the page's nonce is refused (${noNonce.status})`)
+    const subNonceJar = await login(`${MARK}-sub`, 'probe-sub-pass')
+    const asSubscriber = await browser(subNonceJar, '/rankxai/v1/admin/redirects', { from: localFrom, to: '/sample-page/' }, await restNonce(subNonceJar))
+    check(asSubscriber.status === 403, `a signed-in subscriber is refused (${asSubscriber.status})`)
+    const liveSource = await browser(adminJar, '/rankxai/v1/admin/redirects', { from: '/sample-page/', to: '/' }, adminNonce)
+    check(liveSource.status === 409 && liveSource.json?.data?.field === 'path', `a live page is never redirected (${liveSource.status} ${liveSource.json?.data?.field})`)
+    const offSite = await browser(adminJar, '/rankxai/v1/admin/redirects', { from: localFrom, to: 'https://evil.example/' }, adminNonce)
+    check(offSite.status === 409 && offSite.json?.data?.field === 'target', `a target off the site is refused (${offSite.status})`)
+    const added = await browser(adminJar, '/rankxai/v1/admin/redirects', { from: localFrom, to: '/sample-page/' }, adminNonce)
+    check(added.status === 201 && /^own_store:[a-z0-9]+$/.test(added.json?.id ?? ''), `the administrator adds one (${added.status} ${added.json?.id})`)
+    const servedLocal = await follow(localFrom)
+    check(servedLocal.status === 301 && servedLocal.location === '/sample-page/', `and it serves (${servedLocal.status} → ${servedLocal.location})`)
+    const again = await browser(adminJar, '/rankxai/v1/admin/redirects', { from: localFrom, to: '/' }, adminNonce)
+    check(again.status === 409, `a second one for the same address is refused: it no longer answers "not found" (${again.status})`)
+    const removed = await browser(adminJar, '/rankxai/v1/admin/redirects/delete', { id: added.json?.id ?? '' }, adminNonce)
+    check(removed.status === 200, `the administrator removes it (${removed.status})`)
+    check((await follow(localFrom)).status === 404, 'and the address answers "not found" again')
+    const removedTwice = await browser(adminJar, '/rankxai/v1/admin/redirects/delete', { id: added.json?.id ?? '' }, adminNonce)
+    check(removedTwice.status === 404, `removing it again is a 404, not a pretend success (${removedTwice.status})`)
+    const badId = await browser(adminJar, '/rankxai/v1/admin/redirects/delete', { id: 'nope' }, adminNonce)
+    check(badId.status === 400, `an id that is not one is refused (${badId.status})`)
+
+    wp('plugin', 'activate', 'redirection')
+    const redFrom = `/${MARK}-red`
+    const viaRed = await browser(adminJar, '/rankxai/v1/admin/redirects', { from: redFrom, to: '/sample-page/' }, adminNonce)
+    check(viaRed.status === 201 && /^redirection:\d+$/.test(viaRed.json?.id ?? ''), `with Redirection active it goes into Redirection (${viaRed.status} ${viaRed.json?.id})`)
+    const servedRed = await follow(redFrom)
+    check(servedRed.status === 301 && servedRed.by.toLowerCase().includes('redirection'), `Redirection serves it (${servedRed.status}, ${servedRed.by})`)
+    const removedRed = await browser(adminJar, '/rankxai/v1/admin/redirects/delete', { id: viaRed.json?.id ?? '' }, adminNonce)
+    check(removedRed.status === 200 && (await follow(redFrom)).status === 404, `and is removed from Redirection (${removedRed.status})`)
+    wp('plugin', 'deactivate', 'redirection')
 
     // ── H  uninstall ──────────────────────────────────────────────────────
     console.log('\n== H  uninstall ==')

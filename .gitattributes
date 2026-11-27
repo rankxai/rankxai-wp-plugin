@@ -22,3 +22,4 @@
 *.webp binary
 /deploy-wporg.mjs  export-ignore
 /README.md          export-ignore
+/build-crawler-ranges.mjs export-ignore

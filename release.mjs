@@ -73,6 +73,11 @@ if (coAuthored) die(`the release commit carries "${coAuthored[0]}"; commits in t
 step('store app source matches the platform’s published source')
 run('node', ['sync-store-app.mjs', '--check'], { stdio: 'inherit' })
 
+// ── The crawler address ranges ────────────────────────────────────────────────
+// They ship in the plugin; a release refuses ranges more than 30 days old.
+step('crawler address ranges are current')
+run('node', ['build-crawler-ranges.mjs', '--check'], { stdio: 'inherit' })
+
 // ── Build and check ───────────────────────────────────────────────────────────
 step('build')
 run('node', ['build-zip.mjs'], { stdio: 'inherit' })

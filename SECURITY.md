@@ -36,12 +36,16 @@ If any of this is ever untrue, that is itself a vulnerability:
   View as AI) and, in the GitHub build only, a check for `rankxai-update.json` in this repository's
   latest release, carrying no site data. The download that check offers is built from the checked
   version number, never taken from that file, and always comes from this repository's releases.
-- **After connecting, it calls one host, `https://app.rankxai.com`, at two fixed paths**: a
-  ten-minute session for an administrator on the Store page, and the disconnect. Nothing it
-  receives is executed; the store app's HTML is sanitised before it is shown.
+- **After connecting, it calls one host, `https://app.rankxai.com`, at three fixed paths**: a
+  ten-minute session for an administrator on the Store page, the IDs of products that changed,
+  and the disconnect. Nothing it receives is executed; the store app's HTML is sanitised before
+  it is shown.
+- **RankX AI's connection cannot change how the site behaves**: it cannot add or remove
+  redirects, create webhooks, or publish llms.txt, agents.md or ai.txt the site owner has not
+  switched on. Redirects are changed only by a signed-in administrator in wp-admin.
 - **Disconnecting, deactivating or deleting it ends RankX AI's access** without RankX AI being
-  reachable: the site token, RankX AI's Application Passwords and its WooCommerce webhooks are
-  removed on the site itself.
+  reachable: the site token and RankX AI's user and Application Password are removed on the site
+  itself.
 
 ## Supported versions
 

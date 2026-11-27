@@ -19,7 +19,7 @@ const ProductImagesPage = lazy(() => PAGE_LOADERS['product-images']().then((m) =
 const ProductPage = lazy(() => PAGE_LOADERS.product().then((m) => ({ default: m.ProductPage })));
 const BlogPage = lazy(() => PAGE_LOADERS.blog().then((m) => ({ default: m.BlogPage })));
 const BlogWritePage = lazy(() => PAGE_LOADERS['blog-new']().then((m) => ({ default: m.BlogWritePage })));
-const BlogPlanPage = lazy(() => PAGE_LOADERS['blog-plan']().then((m) => ({ default: m.BlogPlanPage })));
+const BlogOutlinePage = lazy(() => PAGE_LOADERS['blog-plan']().then((m) => ({ default: m.BlogOutlinePage })));
 const ArticlePage = lazy(() => PAGE_LOADERS.article().then((m) => ({ default: m.ArticlePage })));
 const PlanPage = lazy(() => PAGE_LOADERS.plan().then((m) => ({ default: m.PlanPage })));
 const SettingsPage = lazy(() => PAGE_LOADERS.settings().then((m) => ({ default: m.SettingsPage })));
@@ -59,7 +59,7 @@ function Page() {
         case 'blog-new':
             return <BlogWritePage key={`${page.topic ?? ''}:${page.product?.num ?? ''}`} topic={page.topic} product={page.product ?? null}/>;
         case 'blog-plan':
-            return <BlogPlanPage key={page.briefId} briefId={page.briefId}/>;
+            return <BlogOutlinePage key={page.briefId} briefId={page.briefId}/>;
         case 'article':
             return <ArticlePage key={page.id} id={page.id}/>;
         case 'plan':

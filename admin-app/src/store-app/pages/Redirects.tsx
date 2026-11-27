@@ -8,7 +8,9 @@ import { ErrorBanner, act, useLoad, type PageError } from '../kit';
 import { BatchProgress, useBatch } from '../components/BatchProgress';
 import { useModal, type WriteResult } from '../components/FixModals';
 import { StatusBadge } from '../components/Status';
+import { addRedirect as writeRedirect, redirectsWrittenLocally, removeRedirect, type RedirectWriteResult } from '../redirect-writes';
 import * as UI from '../ui';
+const LOCAL_IMPORT_MAX = 100;
 interface Suggestion {
     id: string;
     path: string;
@@ -39,10 +41,20 @@ export function RedirectsSection({ setError }: {
     }) | null>(null);
     const fileRef = useRef<HTMLInputElement | null>(null);
     const [manual, setManual] = useState({ path: '', target: '' });
-    const [added, setAdded] = useState<(WriteResult & {
+    const [added, setAdded] = useState<(RedirectWriteResult & {
         path: string;
         target: string;
     }) | null>(null);
+    const local = redirectsWrittenLocally();
+    const [localImport, setLocalImport] = useState<{
+        done: number;
+        added: number;
+        failed: Array<{
+            path: string;
+            message: string;
+        }>;
+        total: number;
+    } | null>(null);
     const importModal = useModal('import');
     const [importError, setImportError] = useState<PageError | null>(null);
     const batch = useBatch(() => void list.reload());
@@ -81,6 +93,32 @@ export function RedirectsSection({ setError }: {
     async function importRows() {
         if (!csv || csv.rows.length === 0)
             return;
+        if (local) {
+            const rows = csv.rows.slice(0, LOCAL_IMPORT_MAX);
+            const progress = { done: 0, added: 0, failed: [] as Array<{
+                    path: string;
+                    message: string;
+                }>, total: rows.length };
+            setBusy('import');
+            setImportError(null);
+            importModal.hide();
+            setCsv(null);
+            setLocalImport({ ...progress });
+            for (const row of rows) {
+                const r = await writeRedirect(row.path, row.target);
+                progress.done++;
+                if (r.ok)
+                    progress.added++;
+                else
+                    progress.failed.push({ path: row.path, message: r.error ?? 'Not added.' });
+                setLocalImport({ ...progress, failed: [...progress.failed] });
+            }
+            setBusy(null);
+            if (progress.added > 0)
+                toastSuccess(`${fmtCount(progress.added, 'redirect', 'redirects')} added`);
+            void list.reload();
+            return;
+        }
         const r = await act(() => api('fixes/redirects/import', { method: 'POST', body: { rows: csv.rows } }), (b) => setBusy(b ? 'import' : null), setImportError);
         if (r.ok && batch.begin(r.data, 'apply')) {
             importModal.hide();
@@ -91,6 +129,16 @@ export function RedirectsSection({ setError }: {
         const target = (targets[s.id] ?? s.suggestedTarget ?? '').trim();
         if (!target)
             return;
+        if (local) {
+            const w = await act(() => writeRedirect(s.path, target), (b) => setBusy(b ? s.id : null), setError);
+            if (!w.ok)
+                return;
+            await api(`fixes/redirect-suggestions/${s.id}/resolved`, { method: 'POST' });
+            setHandled((h) => ({ ...h, [s.id]: 'redirected' }));
+            toastSuccess('Redirect added');
+            void list.reload();
+            return;
+        }
         const r = await act(() => api<WriteResult>(`fixes/redirect-suggestions/${s.id}/apply`, { method: 'POST', body: { target } }), (b) => setBusy(b ? s.id : null), setError);
         if (r.ok && r.data) {
             setHandled((h) => ({ ...h, [s.id]: r.data!.verified ? 'redirected' : 'unconfirmed' }));
@@ -103,19 +151,23 @@ export function RedirectsSection({ setError }: {
         const target = manual.target.trim();
         if (!path || !target)
             return;
-        const r = await act(() => api<WriteResult>('fixes/redirects', { method: 'POST', body: { path, target } }), (b) => setBusy(b ? 'add' : null), setError);
+        const r = await act(() => writeRedirect(path, target), (b) => setBusy(b ? 'add' : null), setError);
         if (r.ok && r.data) {
             setAdded({ ...r.data, path, target });
             setManual({ path: '', target: '' });
-            toastWrite(r.data.verified, 'Redirect created and confirmed', 'Redirect created');
+            if (local)
+                toastSuccess('Redirect added');
+            else
+                toastWrite(r.data.verified, 'Redirect created and confirmed', 'Redirect created');
             void list.reload();
         }
     }
     async function undoAdded() {
+        const localId = added?.localId;
         const changeId = added?.changeId;
-        if (!changeId)
+        if (!localId && !changeId)
             return;
-        const r = await act(() => api(`changes/${changeId}/undo`, { method: 'POST' }), (b) => setBusy(b ? 'undo:add' : null), setError);
+        const r = await act(() => (localId ? removeRedirect(localId) : api(`changes/${changeId}/undo`, { method: 'POST' })), (b) => setBusy(b ? 'undo:add' : null), setError);
         if (r.ok) {
             setAdded(null);
             toastSuccess('Redirect removed and confirmed');
@@ -193,7 +245,7 @@ export function RedirectsSection({ setError }: {
             {added ? (<UI.Stack direction="inline" gap="small-200" alignItems="center">
                 <StatusBadge status={added.verified ? 'saved' : 'saved_unconfirmed'}/>
                 <UI.Text color="subdued">{`${added.path} → ${added.target}`}</UI.Text>
-                {added.changeId ? (<UI.Button variant="tertiary" disabled={busy !== null || undefined} loading={busy === 'undo:add' || undefined} onClick={() => void undoAdded()}>
+                {added.changeId || added.localId ? (<UI.Button variant="tertiary" disabled={busy !== null || undefined} loading={busy === 'undo:add' || undefined} onClick={() => void undoAdded()}>
                     Undo
                   </UI.Button>) : null}
               </UI.Stack>) : null}
@@ -208,6 +260,14 @@ export function RedirectsSection({ setError }: {
               <input ref={fileRef} type="file" accept=".csv,text/csv" hidden aria-label="Import CSV" onChange={(e) => void readFile(e.currentTarget.files?.[0])}/>
             </UI.Stack>) : null}
           <BatchProgress handle={batch} setError={setError}/>
+          {localImport ? (<UI.Stack gap="small-100">
+              <UI.Text>
+                {localImport.done < localImport.total
+                ? `Adding redirects: ${fmtNumber(localImport.done)} of ${fmtNumber(localImport.total)}…`
+                : `${fmtCount(localImport.added, 'redirect', 'redirects')} added${localImport.failed.length ? `, ${fmtNumber(localImport.failed.length)} not added` : ''}.`}
+              </UI.Text>
+              {localImport.failed.slice(0, 10).map((f) => (<UI.Text key={f.path} color="subdued">{`${f.path}: ${f.message}`}</UI.Text>))}
+            </UI.Stack>) : null}
           {list.error ? (<UI.Paragraph>{list.error}</UI.Paragraph>) : !list.data ? (<UI.Text color="subdued">Reading your redirects…</UI.Text>) : list.data.redirects.length === 0 ? (<UI.EmptyState heading="No redirects yet">
               <UI.Paragraph>A redirect sends visitors from an old address to a page that exists. Add one above, or import a CSV.</UI.Paragraph>
             </UI.EmptyState>) : (<UI.Table variant="auto">
@@ -221,9 +281,9 @@ export function RedirectsSection({ setError }: {
                     <UI.TableCell>{r.path}</UI.TableCell>
                     <UI.TableCell>{r.target}</UI.TableCell>
                     <UI.TableCell>
-                      <UI.Button variant="tertiary" disabled={busy !== null || undefined} loading={busy === r.id || undefined} onClick={() => void act(() => api('fixes/redirects/delete', { method: 'POST', body: { redirectId: r.id } }), (b) => setBusy(b ? r.id : null), setError).then(async (res) => {
+                      <UI.Button variant="tertiary" disabled={busy !== null || undefined} loading={busy === r.id || undefined} onClick={() => void act(() => removeRedirect(r.id), (b) => setBusy(b ? r.id : null), setError).then(async (res) => {
                     if (res.ok) {
-                        toastSuccess('Redirect removed and confirmed');
+                        toastSuccess(local ? 'Redirect removed' : 'Redirect removed and confirmed');
                         await list.reload();
                     }
                 })}>
@@ -243,7 +303,9 @@ export function RedirectsSection({ setError }: {
             <UI.Paragraph>
               {csv.rows.length === 0
                 ? 'No redirect in this file can be imported.'
-                : `${fmtCount(csv.rows.length, 'redirect', 'redirects')} ready. Each is checked on your store after it is created, and the import can be undone as one.`}
+                : local
+                    ? `${fmtCount(Math.min(csv.rows.length, LOCAL_IMPORT_MAX), 'redirect', 'redirects')} will be added one by one, each only if its old address shows “page not found”.${csv.rows.length > LOCAL_IMPORT_MAX ? ` The first ${fmtNumber(LOCAL_IMPORT_MAX)} are imported; import the rest in another file.` : ''}`
+                    : `${fmtCount(csv.rows.length, 'redirect', 'redirects')} ready. Each is checked on your store after it is created, and the import can be undone as one.`}
             </UI.Paragraph>
             {csv.rows.length > 0 ? (<UI.Table variant="auto">
                 <UI.TableHeaderRow>

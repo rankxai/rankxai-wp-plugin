@@ -523,6 +523,34 @@ class RankXAI_Redirects {
 	}
 
 	/**
+	 * Delete a redirect from the Redirection plugin, through its own PHP classes.
+	 *
+	 * @param string $id Redirection's id for it.
+	 * @return array{from: string, error: string}
+	 */
+	public static function delete_in_redirection( $id ) {
+		if ( ! defined( 'REDIRECTION_VERSION' ) || ! class_exists( 'Red_Item' ) || ! method_exists( 'Red_Item', 'get_by_id' ) ) {
+			return array(
+				'from'  => '',
+				'error' => 'unavailable',
+			);
+		}
+		$item = ctype_digit( (string) $id ) ? \Red_Item::get_by_id( (int) $id ) : false;
+		if ( ! is_object( $item ) || ! method_exists( $item, 'delete' ) ) {
+			return array(
+				'from'  => '',
+				'error' => 'not_found',
+			);
+		}
+		$from = method_exists( $item, 'get_url' ) ? self::normalise( (string) $item->get_url() ) : '';
+		$item->delete();
+		return array(
+			'from'  => $from,
+			'error' => '',
+		);
+	}
+
+	/**
 	 * Delete a redirect by backend and id.
 	 *
 	 * @param string $backend 'rank_math' or 'own_store'.

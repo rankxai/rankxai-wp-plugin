@@ -362,11 +362,11 @@ class RankXAI_Pages {
 		);
 
 		if ( RankXAI_Generate::site_discourages_indexing() ) {
-			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site is set to discourage search engines (Settings → Reading), so nothing is generated here and markdown copies are not served. Anything published from a RankX AI account is still served.', 'rankxai' ) . '</p></div>';
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site is set to discourage search engines (Settings → Reading), so nothing is generated here and markdown copies are not served. A document you switched on below that RankX AI published is still served.', 'rankxai' ) . '</p></div>';
 		}
 		$coming_soon = RankXAI_Woo::coming_soon();
 		if ( 'site' === $coming_soon ) {
-			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Your site is in WooCommerce’s “Coming soon” mode, so nothing is generated here and markdown copies are not served until it is live. Anything published from a RankX AI account is still served.', 'rankxai' ) . '</p></div>';
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Your site is in WooCommerce’s “Coming soon” mode, so nothing is generated here and markdown copies are not served until it is live. A document you switched on below that RankX AI published is still served.', 'rankxai' ) . '</p></div>';
 		} elseif ( 'store' === $coming_soon ) {
 			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Your store is in WooCommerce’s “Coming soon” mode, so products and store pages get no markdown copy and are left out of llms.txt until the store is live.', 'rankxai' ) . '</p></div>';
 		}
@@ -377,10 +377,21 @@ class RankXAI_Pages {
 			$url   = home_url( '/' . $doc['path'] );
 
 			echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html( $doc['label'] ) . '</div><div>';
-			if ( in_array( $slug, $supported, true ) ) {
-				echo '<label class="rankxai-check"><input type="checkbox" name="rankxai_generate[' . esc_attr( $slug ) . ']" value="1" ' . checked( ! empty( $generated[ $slug ] ), true, false ) . ' /> <span>' . esc_html__( 'Generate it from the content on this site', 'rankxai' ) . '</span></label>';
-			}
-			echo '<p class="rankxai-field__hint">' . esc_html( self::describe_document( $state['source'] ) ) . '</p>';
+			echo '<label class="rankxai-check"><input type="checkbox" name="rankxai_generate[' . esc_attr( $slug ) . ']" value="1" ' . checked( ! empty( $generated[ $slug ] ), true, false ) . ' /> <span>' . esc_html(
+				sprintf(
+					/* translators: %s: the document's address, such as /llms.txt. */
+					__( 'Serve it at %s', 'rankxai' ),
+					'/' . $doc['path']
+				)
+			) . '</span></label>';
+			echo '<p class="rankxai-field__hint">' . esc_html(
+				in_array( $slug, $supported, true )
+					? __( 'Off by default. Once on, it serves what you publish from a RankX AI account, or else a copy generated from the content on this site.', 'rankxai' )
+					: __( 'Off by default. Once on, it serves what you publish from a RankX AI account.', 'rankxai' )
+			) . '</p>';
+			$held = RankXAI_Documents::get( $slug );
+			$kept = empty( $generated[ $slug ] ) && null !== $held && '' !== $held['content'];
+			echo '<p class="rankxai-field__hint">' . esc_html( $kept ? __( 'RankX AI published one, and it is kept here, but nothing is served until you tick the box.', 'rankxai' ) : self::describe_document( $state['source'] ) ) . '</p>';
 			if ( '' !== $state['content'] || 'file' === $state['source'] ) {
 				echo '<p class="rankxai-field__hint"><a href="' . esc_url( $url ) . '" target="_blank" rel="noopener">' . esc_html( $url ) . '</a></p>';
 			}

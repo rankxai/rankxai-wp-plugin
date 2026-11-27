@@ -178,10 +178,18 @@ async function run() {
     method: 'PUT',
     body: JSON.stringify({ content: '# Agents\n\nThis is the stored document.\n' }),
   })
+  const docNotOn = await raw('/agents.md')
+  docNotOn.status === 404
+    ? ok('OFF — a stored /agents.md is not served until the site owner switches it on')
+    : bad(`OFF — /agents.md answered ${docNotOn.status} while switched off`)
+  const docsBefore = await wpOption('rankxai_documents_local')
+  await wpExec(['option', 'update', 'rankxai_documents_local', '{"llms_txt":false,"agents_md":true,"ai_txt":false}', '--format=json'])
   const docOff = await raw('/agents.md')
   has(/This is the stored document/, docOff.body) && docOff.source === 'virtual-route'
-    ? ok('OFF — /agents.md serves the stored document')
+    ? ok('OFF — switched on, /agents.md serves the stored document')
     : bad(`OFF — /agents.md served source=${docOff.source} status=${docOff.status}`)
+  if (docsBefore === null) await wpExec(['option', 'delete', 'rankxai_documents_local'])
+  else await wpExec(['option', 'update', 'rankxai_documents_local', JSON.stringify(docsBefore), '--format=json'])
 
   const remote = await apiJson('/rankxai/v1/twins', { method: 'PUT', body: JSON.stringify({ enabled: true }) })
   remote.status === 403 && remote.json?.code === 'rankxai_twins_site_only'

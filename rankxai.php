@@ -100,6 +100,9 @@ add_action(
 		// Loaded everywhere so REST and cron product changes also clear the check.
 		require_once __DIR__ . '/includes/store/class-rankxai-product-check.php';
 		RankXAI_Product_Check::init();
+		// Loaded everywhere: a product changes in wp-admin, over REST and in cron.
+		require_once __DIR__ . '/includes/store/class-rankxai-product-events.php';
+		RankXAI_Product_Events::init();
 		if ( is_admin() ) {
 			require_once __DIR__ . '/includes/store/class-rankxai-store-admin.php';
 			require_once __DIR__ . '/includes/store/class-rankxai-product-panel.php';

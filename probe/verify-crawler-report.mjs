@@ -299,7 +299,7 @@ async function run() {
     check(after.includes('Counting since') && after.includes('No visits seen'), 'the page says when counting started, and "no visits seen" dates from it')
 
     // ── G ─────────────────────────────────────────────────────────────────
-    console.log('\n== G  the crawler-config contract ==')
+    console.log('\n== G  the crawler list and ranges ship with the plugin ==')
     const appPass = wp('user', 'application-password', 'create', 'admin', MARK, '--porcelain')
     const AUTH = 'Basic ' + Buffer.from(`admin:${appPass}`).toString('base64')
     const api = async (route, init = {}) => {
@@ -307,25 +307,12 @@ async function run() {
       return { status: res.status, json: await res.json().catch(() => null) }
     }
     const man = await api('/rankxai/v1/manifest')
-    check(man.json?.capabilities?.includes('crawlers.config.v2'), 'the manifest advertises crawlers.config.v2')
+    check(Array.isArray(man.json?.capabilities) && !man.json.capabilities.some((c) => c.startsWith('crawlers.config')), 'the manifest no longer offers a crawler-config push')
     const get0 = await api('/rankxai/v1/crawlers')
-    check(get0.json?.configShape === 2 && typeof get0.json?.countingSince === 'string', 'GET /crawlers says it reads config shape 2, and when counting started')
-    const v2 = { version: `v2-${MARK}`, bots: [{ id: 'gptbot', tokens: ['GPTBot'], prefixes: [], label: 'OpenAI training probe', purpose: 'training', group: 'ai' }], proxies: [] }
-    const p2 = await api('/rankxai/v1/crawlers/config', { method: 'PUT', body: JSON.stringify(v2) })
-    check(p2.status === 200 && evalPhp('echo RankXAI_Crawlers::meta( "gptbot" )["label"];') === 'OpenAI training probe', 'a labelled push is stored and its name is used')
-    const half = await api('/rankxai/v1/crawlers/config', { method: 'PUT', body: JSON.stringify({ version: 'v2-half', bots: [{ id: 'gptbot', tokens: ['GPTBot'], label: 'x' }] }) })
-    check(half.status === 400 && evalPhp('echo RankXAI_Crawlers::meta( "gptbot" )["label"];') === 'OpenAI training probe', `a half-labelled push is refused and changes nothing (${half.status})`)
-    const v1 = await api('/rankxai/v1/crawlers/config', { method: 'PUT', body: JSON.stringify({ version: `v1-${MARK}`, bots: [{ id: 'gptbot', tokens: ['GPTBot'], prefixes: [] }], proxies: [] }) })
-    check(v1.status === 200 && evalPhp('echo RankXAI_Crawlers::meta( "gptbot" )["label"];') === 'ChatGPT training', 'a shape-1 push still works, and the default name returns')
-    // An older release of the class, loaded under another name, given a labelled push.
-    const old = execFileSync('git', ['show', '53d5973:includes/class-rankxai-crawlers.php'], { cwd: ROOT, encoding: 'utf8' })
-      .replace('class RankXAI_Crawlers', 'class RankXAI_Crawlers_Released')
-      .replace(/^<\?php/, '')
-    // Through stdin into a file: the class is too long for a Windows command line.
-    execFileSync('docker', ['exec', '-i', '-u', '33', cliContainer(), 'sh', '-c', 'cat > /tmp/rankxai-released-crawlers.php'], { input: `<?php ${old}`, env })
-    const b64 = (s) => Buffer.from(s).toString('base64')
-    const oldOk = evalPhp(`require "/tmp/rankxai-released-crawlers.php"; $r = RankXAI_Crawlers_Released::save_config( json_decode( base64_decode( '${b64(JSON.stringify({ ...v2, version: 'v2-old' }))}' ), true ) ); echo is_wp_error( $r ) ? "refused" : "accepted";`)
-    check(oldOk === 'accepted', `the released 0.4.x class accepts a labelled push rather than refusing it (${oldOk})`)
+    check(get0.json?.configShape === 2 && typeof get0.json?.countingSince === 'string' && get0.json?.config?.prefixes > 100, 'GET /crawlers reports the shipped ranges and when counting started')
+    const push = await api('/rankxai/v1/crawlers/config', { method: 'PUT', body: JSON.stringify({ version: `v2-${MARK}`, bots: [{ id: 'gptbot', tokens: ['GPTBot'], prefixes: [], label: 'OpenAI training probe', purpose: 'training', group: 'ai' }], proxies: [] }) })
+    check(push.status === 404, `a push has nowhere to go (${push.status})`)
+    check(evalPhp('echo RankXAI_Crawlers::meta( "gptbot" )["label"];') === 'ChatGPT training', 'crawler names come from the plugin itself')
     wpSoft('user', 'application-password', 'delete', 'admin', '--all')
   } finally {
     for (const [o, v] of Object.entries(saved)) {

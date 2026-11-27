@@ -101,12 +101,14 @@ class RankXAI_Store_Admin {
 	 */
 	private static function render_app() {
 		$config = array(
-			'apiBase'    => RankXAI_App_Client::APP_ORIGIN . self::API_PATH,
-			'sessionUrl' => rest_url( RankXAI_REST::NAMESPACE_V1 . '/session' ),
-			'nonce'      => wp_create_nonce( 'wp_rest' ),
-			'pageUrl'    => admin_url( 'admin.php?page=' . self::PAGE ),
-			'adminUrl'   => admin_url(),
-			'locale'     => get_user_locale(),
+			'apiBase'      => RankXAI_App_Client::APP_ORIGIN . self::API_PATH,
+			'sessionUrl'   => rest_url( RankXAI_REST::NAMESPACE_V1 . '/session' ),
+			'nonce'        => wp_create_nonce( 'wp_rest' ),
+			'pageUrl'      => admin_url( 'admin.php?page=' . self::PAGE ),
+			'adminUrl'     => admin_url(),
+			'locale'       => get_user_locale(),
+			// Redirects are added and removed here, by the signed-in administrator.
+			'redirectsUrl' => rest_url( RankXAI_REST::NAMESPACE_V1 . '/admin/redirects' ),
 		);
 		echo '<div class="wrap"><h1 class="screen-reader-text">' . esc_html__( 'RankX AI', 'rankxai' ) . '</h1><hr class="wp-header-end">';
 		wp_print_inline_script_tag(

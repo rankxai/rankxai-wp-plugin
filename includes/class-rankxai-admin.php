@@ -262,7 +262,7 @@ class RankXAI_Admin {
 		}
 
 		$documents = array();
-		foreach ( RankXAI_Generate::supported() as $slug ) {
+		foreach ( array_keys( RankXAI_Documents::catalogue() ) as $slug ) {
 			$documents[ $slug ] = isset( $_POST['rankxai_generate'][ $slug ] );
 		}
 
@@ -418,10 +418,6 @@ class RankXAI_Admin {
 		$context = RankXAI_Twins::context();
 		if ( '' !== $context['updated'] ) {
 			$stamps[] = $context['updated'];
-		}
-		$config = RankXAI_Crawlers::config_summary();
-		if ( '' !== $config['updated'] ) {
-			$stamps[] = $config['updated'];
 		}
 		foreach ( RankXAI_Summary::all() as $summary ) {
 			$stamps[] = (string) $summary['receivedAt'];

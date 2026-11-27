@@ -252,8 +252,26 @@ class RankXAI_Redirect_Requests {
 		$request = $requests[ $index ];
 		// Ask for the address as found: without its trailing slash, a live page
 		// answers with core's canonical redirect rather than 200.
-		$asked = isset( $request['asked'] ) ? $request['asked'] : $request['from'];
+		$asked   = isset( $request['asked'] ) ? $request['asked'] : $request['from'];
+		$outcome = self::check_and_write( $asked, $request['from'], $request['to'], $request['backend'] );
 
+		$request['state']   = $outcome['state'];
+		$request['message'] = $outcome['message'];
+		$request['settled'] = gmdate( 'c' );
+		$requests[ $index ] = $request;
+		self::save( $requests );
+	}
+
+	/**
+	 * Confirm an address is missing, then write the redirect to the chosen manager.
+	 *
+	 * @param string $asked   The address as found, for the check.
+	 * @param string $from    Normalised source path.
+	 * @param string $to      Destination path.
+	 * @param string $backend 'redirection', 'rank_math' or 'own_store'.
+	 * @return array{state: string, message: string, item: array<string, mixed>|null}
+	 */
+	private static function check_and_write( $asked, $from, $to, $backend ) {
 		$response = RankXAI_Loopback::request( RankXAI_Loopback::url( $asked ), 'HEAD' );
 		if ( 405 === $response['status'] ) {
 			$response = RankXAI_Loopback::request( RankXAI_Loopback::url( $asked ), 'GET' );
@@ -261,40 +279,128 @@ class RankXAI_Redirect_Requests {
 		$status = $response['status'];
 
 		if ( 404 === $status || 410 === $status ) {
-			$result = 'redirection' === $request['backend']
-				? RankXAI_Redirects::create_in_redirection( $request['from'], $request['to'], 301 )
-				: RankXAI_Redirects::create( $request['backend'], $request['from'], $request['to'], 301 );
+			$result = 'redirection' === $backend
+				? RankXAI_Redirects::create_in_redirection( $from, $to, 301 )
+				: RankXAI_Redirects::create( $backend, $from, $to, 301 );
 			if ( '' === $result['error'] ) {
-				RankXAI_Redirects::purge( $request['from'] );
-				$request['state']   = 'added';
-				$request['message'] = __( 'Added. The address answered "not found", so the redirect cannot hide a page.', 'rankxai' );
-			} elseif ( 'exists' === $result['error'] ) {
-				$request['state']   = 'refused';
-				$request['message'] = __( 'That address already has a redirect.', 'rankxai' );
-			} else {
-				$request['state']   = 'failed';
-				$request['message'] = __( 'The redirect manager did not store the redirect.', 'rankxai' );
+				RankXAI_Redirects::purge( $from );
+				return array(
+					'state'   => 'added',
+					'message' => __( 'Added. The address answered "not found", so the redirect cannot hide a page.', 'rankxai' ),
+					'item'    => $result['item'],
+				);
 			}
-		} elseif ( $status >= 200 && $status < 400 ) {
-			$request['state']   = 'refused';
-			$request['message'] = sprintf(
-				/* translators: %d: an HTTP status code. */
-				__( 'Not added: the address now answers %d, so it is not missing and a redirect could hide a working page.', 'rankxai' ),
-				$status
+			if ( 'exists' === $result['error'] ) {
+				return array(
+					'state'   => 'refused',
+					'message' => __( 'That address already has a redirect.', 'rankxai' ),
+					'item'    => null,
+				);
+			}
+			return array(
+				'state'   => 'failed',
+				'message' => __( 'The redirect manager did not store the redirect.', 'rankxai' ),
+				'item'    => null,
 			);
-		} else {
-			$request['state']   = 'could_not_check';
-			$request['message'] = 0 === $status
+		}
+		if ( $status >= 200 && $status < 400 ) {
+			return array(
+				'state'   => 'refused',
+				'message' => sprintf(
+					/* translators: %d: an HTTP status code. */
+					__( 'Not added: the address now answers %d, so it is not missing and a redirect could hide a working page.', 'rankxai' ),
+					$status
+				),
+				'item'    => null,
+			);
+		}
+		return array(
+			'state'   => 'could_not_check',
+			'message' => 0 === $status
 				? __( 'Not added: this site did not answer a request to itself, so we could not confirm the address is missing.', 'rankxai' )
 				: sprintf(
 					/* translators: %d: an HTTP status code. */
 					__( 'Not added: the address answered %d, so we could not confirm it is missing.', 'rankxai' ),
 					$status
-				);
+				),
+			'item'    => null,
+		);
+	}
+
+	/**
+	 * Add a redirect now, for the site's administrator in wp-admin. The same checks as request(), run at once.
+	 *
+	 * A destination may also be any address on this site that opens (a product category, the shop page).
+	 *
+	 * @param string $from Source path.
+	 * @param string $to   Destination path.
+	 * @return array{state: string, message: string, item: array<string, mixed>|null, field: string}
+	 */
+	public static function add_now( $from, $to ) {
+		$refuse = function ( $message, $field ) {
+			return array(
+				'state'   => 'refused',
+				'message' => $message,
+				'item'    => null,
+				'field'   => $field,
+			);
+		};
+		$from   = trim( (string) $from );
+		$to     = trim( (string) $to );
+		if ( ! self::offerable( $from ) ) {
+			return $refuse( __( 'Enter the old address as a path on this site, starting with /.', 'rankxai' ), 'path' );
 		}
-		$request['settled'] = gmdate( 'c' );
-		$requests[ $index ] = $request;
-		self::save( $requests );
+		if ( '' !== RankXAI_Redirects::path_rejection( $to ) ) {
+			return $refuse( __( 'Enter where to send visitors as a path on this site, starting with /.', 'rankxai' ), 'target' );
+		}
+		if ( RankXAI_Redirects::normalise( $from ) === RankXAI_Redirects::normalise( $to ) ) {
+			return $refuse( __( 'A redirect cannot point at its own address.', 'rankxai' ), 'target' );
+		}
+		if ( self::live_post( $from ) > 0 ) {
+			return $refuse( __( 'That address is a published page, so a redirect would hide it. Nothing was added.', 'rankxai' ), 'path' );
+		}
+		if ( ! self::valid_destination( $to ) && ! self::opens( $to ) ) {
+			return $refuse( __( 'Send visitors to a page on this site that opens.', 'rankxai' ), 'target' );
+		}
+		$backend = self::backend();
+		if ( '' === $backend['backend'] ) {
+			return $refuse( $backend['reason'], '' );
+		}
+		$outcome          = self::check_and_write( $from, RankXAI_Redirects::normalise( $from ), $to, $backend['backend'] );
+		$outcome['field'] = 'added' === $outcome['state'] ? '' : 'path';
+		return $outcome;
+	}
+
+	/**
+	 * Does this address on the site answer 200?
+	 *
+	 * @param string $path Root-relative path.
+	 * @return bool
+	 */
+	private static function opens( $path ) {
+		$response = RankXAI_Loopback::request( RankXAI_Loopback::url( $path ), 'GET' );
+		return 200 === $response['status'];
+	}
+
+	/**
+	 * Remove a redirect now, for the site's administrator in wp-admin.
+	 *
+	 * @param string $backend 'redirection', 'rank_math' or 'own_store'.
+	 * @param string $id      Id within that manager.
+	 * @return array{state: string, message: string}
+	 */
+	public static function remove_now( $backend, $id ) {
+		$result = 'redirection' === $backend ? RankXAI_Redirects::delete_in_redirection( $id ) : RankXAI_Redirects::delete( $backend, $id );
+		if ( '' !== $result['error'] ) {
+			return self::verdict(
+				'not_found' === $result['error'] ? 'not_found' : 'failed',
+				'not_found' === $result['error'] ? __( 'That redirect is no longer there.', 'rankxai' ) : __( 'The redirect manager did not remove the redirect.', 'rankxai' )
+			);
+		}
+		if ( '' !== $result['from'] ) {
+			RankXAI_Redirects::purge( $result['from'] );
+		}
+		return self::verdict( 'removed', __( 'Removed.', 'rankxai' ) );
 	}
 
 	/**

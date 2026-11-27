@@ -1,4 +1,4 @@
-import type { StoreHost } from '../../host-types';
+import type { LocalRedirectResult, StoreHost } from '../../host-types';
 import { confirmLeave, hasUnsavedChanges, pushToast } from './registries';
 import { appPathFromHash, hashFromAppPath, hrefKind, wpAdminHref } from './hash-route';
 import { sessionExpiry } from './session-expiry';
@@ -11,9 +11,10 @@ export interface WordPressStoreConfig {
     pageUrl: string;
     adminUrl: string;
     locale: string | null;
+    redirectsUrl: string;
 }
 function readConfig(): WordPressStoreConfig {
-    const fallback: WordPressStoreConfig = { apiBase: '', sessionUrl: '', nonce: '', pageUrl: 'admin.php?page=rankxai-store', adminUrl: '', locale: null };
+    const fallback: WordPressStoreConfig = { apiBase: '', sessionUrl: '', nonce: '', pageUrl: 'admin.php?page=rankxai-store', adminUrl: '', locale: null, redirectsUrl: '' };
     if (typeof document === 'undefined')
         return fallback;
     try {
@@ -71,6 +72,31 @@ async function sessionToken(force = false): Promise<string | null> {
         return session?.token ?? null;
     })();
     return pending;
+}
+async function localRedirect(path: string, body: Record<string, unknown>): Promise<LocalRedirectResult> {
+    try {
+        const res = await fetch(`${config.redirectsUrl}${path}`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const json = (await res.json().catch(() => null)) as {
+            id?: unknown;
+            message?: unknown;
+            data?: {
+                field?: unknown;
+            };
+        } | null;
+        const message = typeof json?.message === 'string' ? json.message : '';
+        if (res.ok && typeof json?.id === 'string')
+            return { ok: true, id: json.id, message };
+        const field = json?.data?.field === 'path' || json?.data?.field === 'target' ? json.data.field : undefined;
+        return { ok: false, message: message || 'WordPress did not accept the redirect. Reload the page and try again.', ...(field ? { field } : {}) };
+    }
+    catch {
+        return { ok: false, message: 'WordPress did not answer. Check your connection and try again.' };
+    }
 }
 const bearer = (token: string | null): Record<string, string> => (token ? { Authorization: `Bearer ${token}` } : {});
 let lastHash = '';
@@ -154,5 +180,11 @@ export const host: StoreHost = {
         if (hrefKind(url) === 'web')
             window.open(url, '_blank', 'noopener');
     },
+    redirects: config.redirectsUrl
+        ? {
+            add: (path, target) => localRedirect('', { from: path, to: target }),
+            remove: (id) => localRedirect('/delete', { id }),
+        }
+        : undefined,
     locale: () => (config.locale ? config.locale.replace(/_/g, '-') : null),
 };

@@ -8,6 +8,19 @@ export interface PickProductsOptions {
     productsOnly?: boolean;
 }
 export type ScopeAnswer = 'granted' | 'declined';
+export type LocalRedirectResult = {
+    ok: true;
+    id: string;
+    message: string;
+} | {
+    ok: false;
+    message: string;
+    field?: 'path' | 'target';
+};
+export interface LocalRedirects {
+    add(path: string, target: string): Promise<LocalRedirectResult>;
+    remove(id: string): Promise<LocalRedirectResult>;
+}
 export type AppExtensions = Parameters<typeof embedStatusFromExtensions>[0];
 export interface StoreHost {
     readonly name: 'shopify' | 'wordpress' | 'web';
@@ -36,6 +49,7 @@ export interface StoreHost {
     };
     openPlanPage(url: string): void;
     locale(): string | null;
+    redirects?: LocalRedirects;
     requestScopes?(scopes: string[]): Promise<ScopeAnswer>;
     requestReview?(): void;
     appExtensions?(): Promise<AppExtensions>;

@@ -45,7 +45,23 @@ class RankXAI_Generate {
 	}
 
 	/**
-	 * Is local generation switched on for this slug? Off by default.
+	 * Has the site owner switched this root document on in Settings? Off by default.
+	 *
+	 * Nothing is served at a document's address until it is, whatever RankX AI publishes.
+	 *
+	 * @param string $slug Document slug.
+	 * @return bool
+	 */
+	public static function switched_on( $slug ) {
+		if ( ! array_key_exists( $slug, RankXAI_Documents::catalogue() ) ) {
+			return false;
+		}
+		$stored = get_option( self::OPTION, array() );
+		return is_array( $stored ) && isset( $stored[ $slug ] ) && true === $stored[ $slug ];
+	}
+
+	/**
+	 * Is the document switched on and generated here, from the site's own content?
 	 *
 	 * @param string $slug Document slug.
 	 * @return bool
@@ -54,11 +70,7 @@ class RankXAI_Generate {
 		if ( ! in_array( $slug, self::supported(), true ) ) {
 			return false;
 		}
-		$stored = get_option( self::OPTION, array() );
-		if ( ! is_array( $stored ) ) {
-			return false;
-		}
-		$on = isset( $stored[ $slug ] ) && true === $stored[ $slug ];
+		$on = self::switched_on( $slug );
 
 		// Never on a site that discourages indexing, such as a staging clone.
 		if ( self::site_discourages_indexing() || 'site' === RankXAI_Woo::coming_soon() ) {
@@ -84,28 +96,28 @@ class RankXAI_Generate {
 	}
 
 	/**
-	 * The stored state for every supported slug, before the filter.
+	 * The switch for every root document, before the filter.
 	 *
 	 * @return array<string, bool>
 	 */
 	public static function stored_state() {
 		$stored = get_option( self::OPTION, array() );
 		$out    = array();
-		foreach ( self::supported() as $slug ) {
+		foreach ( array_keys( RankXAI_Documents::catalogue() ) as $slug ) {
 			$out[ $slug ] = is_array( $stored ) && isset( $stored[ $slug ] ) && true === $stored[ $slug ];
 		}
 		return $out;
 	}
 
 	/**
-	 * Store which documents are generated locally.
+	 * Store which root documents the site owner switched on.
 	 *
 	 * @param array<string, bool> $state Slug to on/off. Unknown slugs ignored.
 	 * @return void
 	 */
 	public static function save_state( $state ) {
 		$out = array();
-		foreach ( self::supported() as $slug ) {
+		foreach ( array_keys( RankXAI_Documents::catalogue() ) as $slug ) {
 			$out[ $slug ] = isset( $state[ $slug ] ) && (bool) $state[ $slug ];
 		}
 		update_option( self::OPTION, $out, true );

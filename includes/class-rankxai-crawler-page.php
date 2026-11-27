@@ -446,8 +446,12 @@ class RankXAI_Crawler_Page {
 		}
 		RankXAI_UI::note(
 			$checked
-				? __( 'A visit from an address the crawler\'s operator publishes is counted as that crawler. The rest only say they are.', 'rankxai' )
-				: __( 'Crawlers are named from what they say they are. With a RankX AI account connected, each visit is also checked against the address ranges the operator publishes.', 'rankxai' )
+				? sprintf(
+					/* translators: %s: date the address ranges were published. */
+					__( 'A visit from an address the crawler\'s operator publishes is counted as that crawler; the rest only say they are. Address ranges as published on %s, included with this plugin and updated with each release.', 'rankxai' ),
+					wp_date( (string) get_option( 'date_format' ), (int) strtotime( RankXAI_Crawlers::config_summary()['updated'] . ' 12:00:00 UTC' ) )
+				)
+				: __( 'Crawlers are named from what they say they are.', 'rankxai' )
 		);
 		RankXAI_UI::card_close();
 	}

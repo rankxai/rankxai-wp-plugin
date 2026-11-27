@@ -279,6 +279,8 @@ class RankXAI_Connection {
 		}
 		delete_option( self::OPTION );
 		delete_option( self::STATES_OPTION );
+		delete_option( 'rankxai_product_events' );
+		wp_clear_scheduled_hook( 'rankxai_send_product_events' );
 		RankXAI_Session_Cache::clear_all();
 		$removed = self::remove_app_passwords();
 		self::remove_webhooks();
@@ -288,7 +290,8 @@ class RankXAI_Connection {
 	}
 
 	/**
-	 * Remove the WooCommerce webhooks that deliver to RankX AI.
+	 * Remove the WooCommerce webhooks that deliver to RankX AI. Earlier versions let
+	 * RankX AI create them; this plugin now reports product changes itself.
 	 *
 	 * @return int How many were removed.
 	 */

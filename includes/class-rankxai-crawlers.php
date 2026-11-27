@@ -24,11 +24,8 @@ class RankXAI_Crawlers {
 	/** The switch. Autoloaded: it is read on every front-end request. */
 	const OPTION_ENABLED = 'rankxai_crawlers_enabled';
 
-	/** Crawler names and their user-agent tokens. Autoloaded, and small. */
-	const OPTION_TOKENS = 'rankxai_crawler_tokens';
-
-	/** Address ranges. Not autoloaded: read only when a crawler is seen. */
-	const OPTION_RANGES = 'rankxai_crawler_ranges';
+	/** Options earlier versions stored the crawler list and ranges in, removed on upgrade. */
+	const OBSOLETE_OPTIONS = array( 'rankxai_crawler_tokens', 'rankxai_crawler_ranges' );
 
 	/** The UTC day retention last ran. */
 	const OPTION_PRUNED = 'rankxai_crawlers_pruned';
@@ -51,12 +48,6 @@ class RankXAI_Crawlers {
 	/** Longest path stored. */
 	const MAX_PATH = 255;
 
-	/** Limits on a pushed configuration. */
-	const MAX_BOTS     = 40;
-	const MAX_TOKENS   = 20;
-	const MAX_TOKEN    = 64;
-	const MAX_PREFIXES = 8000;
-
 	/**
 	 * Hook the recorder.
 	 */
@@ -67,7 +58,7 @@ class RankXAI_Crawlers {
 	}
 
 	/**
-	 * Crawlers counted with no configuration from RankX AI.
+	 * The crawlers counted.
 	 *
 	 * Tokens are matched case-insensitively anywhere in the user agent. Order
 	 * matters only if two tokens could match one agent; none of these do.
@@ -140,17 +131,13 @@ class RankXAI_Crawlers {
 	}
 
 	/**
-	 * Name, purpose and group for a crawler id: RankX AI's, then the default,
-	 * then the id itself with no purpose, so an unknown crawler is still shown.
+	 * Name, purpose and group for a crawler id, or the id itself with no purpose,
+	 * so an unknown crawler is still shown.
 	 *
 	 * @param string $id Crawler id.
 	 * @return array{label: string, purpose: string, group: string}
 	 */
 	public static function meta( $id ) {
-		$stored = get_option( self::OPTION_TOKENS );
-		if ( is_array( $stored ) && isset( $stored['meta'][ $id ] ) && is_array( $stored['meta'][ $id ] ) ) {
-			return $stored['meta'][ $id ];
-		}
 		$defaults = self::default_meta();
 		if ( isset( $defaults[ $id ] ) ) {
 			return $defaults[ $id ];
@@ -342,15 +329,11 @@ class RankXAI_Crawlers {
 	}
 
 	/**
-	 * The crawler list in force: RankX AI's, or the default.
+	 * The crawlers counted.
 	 *
 	 * @return array<string, string[]>
 	 */
 	public static function bots() {
-		$stored = get_option( self::OPTION_TOKENS );
-		if ( is_array( $stored ) && isset( $stored['bots'] ) && is_array( $stored['bots'] ) && $stored['bots'] ) {
-			return $stored['bots'];
-		}
 		return self::default_bots();
 	}
 
@@ -762,185 +745,61 @@ class RankXAI_Crawlers {
 	}
 
 	// -----------------------------------------------------------------------
-	// Configuration pushed by RankX AI
+	// Published address ranges, shipped with the plugin
 	// -----------------------------------------------------------------------
 
 	/**
-	 * The stored address ranges.
+	 * The address ranges each operator publishes, as shipped in includes/data/crawler-ranges.php.
 	 *
-	 * @return array{bots: array<string, string[]>, proxies: string[]}
+	 * @return array{updated: string, version: string, bots: array<string, string[]>, proxies: string[]}
 	 */
-	public static function ranges() {
+	public static function published() {
 		static $cache = null;
 		if ( null !== $cache ) {
 			return $cache;
 		}
-		$stored = get_option( self::OPTION_RANGES );
-		$cache  = array(
-			'bots'    => ( is_array( $stored ) && isset( $stored['bots'] ) && is_array( $stored['bots'] ) ) ? $stored['bots'] : array(),
-			'proxies' => ( is_array( $stored ) && isset( $stored['proxies'] ) && is_array( $stored['proxies'] ) ) ? $stored['proxies'] : array(),
+		$data  = include __DIR__ . '/data/crawler-ranges.php';
+		$data  = is_array( $data ) ? $data : array();
+		$cache = array(
+			'updated' => isset( $data['updated'] ) && is_string( $data['updated'] ) ? $data['updated'] : '',
+			'version' => isset( $data['version'] ) && is_string( $data['version'] ) ? $data['version'] : '',
+			'bots'    => isset( $data['bots'] ) && is_array( $data['bots'] ) ? $data['bots'] : array(),
+			'proxies' => isset( $data['proxies'] ) && is_array( $data['proxies'] ) ? $data['proxies'] : array(),
 		);
 		return $cache;
 	}
 
 	/**
-	 * What configuration is stored, for the REST API and the settings screen.
+	 * The address ranges visits are checked against.
+	 *
+	 * @return array{bots: array<string, string[]>, proxies: string[]}
+	 */
+	public static function ranges() {
+		$published = self::published();
+		return array(
+			'bots'    => $published['bots'],
+			'proxies' => $published['proxies'],
+		);
+	}
+
+	/**
+	 * Which ranges are in use, for the REST API and the admin pages.
 	 *
 	 * @return array{version: string, updated: string, bots: int, prefixes: int, proxies: int}
 	 */
 	public static function config_summary() {
-		$tokens   = get_option( self::OPTION_TOKENS );
-		$ranges   = get_option( self::OPTION_RANGES );
-		$prefixes = 0;
-		if ( is_array( $ranges ) && isset( $ranges['bots'] ) && is_array( $ranges['bots'] ) ) {
-			foreach ( $ranges['bots'] as $list ) {
-				$prefixes += is_array( $list ) ? count( $list ) : 0;
-			}
+		$published = self::published();
+		$prefixes  = 0;
+		foreach ( $published['bots'] as $list ) {
+			$prefixes += is_array( $list ) ? count( $list ) : 0;
 		}
 		return array(
-			'version'  => is_array( $tokens ) && isset( $tokens['version'] ) ? (string) $tokens['version'] : '',
-			'updated'  => is_array( $tokens ) && isset( $tokens['updated'] ) ? (string) $tokens['updated'] : '',
+			'version'  => $published['version'],
+			'updated'  => $published['updated'],
 			'bots'     => count( self::bots() ),
 			'prefixes' => $prefixes,
-			'proxies'  => is_array( $ranges ) && isset( $ranges['proxies'] ) && is_array( $ranges['proxies'] ) ? count( $ranges['proxies'] ) : 0,
+			'proxies'  => count( $published['proxies'] ),
 		);
-	}
-
-	/**
-	 * Validate and store a crawler list and its address ranges.
-	 *
-	 * Everything is checked before anything is stored, so a malformed push
-	 * leaves the previous configuration in force.
-	 *
-	 * @param mixed $input Decoded request body.
-	 * @return array|WP_Error The stored summary, or why it was refused.
-	 */
-	public static function save_config( $input ) {
-		if ( ! is_array( $input ) ) {
-			return self::config_error( 'the body must be an object' );
-		}
-		$version = isset( $input['version'] ) ? $input['version'] : '';
-		if ( ! is_string( $version ) || '' === $version || strlen( $version ) > 64 || ! preg_match( '/^[A-Za-z0-9._:-]+$/', $version ) ) {
-			return self::config_error( 'version must be 1 to 64 letters, digits or . _ : -' );
-		}
-		if ( ! isset( $input['bots'] ) || ! is_array( $input['bots'] ) || ! $input['bots'] || count( $input['bots'] ) > self::MAX_BOTS ) {
-			return self::config_error( sprintf( 'bots must list 1 to %d crawlers', self::MAX_BOTS ) );
-		}
-
-		$bots     = array();
-		$ranges   = array();
-		$meta     = array();
-		$prefixes = 0;
-		foreach ( $input['bots'] as $bot ) {
-			$id = is_array( $bot ) && isset( $bot['id'] ) ? $bot['id'] : '';
-			if ( ! is_string( $id ) || ! preg_match( '/^[a-z0-9-]{1,40}$/', $id ) || isset( $bots[ $id ] ) ) {
-				return self::config_error( 'each crawler needs a unique id of 1 to 40 lowercase letters, digits or hyphens' );
-			}
-			$tokens = isset( $bot['tokens'] ) ? $bot['tokens'] : null;
-			if ( ! is_array( $tokens ) || ! $tokens || count( $tokens ) > self::MAX_TOKENS ) {
-				return self::config_error( sprintf( '%s: tokens must list 1 to %d strings', $id, self::MAX_TOKENS ) );
-			}
-			foreach ( $tokens as $token ) {
-				if ( ! is_string( $token ) || '' === $token || strlen( $token ) > self::MAX_TOKEN || preg_match( '/[^\x20-\x7E]/', $token ) ) {
-					return self::config_error( sprintf( '%s: each token must be 1 to %d printable characters', $id, self::MAX_TOKEN ) );
-				}
-			}
-			$list = isset( $bot['prefixes'] ) ? $bot['prefixes'] : array();
-			if ( ! is_array( $list ) ) {
-				return self::config_error( sprintf( '%s: prefixes must be a list', $id ) );
-			}
-			foreach ( $list as $prefix ) {
-				if ( ! self::valid_prefix( $prefix ) ) {
-					return self::config_error( sprintf( '%s: not an address range: %s', $id, is_string( $prefix ) ? substr( $prefix, 0, 60 ) : gettype( $prefix ) ) );
-				}
-			}
-			$bots[ $id ] = array_values( $tokens );
-			if ( $list ) {
-				$ranges[ $id ] = array_values( $list );
-			}
-			$prefixes += count( $list );
-
-			// Optional name, purpose and group: all three or none.
-			$labelled = isset( $bot['label'] ) || isset( $bot['purpose'] ) || isset( $bot['group'] );
-			if ( $labelled ) {
-				$label   = isset( $bot['label'] ) ? $bot['label'] : null;
-				$purpose = isset( $bot['purpose'] ) ? $bot['purpose'] : null;
-				$group   = isset( $bot['group'] ) ? $bot['group'] : null;
-				if ( ! is_string( $label ) || '' === $label || strlen( $label ) > 60 || preg_match( '/[\x00-\x1F\x7F<>]/', $label ) ) {
-					return self::config_error( sprintf( '%s: label must be 1 to 60 printable characters', $id ) );
-				}
-				if ( ! in_array( $purpose, array( 'training', 'search', 'user' ), true ) || ! in_array( $group, array( 'ai', 'search_engine' ), true ) ) {
-					return self::config_error( sprintf( '%s: purpose must be training, search or user and group ai or search_engine', $id ) );
-				}
-				$meta[ $id ] = self::meta_entry( $label, $purpose, $group );
-			}
-		}
-
-		$proxies = isset( $input['proxies'] ) ? $input['proxies'] : array();
-		if ( ! is_array( $proxies ) ) {
-			return self::config_error( 'proxies must be a list' );
-		}
-		foreach ( $proxies as $prefix ) {
-			if ( ! self::valid_prefix( $prefix ) ) {
-				return self::config_error( 'proxies: not an address range' );
-			}
-		}
-		if ( $prefixes + count( $proxies ) > self::MAX_PREFIXES ) {
-			return self::config_error( sprintf( 'at most %d address ranges in all', self::MAX_PREFIXES ) );
-		}
-
-		update_option(
-			self::OPTION_TOKENS,
-			array(
-				'version' => $version,
-				'updated' => gmdate( 'c' ),
-				'bots'    => $bots,
-				'meta'    => $meta,
-			),
-			true
-		);
-		update_option(
-			self::OPTION_RANGES,
-			array(
-				'bots'    => $ranges,
-				'proxies' => array_values( $proxies ),
-			),
-			false
-		);
-		return self::config_summary();
-	}
-
-	/**
-	 * Is this a CIDR prefix?
-	 *
-	 * @param mixed $prefix Candidate.
-	 * @return bool
-	 */
-	public static function valid_prefix( $prefix ) {
-		if ( ! is_string( $prefix ) || strlen( $prefix ) > 64 ) {
-			return false;
-		}
-		$parts = explode( '/', $prefix );
-		if ( 2 !== count( $parts ) || ! preg_match( '/^\d{1,3}$/', $parts[1] ) ) {
-			return false;
-		}
-		if ( false !== filter_var( $parts[0], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
-			return (int) $parts[1] <= 32;
-		}
-		if ( false !== filter_var( $parts[0], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) {
-			return (int) $parts[1] <= 128;
-		}
-		return false;
-	}
-
-	/**
-	 * A refusal of a configuration push.
-	 *
-	 * @param string $message Why.
-	 * @return WP_Error
-	 */
-	private static function config_error( $message ) {
-		return new WP_Error( 'rankxai_crawler_config_invalid', $message, array( 'status' => 400 ) );
 	}
 
 	// -----------------------------------------------------------------------

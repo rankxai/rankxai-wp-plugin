@@ -119,6 +119,83 @@ class RankXAI_REST {
 	}
 
 	/**
+	 * The site's administrator, signed in to wp-admin in this browser, with the page's REST nonce.
+	 *
+	 * Never an Application Password, so the RankX AI connection, or anything else
+	 * calling from outside, cannot use these routes.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return bool|WP_Error
+	 */
+	public static function can_act_in_browser( $request ) {
+		if ( ! current_user_can( 'manage_options' ) || RankXAI_Connector::is_connector( get_current_user_id() ) ) {
+			return false;
+		}
+		if ( null !== rest_get_authenticated_app_password() ) {
+			return new WP_Error( 'rankxai_browser_only', __( 'Redirects are changed only by the site’s administrator, in wp-admin.', 'rankxai' ), array( 'status' => 403 ) );
+		}
+		if ( ! wp_verify_nonce( (string) $request->get_header( 'X-WP-Nonce' ), 'wp_rest' ) ) {
+			return new WP_Error( 'rankxai_bad_nonce', __( 'This page has expired. Reload it and try again.', 'rankxai' ), array( 'status' => 403 ) );
+		}
+		return true;
+	}
+
+	/**
+	 * Add a redirect, for the site's administrator in wp-admin.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_admin_redirect_add( $request ) {
+		$from    = $request->get_param( 'from' );
+		$to      = $request->get_param( 'to' );
+		$outcome = RankXAI_Redirect_Requests::add_now( is_string( $from ) ? $from : '', is_string( $to ) ? $to : '' );
+		if ( 'added' !== $outcome['state'] || ! is_array( $outcome['item'] ) ) {
+			return new WP_Error(
+				'rankxai_redirect_' . $outcome['state'],
+				$outcome['message'],
+				array(
+					'status' => 'could_not_check' === $outcome['state'] || 'failed' === $outcome['state'] ? 502 : 409,
+					'field'  => $outcome['field'],
+				)
+			);
+		}
+		return new WP_REST_Response(
+			array(
+				'id'      => $outcome['item']['backend'] . ':' . $outcome['item']['id'],
+				'from'    => $outcome['item']['from'],
+				'to'      => $outcome['item']['to'],
+				'message' => $outcome['message'],
+			),
+			201
+		);
+	}
+
+	/**
+	 * Remove a redirect, for the site's administrator in wp-admin.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function handle_admin_redirect_delete( $request ) {
+		$raw = $request->get_param( 'id' );
+		if ( ! is_string( $raw ) || ! preg_match( '/^(redirection|rank_math|own_store):([a-z0-9]{1,32})$/', $raw, $m ) ) {
+			return new WP_Error( 'rankxai_redirect_bad_id', __( 'That is not a redirect on this site.', 'rankxai' ), array( 'status' => 400 ) );
+		}
+		$outcome = RankXAI_Redirect_Requests::remove_now( $m[1], $m[2] );
+		if ( 'removed' !== $outcome['state'] ) {
+			return new WP_Error( 'rankxai_redirect_' . $outcome['state'], $outcome['message'], array( 'status' => 'not_found' === $outcome['state'] ? 404 : 502 ) );
+		}
+		return new WP_REST_Response(
+			array(
+				'id'      => $raw,
+				'message' => $outcome['message'],
+			),
+			200
+		);
+	}
+
+	/**
 	 * Register every route.
 	 */
 	public static function register_routes() {
@@ -340,43 +417,35 @@ class RankXAI_REST {
 			)
 		);
 
-		// Redirects are site-wide, so `manage_options`, as the Redirection plugin uses.
+		// Redirects can be read by the connection. Only the site's administrator,
+		// signed in to wp-admin, adds or removes one (the admin/redirects routes).
 		register_rest_route(
 			self::NAMESPACE_V1,
 			'/redirects',
 			array(
-				array(
-					'methods'             => WP_REST_Server::READABLE,
-					'callback'            => array( __CLASS__, 'handle_redirects_get' ),
-					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
-				),
-				array(
-					'methods'             => WP_REST_Server::CREATABLE,
-					'callback'            => array( __CLASS__, 'handle_redirects_create' ),
-					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
-				),
-			)
-		);
-
-		// The backend is constrained in the route pattern, so an unknown one
-		// never reaches the handler.
-		register_rest_route(
-			self::NAMESPACE_V1,
-			'/redirects/(?P<backend>rank_math|own_store)/(?P<id>[a-z0-9]{1,32})',
-			array(
-				'methods'             => WP_REST_Server::DELETABLE,
-				'callback'            => array( __CLASS__, 'handle_redirects_delete' ),
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'handle_redirects_get' ),
 				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
 			)
 		);
 
 		register_rest_route(
 			self::NAMESPACE_V1,
-			'/redirects/purge',
+			'/admin/redirects',
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
-				'callback'            => array( __CLASS__, 'handle_redirects_purge' ),
-				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+				'callback'            => array( __CLASS__, 'handle_admin_redirect_add' ),
+				'permission_callback' => array( __CLASS__, 'can_act_in_browser' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/admin/redirects/delete',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'handle_admin_redirect_delete' ),
+				'permission_callback' => array( __CLASS__, 'can_act_in_browser' ),
 			)
 		);
 
@@ -397,16 +466,6 @@ class RankXAI_REST {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( __CLASS__, 'handle_crawlers_get' ),
-				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
-			)
-		);
-
-		register_rest_route(
-			self::NAMESPACE_V1,
-			'/crawlers/config',
-			array(
-				'methods'             => WP_REST_Server::EDITABLE,
-				'callback'            => array( __CLASS__, 'handle_crawlers_config' ),
 				'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
 			)
 		);
@@ -630,20 +689,6 @@ class RankXAI_REST {
 	}
 
 	/**
-	 * Store the crawler list and the address ranges RankX AI publishes.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public static function handle_crawlers_config( $request ) {
-		$saved = RankXAI_Crawlers::save_config( $request->get_json_params() );
-		if ( is_wp_error( $saved ) ) {
-			return $saved;
-		}
-		return new WP_REST_Response( $saved, 200 );
-	}
-
-	/**
 	 * Every redirect manager on the site, and the redirects we can read.
 	 *
 	 * @param WP_REST_Request $request Request.
@@ -670,103 +715,11 @@ class RankXAI_REST {
 				'totals'   => $listed['totals'],
 				// A subdirectory install changes what a path means.
 				'homePath' => (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ),
+				// Only the site's administrator, in wp-admin, adds or removes a redirect.
+				'writes'   => 'site_admin',
 			),
 			200
 		);
-	}
-
-	/**
-	 * Create a redirect on the requested backend.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public static function handle_redirects_create( $request ) {
-		$backend = $request->get_param( 'backend' );
-		$from    = $request->get_param( 'from' );
-		$to      = $request->get_param( 'to' );
-		$code    = null === $request->get_param( 'code' ) ? 301 : $request->get_param( 'code' );
-
-		if ( ! in_array( $backend, array( 'rank_math', 'own_store' ), true ) ) {
-			return new WP_Error( 'rankxai_redirect_bad_backend', __( '`backend` must be rank_math or own_store.', 'rankxai' ), array( 'status' => 400 ) );
-		}
-		foreach ( array(
-			'from' => $from,
-			'to'   => $to,
-		) as $field => $value ) {
-			$reason = RankXAI_Redirects::path_rejection( $value );
-			if ( '' !== $reason ) {
-				return new WP_Error( 'rankxai_redirect_bad_path', sprintf( '%s %s', $field, $reason ), array( 'status' => 400 ) );
-			}
-		}
-		if ( ! in_array( $code, array( 301, 302 ), true ) ) {
-			return new WP_Error( 'rankxai_redirect_bad_code', __( '`code` must be 301 or 302.', 'rankxai' ), array( 'status' => 400 ) );
-		}
-
-		$result = RankXAI_Redirects::create( $backend, $from, $to, $code );
-		if ( '' !== $result['error'] ) {
-			$status = 'rejected' === $result['error'] || 'not_stored' === $result['error'] ? 422 : 409;
-			return new WP_Error(
-				'rankxai_redirect_' . $result['error'],
-				self::redirect_error_message( $result['error'] ),
-				array(
-					'status'   => $status,
-					'managers' => RankXAI_Redirects::managers(),
-				)
-			);
-		}
-
-		return new WP_REST_Response(
-			array(
-				'item'   => $result['item'],
-				'purged' => RankXAI_Redirects::purge( RankXAI_Redirects::normalise( $from ) ),
-			),
-			200
-		);
-	}
-
-	/**
-	 * Delete a redirect.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public static function handle_redirects_delete( $request ) {
-		$backend = (string) $request['backend'];
-		$result  = RankXAI_Redirects::delete( $backend, (string) $request['id'] );
-		if ( '' !== $result['error'] ) {
-			return new WP_Error(
-				'rankxai_redirect_' . $result['error'],
-				self::redirect_error_message( $result['error'] ),
-				array( 'status' => 'not_found' === $result['error'] ? 404 : 409 )
-			);
-		}
-
-		return new WP_REST_Response(
-			array(
-				'backend'   => $backend,
-				'from'      => $result['from'],
-				// What remains for that source, so the caller can confirm the delete.
-				'remaining' => '' === $result['from'] ? array() : RankXAI_Redirects::items( $result['from'] )['items'],
-				'purged'    => '' === $result['from'] ? array() : RankXAI_Redirects::purge( $result['from'] ),
-			),
-			200
-		);
-	}
-
-	/**
-	 * Purge one path from the page caches, for a redirect written elsewhere.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public static function handle_redirects_purge( $request ) {
-		$path   = $request->get_param( 'path' );
-		$reason = RankXAI_Redirects::path_rejection( $path );
-		if ( '' !== $reason ) {
-			return new WP_Error( 'rankxai_redirect_bad_path', sprintf( 'path %s', $reason ), array( 'status' => 400 ) );
-		}
-		return new WP_REST_Response( array( 'purged' => RankXAI_Redirects::purge( RankXAI_Redirects::normalise( $path ) ) ), 200 );
 	}
 
 	/**
@@ -1207,9 +1160,11 @@ class RankXAI_REST {
 				'stored'           => null !== $doc,
 				'content'          => null !== $doc ? $doc['content'] : '',
 				'updated'          => null !== $doc ? $doc['updated'] : '',
-				// False when a real file on disk owns the path.
-				'serving'          => null !== $doc && ! $blocked,
+				// False when a real file on disk owns the path, or the site owner has not switched it on.
+				'serving'          => null !== $doc && ! $blocked && RankXAI_Generate::switched_on( $slug ),
 				'fileOnDisk'       => $blocked,
+				// The site owner's own switch, in RankX AI › Settings › Root documents.
+				'switchedOn'       => RankXAI_Generate::switched_on( $slug ),
 
 				// What actually answers, which may be a locally generated document.
 				'generatedLocally' => RankXAI_Generate::is_local( $slug ),
@@ -1299,7 +1254,7 @@ class RankXAI_REST {
 					'mayOwnHead'     => RankXAI_Detect::may_own_head(),
 					'writableFields' => self::writable_fields(),
 				),
-				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'seo.fill', 'redirects.read', 'redirects.write', 'crawlers.read', 'crawlers.config', 'crawlers.config.v2', 'checks.read', 'summary.write', 'seo.noindex', 'term_seo.read', 'term_seo.write' ),
+				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'seo.fill', 'redirects.read', 'crawlers.read', 'checks.read', 'summary.write', 'seo.noindex', 'term_seo.read', 'term_seo.write' ),
 				// Which root documents this install can publish.
 				'documents'       => array_keys( RankXAI_Documents::catalogue() ),
 			),
