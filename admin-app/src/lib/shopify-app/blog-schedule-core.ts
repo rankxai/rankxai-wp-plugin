@@ -1,7 +1,7 @@
-export const PLAN_FREQUENCIES = [7, 14, 30] as const;
-export type PlanFrequency = (typeof PLAN_FREQUENCIES)[number];
-export const PLAN_CAP_MAX = 31;
-export const PLAN_TOPICS_MAX = 50;
+export const SCHEDULE_FREQUENCIES = [7, 14, 30] as const;
+export type PlanFrequency = (typeof SCHEDULE_FREQUENCIES)[number];
+export const SCHEDULE_CAP_MAX = 31;
+export const SCHEDULE_TOPICS_MAX = 50;
 export const PLAN_LENGTHS = ['short', 'standard', 'long'] as const;
 export type PlanLength = (typeof PLAN_LENGTHS)[number];
 export function frequencyLabel(days: number): string {
@@ -14,7 +14,7 @@ export function frequencyLabel(days: number): string {
     return `Every ${days} days`;
 }
 export function allowedFrequencies(floorDays: number): PlanFrequency[] {
-    return PLAN_FREQUENCIES.filter((d) => d >= floorDays);
+    return SCHEDULE_FREQUENCIES.filter((d) => d >= floorDays);
 }
 export function runLine(state: string, failReason: string | null): {
     label: string;

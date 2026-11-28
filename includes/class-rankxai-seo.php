@@ -156,6 +156,15 @@ class RankXAI_SEO {
 					'reason' => 'must be an http or https URL',
 				);
 			}
+			$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+			$home = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+			if ( RankXAI_Access_Scope::is_connection_request() && $host !== $home ) {
+				return array(
+					'ok'     => false,
+					'value'  => '',
+					'reason' => 'must be an address on this site',
+				);
+			}
 			return array(
 				'ok'     => true,
 				'value'  => $url,

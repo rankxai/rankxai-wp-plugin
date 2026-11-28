@@ -19,7 +19,6 @@ export interface BatchState {
     counts: BatchCountsView;
     sentence: string | null;
     results: BatchItem[];
-    freeAllowanceUsed: boolean | null;
 }
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
 const rec = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {});
@@ -44,7 +43,7 @@ export function batchFromStart(raw: unknown): BatchState | null {
         if (!batchId)
             return null;
         const total = num(r.total);
-        return { batchId, status: 'running', total, processed: 0, counts: { applied: 0, unconfirmed: 0, failed: 0 }, sentence: null, results: [], freeAllowanceUsed: null };
+        return { batchId, status: 'running', total, processed: 0, counts: { applied: 0, unconfirmed: 0, failed: 0 }, sentence: null, results: [] };
     }
     const results = items(r.results);
     const applied = 'applied' in r ? num(r.applied) : num(r.undone);
@@ -58,7 +57,6 @@ export function batchFromStart(raw: unknown): BatchState | null {
         counts,
         sentence: typeof r.sentence === 'string' ? r.sentence : null,
         results,
-        freeAllowanceUsed: typeof r.freeAllowanceUsed === 'boolean' ? r.freeAllowanceUsed : null,
     };
 }
 export function batchFromView(raw: unknown): BatchState | null {
@@ -76,7 +74,6 @@ export function batchFromView(raw: unknown): BatchState | null {
         counts: { applied: num(c.applied), unconfirmed: num(c.unconfirmed), failed: num(c.failed) },
         sentence: typeof b.sentence === 'string' ? b.sentence : null,
         results: items(b.results),
-        freeAllowanceUsed: typeof b.allowanceReleased === 'boolean' ? !b.allowanceReleased : null,
     };
 }
 export function batchSummary(s: BatchState, verb: 'saved' | 'put back', fmt: (n: number) => string = String): string {

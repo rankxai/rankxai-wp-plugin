@@ -34,8 +34,6 @@ interface TemplatesData {
         rules?: Rule[];
     }>;
     targets: TemplateTarget[];
-    canAutoApply: boolean;
-    lockedBy: string | null;
 }
 interface PreviewItem {
     objectType: string;
@@ -226,10 +224,10 @@ function TemplateEditor({ d, setError, onSaved, initialTarget = null }: {
             </UI.Stack>
           </UI.Stack>) : null}
         
-        {t.objectType === 'product' ? (<UI.Switch label="Apply automatically to new products" details={d.canAutoApply ? 'New products get this template when their field is empty. Every change can be undone.' : `Available on ${d.lockedBy ?? 'a paid plan'}.`} checked={auto || undefined} disabled={!d.canAutoApply || busy !== null || text.trim() === '' || undefined} onChange={(ev) => void save(ev.currentTarget.checked === true)}/>) : null}
-        {d.canAutoApply ? (<UI.Text color="subdued">
-            Every change is listed in <UI.Link href={APP_PATHS.changes}>Changes</UI.Link>.
-          </UI.Text>) : null}
+        {t.objectType === 'product' ? (<UI.Switch label="Apply automatically to new products" details="New products get this template when their field is empty. Every change can be undone." checked={auto || undefined} disabled={busy !== null || text.trim() === '' || undefined} onChange={(ev) => void save(ev.currentTarget.checked === true)}/>) : null}
+        <UI.Text color="subdued">
+          Every change is listed in <UI.Link href={APP_PATHS.changes}>Changes</UI.Link>.
+        </UI.Text>
         <UI.Stack direction="inline" gap="small-200">
           <UI.Button variant="primary" disabled={!p || p.total === 0 || busy !== null || batch.state?.status === 'running' || undefined} loading={busy === 'all' || undefined} onClick={() => void applyAll()}>
             {p ? `Apply to ${p.applyLimit && p.total > p.applyLimit ? `the first ${fmtNumber(p.applyLimit)} of ` : ''}${fmtCount(p.total, 'empty field', 'empty fields')}` : 'Apply'}

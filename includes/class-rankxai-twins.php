@@ -347,12 +347,6 @@ class RankXAI_Twins {
 	 * @return void
 	 */
 	private static function rewrite( $path, $query ) {
-		if ( ! isset( $_SERVER['RANKXAI_REQUEST_URI'] ) && isset( $_SERVER['REQUEST_URI'] ) ) {
-			// Keep the original URL for anything running later, such as a cache plugin.
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- Verbatim copy, not used as input here.
-			$_SERVER['RANKXAI_REQUEST_URI'] = $_SERVER['REQUEST_URI'];
-		}
-
 		// Not `user_trailingslashit()`: `$wp_rewrite` does not exist yet at
 		// `plugins_loaded`. Same check as `WP_Rewrite::init()`.
 		$structure = (string) get_option( 'permalink_structure' );

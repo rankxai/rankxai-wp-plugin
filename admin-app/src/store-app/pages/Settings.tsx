@@ -11,7 +11,7 @@ import { fmtCount, fmtNumber } from '../format';
 import { SkeletonSection } from '../components/Status';
 import { PageColumns } from '../components/PageColumns';
 import * as UI from '../ui';
-import { redirectsWrittenLocally } from '../redirect-writes';
+import { AutoRedirectSetting } from '../redirect-writes';
 import { AgencyCard } from '../components/AgencyCard';
 interface Settings {
     store: {
@@ -320,8 +320,7 @@ function PreferencesSection({ prefs, setError }: {
         return null;
     return (<UI.Section heading="Automatic changes and emails">
       <UI.Stack gap="base">
-        
-        {redirectsWrittenLocally() ? null : (<UI.Checkbox label="Redirect a deleted product's address automatically" details="When you delete a product, its address is sent to your catalogue page so visitors and search engines do not reach a missing page. Each redirect can be undone." checked={p.autoRedirectDeleted || undefined} disabled={busy || undefined} onChange={(e) => void change({ autoRedirectDeleted: e.currentTarget.checked }, e.currentTarget.checked ? 'Deleted products will be redirected' : 'Automatic redirects switched off')}/>)}
+        <AutoRedirectSetting on={p.autoRedirectDeleted} disabled={busy} save={(patch, done) => void change(patch, done)}/>
         <UI.Text color="subdued">
           Every automatic change is listed in <UI.Link href={APP_PATHS.changes}>Changes</UI.Link>.
         </UI.Text>

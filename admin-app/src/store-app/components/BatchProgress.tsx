@@ -110,7 +110,6 @@ export function BatchProgress({ handle, setError, heading }: {
               {s.counts.failed > 0 ? <UI.Badge tone="critical">{`${fmtNumber(s.counts.failed)} not changed`}</UI.Badge> : null}
             </UI.Stack>
             <UI.Paragraph>{batchSummary(s, verb, fmtNumber)}</UI.Paragraph>
-            {s.freeAllowanceUsed === true ? <UI.Text color="subdued">This used this month’s free bulk fix on the Free plan.</UI.Text> : null}
             {failed.length > 0 ? (<UI.Stack gap="small-100">
                 {failed.slice(0, 5).map((f, i) => (<UI.Text key={i} color="subdued">{`${f.label ?? 'An item'}: ${f.message}`}</UI.Text>))}
                 {failed.length > 5 ? (<UI.Text color="subdued">

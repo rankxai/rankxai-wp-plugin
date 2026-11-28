@@ -214,6 +214,7 @@ class RankXAI_REST {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( __CLASS__, 'handle_status' ),
+				// Public on purpose: it only says the plugin is active, so RankX AI can find it before connecting.
 				'permission_callback' => '__return_true',
 			)
 		);
@@ -1275,7 +1276,6 @@ class RankXAI_REST {
 				'contractVersion' => RANKXAI_CONTRACT_VERSION,
 				'pluginVersion'   => RANKXAI_VERSION,
 				'wpVersion'       => get_bloginfo( 'version' ),
-				'phpVersion'      => PHP_VERSION,
 				'isMultisite'     => is_multisite(),
 				'seo'             => array(
 					// 'none' cannot be determined from outside through the REST API.
@@ -1285,7 +1285,7 @@ class RankXAI_REST {
 					'mayOwnHead'     => RankXAI_Detect::may_own_head(),
 					'writableFields' => self::writable_fields(),
 				),
-				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'seo.fill', 'redirects.read', 'crawlers.read', 'checks.read', 'summary.write', 'seo.noindex', 'term_seo.read', 'term_seo.write' ),
+				'capabilities'    => array( 'seo.read', 'seo.write', 'manifest', 'documents.read', 'documents.write', 'twins.read', 'twins.write', 'content.write', 'schema.read', 'schema.write', 'schema.set', 'fill.read', 'redirects.read', 'crawlers.read', 'checks.read', 'summary.write', 'seo.noindex', 'term_seo.read', 'term_seo.write' ),
 				// Which root documents this install can publish.
 				'documents'       => array_keys( RankXAI_Documents::catalogue() ),
 			),

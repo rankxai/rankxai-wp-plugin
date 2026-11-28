@@ -6,10 +6,9 @@ import { toastWrite } from '../reviews';
 import { fmtCount, fmtDate, fmtNumber } from '../format';
 import { ErrorBanner, act, useLoad, type PageError } from '../kit';
 import { BatchProgress, useBatch } from '../components/BatchProgress';
-import { useModal, type WriteResult } from '../components/FixModals';
+import { useModal } from '../components/FixModals';
 import { StatusBadge } from '../components/Status';
-import { addRedirect as writeRedirect, redirectsWrittenLocally, removeRedirect, type RedirectWriteResult } from '../redirect-writes';
-import { host } from '../host';
+import { addRedirect as writeRedirect, applyRedirectSuggestion, importRedirectRows, redirectsWrittenLocally, removeRedirect, type RedirectWriteResult } from '../redirect-writes';
 import * as UI from '../ui';
 interface Suggestion {
     id: string;
@@ -119,10 +118,7 @@ export function RedirectsSection({ setError }: {
             void list.reload();
             return;
         }
-        const server = host.serverRedirects;
-        if (!server)
-            return;
-        const r = await act(() => server.importRows(csv.rows), (b) => setBusy(b ? 'import' : null), setImportError);
+        const r = await act(() => importRedirectRows(csv.rows), (b) => setBusy(b ? 'import' : null), setImportError);
         if (r.ok && batch.begin(r.data, 'apply')) {
             importModal.hide();
             setCsv(null);
@@ -132,23 +128,13 @@ export function RedirectsSection({ setError }: {
         const target = (targets[s.id] ?? s.suggestedTarget ?? '').trim();
         if (!target)
             return;
-        if (local) {
-            const w = await act(() => writeRedirect(s.path, target), (b) => setBusy(b ? s.id : null), setError);
-            if (!w.ok)
-                return;
-            await api(`fixes/redirect-suggestions/${s.id}/resolved`, { method: 'POST' });
-            setHandled((h) => ({ ...h, [s.id]: 'redirected' }));
-            toastSuccess('Redirect added');
-            void list.reload();
-            return;
-        }
-        const server = host.serverRedirects;
-        if (!server)
-            return;
-        const r = await act(() => server.applySuggestion(s.id, target), (b) => setBusy(b ? s.id : null), setError);
+        const r = await act(() => applyRedirectSuggestion(s.id, s.path, target), (b) => setBusy(b ? s.id : null), setError);
         if (r.ok && r.data) {
             setHandled((h) => ({ ...h, [s.id]: r.data!.verified ? 'redirected' : 'unconfirmed' }));
-            toastWrite(r.data.verified, 'Redirect created and confirmed', 'Redirect created');
+            if (local)
+                toastSuccess('Redirect added');
+            else
+                toastWrite(r.data.verified, 'Redirect created and confirmed', 'Redirect created');
             void list.reload();
         }
     }

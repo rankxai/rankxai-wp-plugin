@@ -50,18 +50,8 @@ export interface StoreHost {
     openPlanPage(url: string): void;
     locale(): string | null;
     redirects?: LocalRedirects;
-    serverRedirects?: ServerRedirects;
     requestScopes?(scopes: string[]): Promise<ScopeAnswer>;
     requestReview?(): void;
     appExtensions?(): Promise<AppExtensions>;
     appApiKey?(): string | null;
-}
-export interface ServerRedirects {
-    add(path: string, target: string): Promise<import('./api').ApiResult<import('./components/FixModals').WriteResult>>;
-    remove(id: string): Promise<import('./api').ApiResult<unknown>>;
-    importRows(rows: Array<{
-        path: string;
-        target: string;
-    }>): Promise<import('./api').ApiResult<unknown>>;
-    applySuggestion(id: string, target: string): Promise<import('./api').ApiResult<import('./components/FixModals').WriteResult>>;
 }

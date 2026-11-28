@@ -170,25 +170,28 @@ class RankXAI_Markdown {
 			$content = do_blocks( $content );
 		}
 
-		$previous = isset( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
-
-		// Core's own `the_content` filters (blocks, shortcodes, embeds) read the current post from this global,
-		// as in the loop. It is set for this one call and the previous value is restored straight after.
-		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- See above.
-		$GLOBALS['post'] = $post;
-		setup_postdata( $post );
+		// Core's `the_content` filters (blocks, shortcodes, embeds) read the current post, so run them inside a loop for it.
+		$query   = new WP_Query(
+			array(
+				'p'                   => $post->ID,
+				'post_type'           => $post->post_type,
+				'post_status'         => $post->post_status,
+				'posts_per_page'      => 1,
+				'no_found_rows'       => true,
+				'ignore_sticky_posts' => true,
+			)
+		);
+		$in_loop = $query->have_posts();
+		if ( $in_loop ) {
+			$query->the_post();
+		}
 
 		/** This filter is documented in wp-includes/post-template.php */
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core filter.
 		$content = apply_filters( 'the_content', $content );
 
-		if ( $previous instanceof WP_Post ) {
-			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restoring the value saved above.
-			$GLOBALS['post'] = $previous;
-			setup_postdata( $previous );
-		} else {
+		if ( $in_loop ) {
 			wp_reset_postdata();
-			unset( $GLOBALS['post'] );
 		}
 
 		return str_replace( ']]>', ']]&gt;', $content );

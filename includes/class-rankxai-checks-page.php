@@ -507,7 +507,7 @@ class RankXAI_Checks_Page {
 				: __( 'Does not see: widgets, links your theme writes into its own header and footer templates, links a page builder keeps outside the page content, and anything added by JavaScript in the browser.', 'rankxai' );
 		}
 		echo '<li>' . esc_html( $chrome ) . '</li>';
-		echo '<li>' . esc_html__( 'Links to other websites are not checked here. A RankX AI site audit checks them.', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'Links to other websites are not checked here.', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'Each address is confirmed by asking this site for it, from your own server, with the user agent RankXAI-SiteCheck. A security plugin\'s or a redirect plugin\'s 404 log may list these requests.', 'rankxai' ) . '</li>';
 		echo '</ul>';
 		if ( $findings['capped'] ) {

@@ -73,7 +73,7 @@ class RankXAI_Access_Scope {
 	 * @return string[]
 	 */
 	public static function no_unfiltered_html( $caps, $cap ) {
-		if ( 'unfiltered_html' === $cap && self::is_rankxai_password() ) {
+		if ( 'unfiltered_html' === $cap && self::is_connection_request() ) {
 			$caps[] = 'do_not_allow';
 		}
 		return $caps;
@@ -88,7 +88,7 @@ class RankXAI_Access_Scope {
 	 * @return mixed
 	 */
 	public static function enforce( $result, $server, $request ) {
-		if ( null !== $result || ! self::is_rankxai_password() ) {
+		if ( null !== $result || ! self::is_connection_request() ) {
 			return $result;
 		}
 		$reason = self::refusal( $request->get_method(), $request->get_route(), $request );
@@ -119,6 +119,9 @@ class RankXAI_Access_Scope {
 		}
 		if ( 'DELETE' === $method && rest_sanitize_boolean( $request->get_param( 'force' ) ) ) {
 			return __( 'RankX AI only moves things to the trash; it cannot delete them permanently.', 'rankxai' );
+		}
+		if ( ! $read && self::touches_site_page( $method, $route, $request ) ) {
+			return __( 'This page is one the site depends on (the front page, posts page, privacy policy or a store page). RankX AI can edit its text but cannot trash it, unpublish it or change its address, parent or template.', 'rankxai' );
 		}
 		if ( self::allowed( $route, $read ) ) {
 			return '';
@@ -185,7 +188,7 @@ class RankXAI_Access_Scope {
 	private static function readable( $route ) {
 		$patterns = array(
 			'#^/$#',
-			'#^/[a-z0-9-]+/v\d+$#',
+			'#^/(wp/v2|wc/v\d+|rankxai/v1|redirection/v1|wp-abilities/v1)$#',
 			'#^/wp/v2/(types|taxonomies|statuses|search|comments|users|users/me)(/|$)#',
 			'#^/wc/v\d+/(system_status|settings|coupons|orders|refunds|customers)(/|$)#',
 			'#^/wp-abilities/v1/abilities$#',
@@ -238,6 +241,73 @@ class RankXAI_Access_Scope {
 		 */
 		$allowed = (array) apply_filters( 'rankxai_content_post_types', array( 'post', 'page', 'product', 'attachment' ) );
 		return post_type_exists( $type ) && is_post_type_viewable( $type ) && in_array( $type, $allowed, true ) && ! in_array( $type, self::EXCLUDED_POST_TYPES, true );
+	}
+
+	/**
+	 * Pages the site depends on: the front page, posts page, privacy policy and WooCommerce's store pages.
+	 *
+	 * @return int[]
+	 */
+	public static function site_page_ids() {
+		$ids = array( (int) get_option( 'page_on_front' ), (int) get_option( 'page_for_posts' ), (int) get_option( 'wp_page_for_privacy_policy' ) );
+		if ( function_exists( 'wc_get_page_id' ) ) {
+			foreach ( array( 'shop', 'cart', 'checkout', 'myaccount', 'terms' ) as $page ) {
+				$ids[] = (int) wc_get_page_id( $page );
+			}
+		}
+		return array_values(
+			array_filter(
+				array_unique( $ids ),
+				static function ( $id ) {
+					return $id > 0;
+				}
+			)
+		);
+	}
+
+	/**
+	 * Whether a write would trash one of the site's own pages or change its status, address, parent, password or template.
+	 *
+	 * @param string          $method  HTTP method.
+	 * @param string          $route   Normalised route.
+	 * @param WP_REST_Request $request Request.
+	 * @return bool
+	 */
+	private static function touches_site_page( $method, $route, $request ) {
+		if ( ! preg_match( '#^/wp/v2/pages/(\d+)$#', $route, $m ) || ! in_array( (int) $m[1], self::site_page_ids(), true ) ) {
+			return false;
+		}
+		if ( 'DELETE' === $method ) {
+			return true;
+		}
+		$post = get_post( (int) $m[1] );
+		foreach ( array( 'status', 'slug', 'parent', 'password', 'template' ) as $key ) {
+			if ( ! $request->has_param( $key ) ) {
+				continue;
+			}
+			$value   = $request->get_param( $key );
+			$current = array(
+				'status'   => $post ? $post->post_status : '',
+				'slug'     => $post ? $post->post_name : '',
+				'parent'   => $post ? (int) $post->post_parent : 0,
+				'password' => $post ? $post->post_password : '',
+				'template' => $post ? (string) get_page_template_slug( $post ) : '',
+			);
+			$same    = 'parent' === $key ? (int) $value === $current[ $key ] : (string) $value === (string) $current[ $key ];
+			if ( ! $same ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Whether this request comes from RankX AI's connection: its Application Password, or its user signed in any other way.
+	 *
+	 * @return bool
+	 */
+	public static function is_connection_request() {
+		return self::is_rankxai_password() || RankXAI_Connector::is_connector( get_current_user_id() );
 	}
 
 	/**

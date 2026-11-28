@@ -27,6 +27,8 @@ const active = JSON.parse(wp('plugin', 'list', '--status=active', '--field=name'
 const wooWasActive = active.includes('woocommerce')
 if (!wooWasActive) wp('plugin', 'activate', 'woocommerce')
 const personalBefore = wpSoft('option', 'get', 'rankxai_share_personal_data')
+const frontBefore = wpSoft('option', 'get', 'page_on_front')
+const showOnFrontBefore = wpSoft('option', 'get', 'show_on_front')
 wpSoft('option', 'delete', 'rankxai_share_personal_data')
 
 const ours = wp('user', 'application-password', 'create', 'admin', 'scope-probe-rankxai', `--app-id=${APP_ID}`, '--porcelain')
@@ -164,6 +166,41 @@ try {
   const putOurs = await call(ours, 'PUT', '/rankxai/v1/connection', { token: 'x' })
   check('its own password reaches the token check', putOurs.status === 400 && putOurs.code === 'rankxai_bad_token', `${putOurs.status} ${putOurs.code}`)
   check('read products', (await call(ours, 'GET', '/wc/v3/products')).status === 200)
+  check("read WooCommerce's namespace root", (await call(ours, 'GET', '/wc/v3')).status === 200)
+  check("another plugin's namespace root is refused", refused(await call(ours, 'GET', '/wp-site-health/v1')))
+
+  console.log("The site's own pages")
+  const front = wp('post', 'create', '--post_type=page', '--post_status=publish', '--post_title=Scope probe front', '--post_name=scope-probe-front', '--porcelain')
+  created.push(front)
+  wp('option', 'update', 'show_on_front', 'page')
+  wp('option', 'update', 'page_on_front', front)
+  check('its text can still be edited', (await call(ours, 'POST', `/wp/v2/pages/${front}`, { title: 'Scope probe front (edited)', status: 'publish' })).status === 200)
+  check('it cannot be moved to the trash', refused(await call(ours, 'DELETE', `/wp/v2/pages/${front}`)))
+  check('it cannot be unpublished', refused(await call(ours, 'POST', `/wp/v2/pages/${front}`, { status: 'draft' })))
+  check('its address cannot change', refused(await call(ours, 'POST', `/wp/v2/pages/${front}`, { slug: 'moved' })))
+  check('it cannot be given a password', refused(await call(ours, 'POST', `/wp/v2/pages/${front}`, { password: 'x' })))
+  check('it is still published', wp('post', 'get', front, '--field=post_status') === 'publish')
+
+  console.log('Canonical addresses from the connection')
+  const seoPost = await call(ours, 'POST', '/wp/v2/posts', { title: 'Scope probe canonical', status: 'draft' })
+  if (seoPost.json?.id) created.push(seoPost.json.id)
+  const offSite = await call(ours, 'POST', `/rankxai/v1/seo/${seoPost.json?.id}`, { fields: { canonical: 'https://evil.example/page' } })
+  check('a canonical on another site is refused', offSite.status >= 400 && offSite.status < 500, `${offSite.status} ${offSite.code}`)
+  const onSite = await call(ours, 'POST', `/rankxai/v1/seo/${seoPost.json?.id}`, { fields: { canonical: `${BASE}/scope-probe-canonical/` } })
+  check('a canonical on this site is accepted', onSite.status === 200, `${onSite.status} ${onSite.code}`)
+
+  console.log('The connector user signed in some other way')
+  const viaUser = wp('eval', [
+    "RankXAI_Connector::ensure_role(); $id = RankXAI_Connector::ensure_user();",
+    "wp_set_current_user( $id );",
+    "$a = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/plugins' ) );",
+    "$b = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/settings' ) );",
+    "echo wp_json_encode( array( $a->get_status(), $a->as_error() ? $a->as_error()->get_error_code() : '', $b->get_status(), current_user_can( 'unfiltered_html' ) ) );",
+    "RankXAI_Connector::remove_user();",
+  ].join(' '))
+  const [aStatus, aCode, bStatus, unfiltered] = JSON.parse(viaUser || '[]')
+  check('the allow list still applies', aStatus === 403 && aCode === 'rankxai_not_allowed' && bStatus === 403, viaUser)
+  check('and it still has no unfiltered_html', unfiltered === false, viaUser)
   check("use the plugin's own routes", (await call(ours, 'GET', '/rankxai/v1/manifest')).status === 200)
 
   console.log('Control: any other Application Password is untouched')
@@ -181,6 +218,8 @@ try {
 } finally {
   rmSync(PRIVATE_TYPE, { force: true })
   wp('option', 'update', 'blogname', title)
+  wpSoft('option', 'update', 'page_on_front', frontBefore ?? '0')
+  wpSoft('option', 'update', 'show_on_front', showOnFrontBefore ?? 'posts')
   for (const id of created) wpSoft('post', 'delete', String(id), '--force')
   for (const id of createdTerms) wpSoft('term', 'delete', 'product_cat', String(id))
   for (const name of ['scope-probe-rankxai', 'scope-probe-other']) {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { blogNewHref, blogArticleHref } from '@/lib/shopify-app/app-routes-core';
-import { PLAN_CAP_MAX, PLAN_LENGTHS, frequencyLabel, monthlyCeiling, type PlanLength } from '@/lib/shopify-app/blog-schedule-core';
+import { SCHEDULE_CAP_MAX, PLAN_LENGTHS, frequencyLabel, monthlyCeiling, type PlanLength } from '@/lib/shopify-app/blog-schedule-core';
 import { api, toastSuccess } from '../api';
 import { usePlan } from '../subscription-context';
 import { ErrorBanner, act, creditsLabel, fieldError, formatDate, useLoad, type PageError } from '../kit';
@@ -152,7 +152,7 @@ export function BlogScheduleView({ blog, error, setError }: {
                   {blog ? lengthLabel(blog, l, LENGTH_NAMES[l]) : LENGTH_NAMES[l]}
                 </UI.Option>))}
             </UI.Select>
-            <UI.NumberField label="At most, articles a month" value={String(p.monthlyCap)} min={1} max={PLAN_CAP_MAX} step={1} disabled={busy !== null || undefined} error={fieldError(error, 'monthlyCap')} onChange={(e) => {
+            <UI.NumberField label="At most, articles a month" value={String(p.monthlyCap)} min={1} max={SCHEDULE_CAP_MAX} step={1} disabled={busy !== null || undefined} error={fieldError(error, 'monthlyCap')} onChange={(e) => {
                 const n = Number(e.currentTarget.value);
                 if (Number.isInteger(n) && n !== p.monthlyCap)
                     void save({ monthlyCap: n }, 'Saved');

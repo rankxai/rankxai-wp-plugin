@@ -65,9 +65,7 @@ class RankXAI_Woo {
 			'terms'       => function_exists( 'wc_terms_and_conditions_page_id' ) ? wc_terms_and_conditions_page_id() : 0,
 			'coming_soon' => wc_get_page_id( 'coming_soon' ),
 		);
-		/** This filter is documented in woocommerce/src/Admin/WCAdminHelper.php */
-		$pages = apply_filters( 'woocommerce_store_pages', $pages ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
-		return self::positive_ids( is_array( $pages ) ? array_values( $pages ) : array() );
+		return self::positive_ids( array_values( $pages ) );
 	}
 
 	/**

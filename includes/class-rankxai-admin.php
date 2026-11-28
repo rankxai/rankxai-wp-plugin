@@ -309,7 +309,7 @@ class RankXAI_Admin {
 
 		// Text for each root document and the business summary, saved only when it changed.
 		$too_long = false;
-		$texts    = isset( $_POST['rankxai_document'] ) && is_array( $_POST['rankxai_document'] ) ? wp_unslash( $_POST['rankxai_document'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each value is sanitised by rankxai_sanitize_plain_text() below.
+		$texts    = isset( $_POST['rankxai_document'] ) && is_array( $_POST['rankxai_document'] ) ? map_deep( wp_unslash( $_POST['rankxai_document'] ), 'rankxai_sanitize_plain_text' ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitised by map_deep( rankxai_sanitize_plain_text ).
 		foreach ( array_keys( RankXAI_Documents::catalogue() ) as $slug ) {
 			if ( ! isset( $texts[ $slug ] ) || ! is_string( $texts[ $slug ] ) ) {
 				continue;
@@ -389,7 +389,7 @@ class RankXAI_Admin {
 		$cell  = function ( $value ) {
 			$value = (string) $value;
 			// A leading formula character would run as a formula in a spreadsheet.
-			if ( '' !== $value && false !== strpos( '=+-@', $value[0] ) ) {
+			if ( '' !== $value && false !== strpos( "=+-@\t\r", $value[0] ) ) {
 				$value = "'" . $value;
 			}
 			return preg_match( '/[",\r\n]/', $value ) ? '"' . str_replace( '"', '""', $value ) . '"' : $value;

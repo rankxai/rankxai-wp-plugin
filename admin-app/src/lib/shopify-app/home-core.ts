@@ -123,7 +123,7 @@ export function planCardState(account: ShopifyAccountData | null, opts: {
     if (account.onFreePlan) {
         return {
             kind: 'free', title: 'Free plan', tone: 'info', date: null, action: change,
-            body: 'Your product check and single fixes are free. Choose a paid plan to check how ChatGPT and Google AI Mode show your products.',
+            body: 'Your product check and product fixes are free. Choose a paid plan to check how ChatGPT and Google AI Mode show your products.',
         };
     }
     if (account.hadContract && account.cancelAtPeriodEnd) {

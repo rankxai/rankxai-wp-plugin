@@ -126,8 +126,8 @@ class RankXAI_SEO_Box {
 			return;
 		}
 		if ( isset( $_POST[ self::NONCE_SCHEMA ] ) && wp_verify_nonce( sanitize_key( wp_unslash( $_POST[ self::NONCE_SCHEMA ] ) ), self::NONCE_SCHEMA ) && isset( $_POST['rankxai_schema_json'] ) ) {
-			// Checked as JSON by RankXAI_Schema::rejection(); it is printed escaped for a script element.
-			$json = trim( (string) wp_unslash( $_POST['rankxai_schema_json'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON, validated by RankXAI_Schema::set().
+			// Plain text, then checked as JSON by RankXAI_Schema::set(); it is printed escaped for a script element.
+			$json = trim( rankxai_sanitize_plain_text( wp_unslash( $_POST['rankxai_schema_json'] ) ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitised by rankxai_sanitize_plain_text().
 			if ( '' === $json ) {
 				RankXAI_Schema::delete( $post_id );
 			} else {
@@ -140,7 +140,7 @@ class RankXAI_SEO_Box {
 		if ( ! isset( $_POST['rankxai_seo'] ) || ! is_array( $_POST['rankxai_seo'] ) ) {
 			return;
 		}
-		$posted = wp_unslash( $_POST['rankxai_seo'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each field is checked and sanitised by RankXAI_SEO::check_field() below.
+		$posted = map_deep( wp_unslash( $_POST['rankxai_seo'] ), 'sanitize_text_field' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitised by map_deep( sanitize_text_field ).
 		$values = array();
 		foreach ( array_keys( self::post_fields() ) as $field ) {
 			if ( isset( $posted[ $field ] ) && is_string( $posted[ $field ] ) ) {
@@ -210,7 +210,7 @@ class RankXAI_SEO_Box {
 		if ( ! $term instanceof WP_Term || (int) $term->term_taxonomy_id !== (int) $tt_id ) {
 			return;
 		}
-		$posted = wp_unslash( $_POST['rankxai_term_seo'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each field is sanitised by RankXAI_Term_SEO::set().
+		$posted = map_deep( wp_unslash( $_POST['rankxai_term_seo'] ), 'sanitize_text_field' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitised by map_deep( sanitize_text_field ).
 		$values = array();
 		foreach ( RankXAI_Term_SEO::fields() as $field ) {
 			if ( isset( $posted[ $field ] ) && is_string( $posted[ $field ] ) ) {
