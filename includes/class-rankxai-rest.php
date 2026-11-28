@@ -833,6 +833,9 @@ class RankXAI_REST {
 		}
 
 		$rejected = RankXAI_Content::rejections( $fields );
+		if ( array_key_exists( 'slug', $fields ) && RankXAI_Access_Scope::is_connection_request() && in_array( $post_id, RankXAI_Access_Scope::site_page_ids(), true ) && (string) get_post_field( 'post_name', $post_id ) !== (string) $fields['slug'] ) {
+			$rejected['slug'] = 'this is one of the pages the site depends on; its address is changed only in wp-admin';
+		}
 		if ( $rejected ) {
 			$detail = array();
 			foreach ( $rejected as $field => $reason ) {
@@ -1407,6 +1410,8 @@ class RankXAI_REST {
 		$rejected = RankXAI_SEO::rejections( $fields );
 		if ( array_key_exists( 'noindex', $fields ) && ! in_array( $fields['noindex'], array( '1', '' ), true ) ) {
 			$rejected['noindex'] = 'must be "1" or ""';
+		} elseif ( isset( $fields['noindex'] ) && '1' === $fields['noindex'] && RankXAI_Access_Scope::is_connection_request() && in_array( $post_id, RankXAI_Access_Scope::site_page_ids(), true ) ) {
+			$rejected['noindex'] = 'this is one of the pages the site depends on; it is hidden from search engines only in wp-admin';
 		}
 		if ( $rejected ) {
 			$detail = array();

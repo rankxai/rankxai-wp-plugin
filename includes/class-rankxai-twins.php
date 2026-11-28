@@ -259,7 +259,8 @@ class RankXAI_Twins {
 	 */
 	public static function intercept() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Request path only, no form.
-		$raw = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+		// esc_url_raw rather than sanitize_text_field, which strips percent-encoded characters from the path.
+		$raw = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
 		if ( '' === $raw ) {
 			return;
 		}
@@ -538,7 +539,9 @@ class RankXAI_Twins {
 			}
 		}
 
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markdown body; escaping would corrupt it.
+		// The body is markdown, sent as text/markdown with nosniff, so a browser never reads it as HTML, and
+		// HTML-escaping would corrupt it. It is built from the post's rendered text with tags removed.
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- See above.
 		echo $markdown;
 		exit;
 	}

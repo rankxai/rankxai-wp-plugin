@@ -1,5 +1,5 @@
 import * as UI from '../ui';
-export type StatusKey = 'can_be_shown' | 'cant_be_shown' | 'cant_tell' | 'measuring' | 'needs_attention' | 'saved' | 'saved_unconfirmed' | 'not_saved' | 'undone' | 'locked';
+export type StatusKey = 'can_be_shown' | 'cant_be_shown' | 'cant_tell' | 'measuring' | 'needs_attention' | 'saved' | 'saved_unconfirmed' | 'not_saved' | 'undone' | 'paid_plan';
 type Tone = 'success' | 'critical' | 'neutral' | 'info' | 'warning';
 const STATUS: Record<StatusKey, {
     label: string;
@@ -14,7 +14,7 @@ const STATUS: Record<StatusKey, {
     saved_unconfirmed: { label: 'Saved, not yet confirmed', tone: 'warning' },
     not_saved: { label: 'Not saved', tone: 'critical' },
     undone: { label: 'Undone', tone: 'neutral' },
-    locked: { label: 'Locked', tone: 'neutral' },
+    paid_plan: { label: 'Paid plan', tone: 'neutral' },
 };
 export function StatusBadge({ status, label }: {
     status: StatusKey;

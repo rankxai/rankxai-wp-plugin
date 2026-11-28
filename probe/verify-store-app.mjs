@@ -144,7 +144,8 @@ async function main() {
     check(witness().filter((w) => w.host === 'app.rankxai.com').length === 0, 'and clicking it sends nothing from the server (the browser is redirected)')
 
     console.log('\n== C  PUT rankxai/v1/connection ==')
-    const pw = wp('user', 'application-password', 'create', 'admin', `rx-store-probe-${Date.now()}`, '--porcelain')
+    // Only RankX AI's own Application Password may place the site token.
+    const pw = wp('user', 'application-password', 'create', 'admin', `rx-store-probe-${Date.now()}`, `--app-id=${APP_ID}`, '--porcelain')
     madePasswords.push(pw)
     const basic = `admin:${pw}`
     const bad1 = await rest('PUT', '/rankxai/v1/connection', { basic, body: { token: 'nope', linkId: LINK } })
@@ -282,7 +283,9 @@ async function main() {
     check(noWoo.status === 200 && !/page=rankxai-store['"]/.test(noWoo.html), 'no Store item without WooCommerce')
     check(noWoo.html.includes('rankxai_connect'), 'Connect is still in Settings on every site')
     const storeNoWoo = await page(jar, '/wp-admin/admin.php?page=rankxai-store')
-    check(storeNoWoo.status === 403 || /not allowed|Sorry/.test(storeNoWoo.html), 'the Store address is refused by WordPress, not a fatal error')
+    check(storeNoWoo.status === 302 && storeNoWoo.location.includes('rankxai-store-unavailable=1'), 'the Store address goes to the Overview with a note, not a fatal error', `${storeNoWoo.status} ${storeNoWoo.location}`)
+    const overviewNote = await page(jar, '/wp-admin/admin.php?page=rankxai&rankxai-store-unavailable=1')
+    check(overviewNote.status === 200 && /WooCommerce/.test(overviewNote.html), 'and the Overview says the Store page needs WooCommerce')
     const noRoute = await rest('POST', '/rankxai/v1/session', { jar, nonce: await restNonce(jar) })
     check(noRoute.status === 404, 'and the session route does not exist')
     const log = debugLog()

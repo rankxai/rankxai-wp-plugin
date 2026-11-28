@@ -30,20 +30,20 @@ class RankXAI_Robots {
 	 */
 	public static function crawlers() {
 		return array(
-			self::entry( 'OAI-SearchBot', 'ChatGPT', 'search', 'ChatGPT cannot include your pages in its search results.', 'oai-searchbot' ),
-			self::entry( 'ChatGPT-User', 'ChatGPT', 'user_fetch', 'ChatGPT cannot open your pages when a user asks it to.', 'chatgpt-user' ),
-			self::entry( 'GPTBot', 'ChatGPT', 'training', 'OpenAI cannot use your pages to learn what your business is.', 'gptbot' ),
-			self::entry( 'Claude-SearchBot', 'Claude', 'search', 'Claude cannot include your pages in its search results.', 'claude-searchbot' ),
-			self::entry( 'Claude-User', 'Claude', 'user_fetch', 'Claude cannot open your pages when a user asks it to.', 'claude-user' ),
-			self::entry( 'ClaudeBot', 'Claude', 'training', 'Anthropic cannot use your pages to learn what your business is.', 'claudebot' ),
-			self::entry( 'PerplexityBot', 'Perplexity', 'search', 'Perplexity cannot index your pages, so it cannot cite you.', 'perplexitybot' ),
-			self::entry( 'Perplexity-User', 'Perplexity', 'user_fetch', 'Perplexity cannot open your pages when a user asks it to.', 'perplexity-user' ),
-			self::entry( 'Google-Extended', 'Google Gemini / AI Overviews', 'training', 'Google cannot use your pages to ground Gemini or AI Overviews.', null ),
-			self::entry( 'Applebot-Extended', 'Apple Intelligence', 'training', 'Apple cannot use your pages for its AI features.', null ),
-			self::entry( 'meta-externalagent', 'Meta AI', 'training', 'Meta cannot use your pages to learn what your business is.', 'meta-externalagent' ),
-			self::entry( 'Amazonbot', 'Amazon Alexa', 'search', 'Alexa cannot surface your pages in answers.', 'amazonbot' ),
-			self::entry( 'Bytespider', 'TikTok / Doubao', 'training', 'ByteDance cannot use your pages for its AI features.', 'bytespider' ),
-			self::entry( 'CCBot', 'Common Crawl', 'training', 'Common Crawl cannot archive your pages, which most open models learn from.', 'ccbot' ),
+			self::entry( 'OAI-SearchBot', 'ChatGPT', 'search', __( 'ChatGPT cannot include your pages in its search results.', 'rankxai' ), 'oai-searchbot' ),
+			self::entry( 'ChatGPT-User', 'ChatGPT', 'user_fetch', __( 'ChatGPT cannot open your pages when a user asks it to.', 'rankxai' ), 'chatgpt-user' ),
+			self::entry( 'GPTBot', 'ChatGPT', 'training', __( 'OpenAI cannot use your pages to learn what your business is.', 'rankxai' ), 'gptbot' ),
+			self::entry( 'Claude-SearchBot', 'Claude', 'search', __( 'Claude cannot include your pages in its search results.', 'rankxai' ), 'claude-searchbot' ),
+			self::entry( 'Claude-User', 'Claude', 'user_fetch', __( 'Claude cannot open your pages when a user asks it to.', 'rankxai' ), 'claude-user' ),
+			self::entry( 'ClaudeBot', 'Claude', 'training', __( 'Anthropic cannot use your pages to learn what your business is.', 'rankxai' ), 'claudebot' ),
+			self::entry( 'PerplexityBot', 'Perplexity', 'search', __( 'Perplexity cannot index your pages, so it cannot cite you.', 'rankxai' ), 'perplexitybot' ),
+			self::entry( 'Perplexity-User', 'Perplexity', 'user_fetch', __( 'Perplexity cannot open your pages when a user asks it to.', 'rankxai' ), 'perplexity-user' ),
+			self::entry( 'Google-Extended', 'Google Gemini / AI Overviews', 'training', __( 'Google cannot use your pages to ground Gemini or AI Overviews.', 'rankxai' ), null ),
+			self::entry( 'Applebot-Extended', 'Apple Intelligence', 'training', __( 'Apple cannot use your pages for its AI features.', 'rankxai' ), null ),
+			self::entry( 'meta-externalagent', 'Meta AI', 'training', __( 'Meta cannot use your pages to learn what your business is.', 'rankxai' ), 'meta-externalagent' ),
+			self::entry( 'Amazonbot', 'Amazon Alexa', 'search', __( 'Alexa cannot surface your pages in answers.', 'rankxai' ), 'amazonbot' ),
+			self::entry( 'Bytespider', 'TikTok / Doubao', 'training', __( 'ByteDance cannot use your pages for its AI features.', 'rankxai' ), 'bytespider' ),
+			self::entry( 'CCBot', 'Common Crawl', 'training', __( 'Common Crawl cannot archive your pages, which most open models learn from.', 'rankxai' ), 'ccbot' ),
 		);
 	}
 

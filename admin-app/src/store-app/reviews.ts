@@ -1,4 +1,4 @@
-import { batchTrigger, outcomeTrigger, shouldAskForReview, writeTrigger, type ReviewTrigger } from '@/lib/shopify-app/review-prompt-core';
+import { batchTrigger, outcomeTrigger, shouldAskForReview, writeTrigger, type ReviewTrigger } from '@/lib/shopify-app/review-request-core';
 import { toastSuccess } from './api';
 import { host } from './host';
 const state = { askedThisSession: false };

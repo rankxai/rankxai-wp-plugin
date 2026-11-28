@@ -364,6 +364,19 @@ async function run() {
   const draft = await raw('/privacy-policy.md')
   draft.status === 404 ? ok('ON — a draft has no twin') : bad(`ON — a draft served ${draft.status}`)
 
+  // A non-ASCII address arrives percent-encoded; the copy must still resolve.
+  const encodedId = await wpCapture([
+    'post', 'create', '--post_type=post', '--post_title=Тест twin probe',
+    '--post_name=тест-twin-probe', '--post_status=publish', '--post_content=<p>Encoded address probe.</p>', '--porcelain',
+  ])
+  const encodedUrl = await wpCapture(['eval', `echo get_permalink(${encodedId.trim()});`])
+  const encodedPath = new URL(encodedUrl).pathname.replace(/\/$/, '')
+  const encoded = await raw(`${encodedPath}.md`)
+  encodedPath.includes('%') && encoded.status === 200 && has(/text\/markdown/, encoded.ct) && has(/Encoded address probe/, encoded.body)
+    ? ok(`ON — a percent-encoded address (${encodedPath}.md) gets its copy`)
+    : bad(`ON — ${encodedPath}.md answered ${encoded.status} ${encoded.ct}`)
+  await wpCapture(['post', 'delete', encodedId.trim(), '--force'])
+
   await setTwins({ enabled: false, context: '' })
   await apiJson('/rankxai/v1/documents/agents_md', { method: 'DELETE' })
 

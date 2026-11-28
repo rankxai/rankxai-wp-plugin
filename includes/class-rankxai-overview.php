@@ -261,13 +261,13 @@ class RankXAI_Overview {
 		$summary = RankXAI_Summary::latest();
 		$card    = array(
 			'title'      => __( 'Do AI assistants mention you?', 'rankxai' ),
-			'subtitle'   => __( 'Only RankX AI can answer this: it asks the assistants the questions your customers ask.', 'rankxai' ),
+			'subtitle'   => __( 'RankX AI answers this by asking the assistants the questions your customers ask.', 'rankxai' ),
 			'link'       => '',
 			'link_label' => '',
 			'action'     => '',
 		);
 		if ( ! $summary ) {
-			$card['state'] = RankXAI_UI::chip( __( 'Needs RankX AI', 'rankxai' ), 'info' );
+			$card['state'] = RankXAI_UI::chip( __( 'On RankX AI', 'rankxai' ), 'info' );
 			if ( '' !== self::CHECKER_URL ) {
 				$domain         = (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST );
 				$card['text']   = __( 'Run the free AI visibility check on rankxai.com: it asks ChatGPT and Gemini three questions a customer would ask and tells you whether this site is named, and who is named instead.', 'rankxai' );

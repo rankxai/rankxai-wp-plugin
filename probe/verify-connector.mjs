@@ -119,7 +119,7 @@ try {
   const page = await openApproval(cookie)
   check('the form posts no web address (hosting firewalls refuse one)', !/<form[\s\S]*name="(success_url|reject_url|_wp_http_referer)"[\s\S]*<\/form>/.test(page.html) && page.html.includes('name="request"'))
   check('the screen lists what the user cannot do', page.html.includes('install, change or remove plugins or themes') && page.html.includes('change site, store or plugin settings, including redirects, shipping and webhooks'))
-  check('and says redirects are only read', page.html.includes('read the list of redirects (only you add or remove them, here in wp-admin)') && !page.html.includes('add and remove redirects'))
+  check('and says redirects are only read', page.html.includes('the list of redirects (only you add or remove redirects, here in wp-admin)') && !page.html.includes('add and remove redirects'))
 
   const rejected = await decide(cookie, page.html, 'reject')
   check('Don’t connect returns success=false', rejected.location.startsWith(RETURN) && rejected.location.includes('success=false'), rejected.location)

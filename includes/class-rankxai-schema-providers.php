@@ -378,7 +378,7 @@ class RankXAI_Schema_Providers {
 			);
 		}
 		// RankX AI's connection never calls another plugin's API: its schema joins Rank Math's graph instead.
-		if ( RankXAI_Access_Scope::is_rankxai_password() ) {
+		if ( RankXAI_Access_Scope::is_connection_request() ) {
 			return array(
 				'available' => false,
 				'reason'    => 'connection_joins_graph',

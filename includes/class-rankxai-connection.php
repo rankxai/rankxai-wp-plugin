@@ -267,7 +267,7 @@ class RankXAI_Connection {
 	}
 
 	/**
-	 * Tell RankX AI, then remove the token, its Application Passwords, its user and webhooks.
+	 * Tell RankX AI, then remove the token, its Application Passwords and its user.
 	 *
 	 * @param string $reason 'disconnected', 'deactivated' or 'uninstalled'.
 	 * @return int How many Application Passwords were removed.

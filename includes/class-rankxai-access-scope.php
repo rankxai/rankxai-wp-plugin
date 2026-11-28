@@ -120,8 +120,11 @@ class RankXAI_Access_Scope {
 		if ( 'DELETE' === $method && rest_sanitize_boolean( $request->get_param( 'force' ) ) ) {
 			return __( 'RankX AI only moves things to the trash; it cannot delete them permanently.', 'rankxai' );
 		}
+		if ( ! $read && preg_match( '#^/wp/v2/[a-z0-9_-]+(/\d+)?$#', $route ) && $request->has_param( 'template' ) && '' !== (string) $request->get_param( 'template' ) ) {
+			return __( 'RankX AI cannot change a page\'s template; that is part of the site\'s design.', 'rankxai' );
+		}
 		if ( ! $read && self::touches_site_page( $method, $route, $request ) ) {
-			return __( 'This page is one the site depends on (the front page, posts page, privacy policy or a store page). RankX AI can edit its text but cannot trash it, unpublish it or change its address, parent or template.', 'rankxai' );
+			return __( 'This page is one the site depends on (the front page, posts page, privacy policy or a store page). RankX AI can edit its text but cannot trash it, unpublish it or change its address or parent.', 'rankxai' );
 		}
 		if ( self::allowed( $route, $read ) ) {
 			return '';

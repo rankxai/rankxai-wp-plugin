@@ -297,7 +297,7 @@ class RankXAI_Connector {
 		$existing = self::user_id();
 		echo '<p>' . esc_html__( 'RankX AI will sign in to this site as its own user, called “RankX AI”, with a password only it holds.', 'rankxai' ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'That user can:', 'rankxai' ) . '</strong></p><ul class="ul-disc">';
-		echo '<li>' . esc_html__( 'create, edit and publish posts, pages and products and their categories and tags: titles, text, excerpts, addresses, status, parent and template, and a product\'s price, stock and other details', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'create, edit and publish posts, pages and products and their categories and tags: titles, text, excerpts, addresses, status and parent, and a product\'s price, stock and other details', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'upload images and set their alt text', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'move content to the trash (never delete it permanently)', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'set a page\'s search title, description, link previews and noindex, in your SEO plugin\'s fields when you have one, and its structured data', 'rankxai' ) . '</li>';
@@ -308,7 +308,7 @@ class RankXAI_Connector {
 		echo '<li>' . esc_html__( 'install, change or remove plugins or themes', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'add, change or remove users', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'change site, store or plugin settings, including redirects, shipping and webhooks', 'rankxai' ) . '</li>';
-		echo '<li>' . esc_html__( 'trash, unpublish or move the front page, posts page, privacy policy or store pages', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'change a page\'s template, or trash, unpublish, move or hide from search engines the front page, posts page, privacy policy or store pages', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'sign in to wp-admin', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'switch any of this plugin\'s features on or off, or write ai.txt', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'read orders, customers, users or comments, unless you allow it in RankX AI › Settings (and even then it cannot change them)', 'rankxai' ) . '</li></ul>';
