@@ -62,10 +62,11 @@ function buildStoreApp() {
   if (!existsSync(join(STORE_SRC, 'package.json'))) {
     throw new Error(`${STORE_SRC}/package.json is missing. Run: node sync-store-app.mjs`)
   }
-  // No lockfile ships; install only when missing or RANKXAI_STORE_REINSTALL is set.
-  if (!existsSync(join(STORE_SRC, 'node_modules', 'vite')) || process.env.RANKXAI_STORE_REINSTALL) {
-    execSync('npm install --no-audit --no-fund --no-package-lock', { cwd: STORE_SRC, stdio: 'inherit' })
+  // Always the locked versions, as the readme tells a reader to build it, so the zip's bundle is what its source rebuilds.
+  if (!existsSync(join(STORE_SRC, 'package-lock.json'))) {
+    throw new Error(`${STORE_SRC}/package-lock.json is missing. Run: node sync-store-app.mjs`)
   }
+  execSync('npm ci --no-audit --no-fund', { cwd: STORE_SRC, stdio: 'inherit' })
   execSync('npm run build', { cwd: STORE_SRC, stdio: 'inherit' })
   const manifest = JSON.parse(readFileSync(join(STORE_OUT, '.vite', 'manifest.json'), 'utf8'))
   const entry = manifest[STORE_ENTRY]
@@ -213,7 +214,7 @@ for (const file of PHP_WITH_BLOCKS) {
 
 // Both targets carry the store app's build, its asset map AND its source with the build tools'
 // configuration (guideline 4: the source is in the plugin, as well as in the public repository).
-const storeNeeded = [`${SLUG}/${ASSET_MAP}`, `${SLUG}/${store.entry}`, `${SLUG}/${STORE_SRC}/package.json`, `${SLUG}/${STORE_SRC}/${STORE_ENTRY}`]
+const storeNeeded = [`${SLUG}/${ASSET_MAP}`, `${SLUG}/${store.entry}`, `${SLUG}/${STORE_SRC}/package.json`, `${SLUG}/${STORE_SRC}/package-lock.json`, `${SLUG}/${STORE_SRC}/${STORE_ENTRY}`]
 const storeMissing = storeNeeded.filter((n) => !names.includes(n))
 const leaked = names.filter((n) => n.includes('/.vite/') || n.includes('/node_modules/') || n.startsWith(`${SLUG}/${STORE_SRC}/dist/`))
 if (storeMissing.length || leaked.length) {

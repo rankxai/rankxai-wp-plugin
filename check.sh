@@ -41,9 +41,9 @@ echo "$ARCHIVE_FILES" | sed 's/^/  /'
 
 # Development artefacts. The only .json files that ship are the store app
 # source's package.json and tsconfig.json, so its build tools can be found.
-STRAYS=$(echo "$ARCHIVE_FILES" | grep -iE '\.(sh|mjs|cjs|ya?ml|dist|lock|json)$|^probe/|^\.' | grep -v '^readme\.txt$' | grep -vxE 'admin-app/src/(package|tsconfig)\.json' || true)
+STRAYS=$(echo "$ARCHIVE_FILES" | grep -iE '\.(sh|mjs|cjs|ya?ml|dist|lock|json)$|^probe/|^\.' | grep -v '^readme\.txt$' | grep -vxE 'admin-app/src/(package|package-lock|tsconfig)\.json' || true)
 # And inside admin-app/src, only the kinds of file the published source is made of.
-STORE_STRAYS=$(echo "$ARCHIVE_FILES" | grep '^admin-app/' | grep -vE '\.(ts|tsx|css|webp)$|^admin-app/src/(package|tsconfig)\.json$|^admin-app/src/vite\.config\.js$|^admin-app/build/(assets/[^/]+\.(js|css|webp)|store-app\.asset\.php)$' || true)
+STORE_STRAYS=$(echo "$ARCHIVE_FILES" | grep '^admin-app/' | grep -vE '\.(ts|tsx|css|webp)$|^admin-app/src/(package|package-lock|tsconfig)\.json$|^admin-app/src/vite\.config\.js$|^admin-app/build/(assets/[^/]+\.(js|css|webp)|store-app\.asset\.php)$' || true)
 # Only file types WordPress.org expects in a plugin (its review named a .mts file as not permitted), and no notes
 # files: readme.txt is the only document besides the licences.
 ODD_TYPES=$(echo "$ARCHIVE_FILES" | grep -viE '\.(php|js|css|txt|png|svg|jpe?g|gif|webp|json|woff2|ts|tsx)$' || true)
