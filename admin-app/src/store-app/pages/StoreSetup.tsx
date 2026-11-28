@@ -1,4 +1,4 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { APP_PATHS, searchHref } from '@/lib/shopify-app/app-routes-core';
 import { storeSettingLink } from '@/lib/shopify-app/product-issues-core';
 import { AdminLink, BackLink, ErrorBanner, formatDate, useLoad, usePageError } from '../kit';

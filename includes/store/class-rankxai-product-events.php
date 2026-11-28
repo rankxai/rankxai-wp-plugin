@@ -37,9 +37,6 @@ class RankXAI_Product_Events {
 	/** Products per request. */
 	const BATCH = 100;
 
-	/** Set once the webhooks earlier versions let RankX AI create have been removed. */
-	const OPTION_CLEANED = 'rankxai_product_webhooks_removed';
-
 	/**
 	 * Hooks.
 	 */
@@ -50,7 +47,6 @@ class RankXAI_Product_Events {
 		add_action( 'untrashed_post', array( __CLASS__, 'restored' ) );
 		add_action( 'before_delete_post', array( __CLASS__, 'deleted' ) );
 		add_action( self::HOOK, array( __CLASS__, 'send' ) );
-		add_action( 'admin_init', array( __CLASS__, 'remove_old_webhooks' ) );
 	}
 
 	/**
@@ -190,18 +186,6 @@ class RankXAI_Product_Events {
 			}
 			update_option( self::OPTION, $current, false );
 		}
-	}
-
-	/**
-	 * Once: remove the WooCommerce webhooks earlier versions let RankX AI create.
-	 * Product changes are reported by this plugin instead.
-	 */
-	public static function remove_old_webhooks() {
-		if ( get_option( self::OPTION_CLEANED ) || ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		RankXAI_Connection::remove_webhooks();
-		update_option( self::OPTION_CLEANED, 1, false );
 	}
 
 	/**

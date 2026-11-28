@@ -4,7 +4,7 @@ import { APP_PATHS } from '@/lib/shopify-app/app-routes-core';
 import { fmtDate } from './format';
 import { host } from './host';
 import * as UI from './ui';
-import { usePlan, useStore } from './plan-context';
+import { usePlan, useStore } from './subscription-context';
 import { isAdminLink, localiseAdminLabel } from '@/lib/store-app/admin-target-core';
 export interface Load<T> {
     data: T | null;

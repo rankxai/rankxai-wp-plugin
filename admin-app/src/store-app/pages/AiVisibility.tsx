@@ -3,7 +3,7 @@ import { useRouter } from '../router';
 import { ViewTabs } from '../kit';
 import { AiOrdersTab } from '../shopify-views/AiOrdersTab';
 import { WooAiOrdersTab } from '../components/WooAiOrders';
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { CompetitorsTab } from './CompetitorsTab';
 import { ShopperQuestionsTab } from './ShopperQuestions';
 import { StoreKnowledgeTab } from './StoreKnowledgeTab';

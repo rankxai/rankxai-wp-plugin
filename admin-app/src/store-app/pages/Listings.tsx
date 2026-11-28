@@ -3,7 +3,7 @@ import { APP_PATHS, searchHref } from '@/lib/shopify-app/app-routes-core';
 import { snippetFor, widthNote, type Device, type Fitted } from '@/lib/shopify-app/serp-preview-core';
 import { api, toastSuccess } from '../api';
 import { toastWrite } from '../reviews';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { fmtDateTime, fmtNumber } from '../format';
 import { ErrorBanner, GoButton, PricedButton, act, creditsLabel, fieldError, useLoad, usePageError, type PageError } from '../kit';
 import { BatchProgress, useBatch } from '../components/BatchProgress';

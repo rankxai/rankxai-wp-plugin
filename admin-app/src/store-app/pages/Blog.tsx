@@ -1,11 +1,11 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { useEffect, useState } from 'react';
 import { APP_PATHS, blogHref, blogNewHref, searchHref, blogArticleHref } from '@/lib/shopify-app/app-routes-core';
 import { alreadyWritten } from '@/lib/shopify-app/article-contents-core';
 import { OWNER_ANSWER_MAX, OWNER_NOTE_MAX, FEATURED_PRODUCTS_MAX, STORE_ARTICLE_TYPES, STORE_ARTICLE_TYPE_COPY, type StoreArticleType } from '@/lib/content/store-article-types';
 import { storeWordRange } from '@/lib/content/store-article-length';
 import { api, toastSuccess } from '../api';
-import { planToName, usePlan } from '../plan-context';
+import { planToName, usePlan } from '../subscription-context';
 import { ErrorBanner, GoButton, ViewTabs, PagePrimaryAction, act, creditsLabel, fieldError, formatDate, useLoad, usePagedRows, usePageError, type PageError } from '../kit';
 import { MissingImagesNotice } from '../components/MissingImagesNotice';
 import { SkeletonSection } from '../components/Status';

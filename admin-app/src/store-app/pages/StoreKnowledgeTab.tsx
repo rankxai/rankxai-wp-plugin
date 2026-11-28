@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { answerQuestionHref, searchHref } from '@/lib/shopify-app/app-routes-core';
 import { siteHref } from '@/lib/shopify-app/competitors-page-core';
 import { api, toastSuccess } from '../api';
-import { usePlan } from '../plan-context';
+import { usePlan } from '../subscription-context';
 import { AdminLink, ErrorBanner, GoButton, PricedButton, act, formatDate, useLoad, usePageError } from '../kit';
 import { SkeletonSection } from '../components/Status';
 import { usePaged } from '../components/Pager';

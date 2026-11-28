@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { APP_PATHS, productsHref } from '@/lib/shopify-app/app-routes-core';
 import { ErrorBanner, ViewTabs, settled, useLoad, usePageError } from '../kit';
-import { usePlan } from '../plan-context';
+import { usePlan } from '../subscription-context';
 import { useRouter } from '../router';
 import { fmtNumber } from '../format';
 import { CheckAgainAction } from '../components/CheckAgain';

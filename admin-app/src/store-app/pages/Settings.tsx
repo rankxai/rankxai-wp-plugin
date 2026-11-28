@@ -6,7 +6,7 @@ import { SUPPORT_EMAIL } from './support-email';
 import { APP_PATHS } from '@/lib/shopify-app/app-routes-core';
 import { api, toastSuccess } from '../api';
 import { ErrorBanner, GoButton, act, fieldError, formatDate, settled, useLoad, usePageError, type Load, type PageError } from '../kit';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { fmtCount, fmtNumber } from '../format';
 import { SkeletonSection } from '../components/Status';
 import { PageColumns } from '../components/PageColumns';

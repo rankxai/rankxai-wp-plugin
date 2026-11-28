@@ -17,13 +17,14 @@ Shoppers now ask ChatGPT, Gemini and Google's AI Mode what to buy. The answers l
 = Free, with no account =
 
 * **Product check.** Checks your products for what AI shopping answers use: barcode (GTIN, UPC, EAN or ISBN), brand, main image and its alt text, a real description, a category and a price. It checks every published product, lists each one with something missing and says where to fix it. It runs on your site; nothing is sent anywhere.
-* **Markdown copies of products and pages.** A plain-text copy of each page at its own address (`/product/blue-mug.md`), so an AI crawler reads your words, not your theme. Product copies start with price, availability, SKU, barcode, brand and categories. Copies carry `noindex`. Off until you switch them on.
-* **llms.txt and agents.md**, generated from your site and served from its root address. Nothing is written to your server, and a real file or another plugin's llms.txt always wins. Off until you switch them on.
+* **Markdown copies of products and pages.** A plain-text copy of each page at its own address (`/product/blue-mug.md`), so an AI crawler reads your words, not your theme. Product copies start with price, availability, SKU, barcode, brand and categories, and can end with a few lines you write about your business. Copies carry `noindex`. Off until you switch them on.
+* **llms.txt, agents.md and ai.txt**, served from your site's root address: llms.txt and agents.md generated from your site, or any of the three written by you in Settings. Nothing is written to your server, and a real file or another plugin's llms.txt always wins. Off until you switch them on.
 * **AI crawler visits.** Counts which AI crawlers (GPTBot, ClaudeBot, PerplexityBot and others) read which pages, per day, and checks each visit against the address ranges the crawler's operator publishes. The ranges are included in the plugin and updated with each release. Off until you switch it on. No IP address or browser details are stored, and counts are deleted after 35 days.
 * **robots.txt, per AI assistant.** Whether each assistant may read your site, the line that decides it, and the change to make. Two Site Health tests report the same.
-* **Site checks.** Broken internal links, pages nothing links to, and images with no alt text, checked in the background. It changes nothing; a missing address gets an "Add redirect" button.
+* **Site checks.** Broken internal links, pages nothing links to, and images with no alt text, checked in the background, with every result listed. It changes nothing; a missing address gets an "Add redirect" button.
+* **Redirects.** Add one, import a CSV file or download them all, in Settings. Each is added only after its old address is confirmed to show "page not found", into the Redirection plugin, Rank Math or this plugin's own list.
 * **View as AI**, under any post, page or product: the copy an assistant is given, and whether the words you wrote are in the HTML your server sends.
-* **Missing SEO tags.** With no SEO plugin, tick them in Settings: a meta description from your excerpt, Open Graph and Twitter tags, WordPress's sitemap, breadcrumbs.
+* **Missing SEO tags.** With no SEO plugin, tick them in Settings: a meta description from your excerpt, Open Graph and Twitter tags, WordPress's sitemap, breadcrumbs. A search title, description and canonical address box also appears on posts, pages, products, categories and tags.
 
 Pages marked `noindex` (cart, checkout, account) and a store in WooCommerce's "Coming soon" mode get no copy and are left out of llms.txt.
 
@@ -37,11 +38,11 @@ Pages marked `noindex` (cart, checkout, account) and a store in WooCommerce's "C
 * Search titles, descriptions and structured data written through your SEO plugin, and which missing tags it would tick in Settings.
 * Redirects for deleted products and broken links, suggested on the Store page and added by you, into the Redirection plugin, Rank Math, or this plugin's own list. RankX AI's connection can read redirects but never adds or removes one.
 
-Anything that uses credits shows its price before you confirm. The plugin never prints a second title or description: it writes into your SEO plugin's own fields.
+Anything that uses credits shows its price before you confirm. With an SEO plugin, search titles and descriptions go into that plugin's own fields, so the plugin never prints a second one.
 
 = Source code and build =
 
-The store app runs from the compiled files in `admin-app/build`. Its full source is included in the plugin, in `admin-app/src`, and is also public at https://github.com/rankxai/rankxai-wp-plugin (same folder). To build it, run `npm install && npm run build` in `admin-app/src`; it writes `dist/wordpress`, which is `admin-app/build`.
+The store app runs from the compiled files in `admin-app/build`. Its full source is included in the plugin, in `admin-app/src`, and is also public at https://github.com/rankxai/rankxai-wp-plugin (same folder). To build it, run `npm install && npm run build` in `admin-app/src`. It writes `dist/wordpress`: its `assets` folder is `admin-app/build/assets`, and `admin-app/build/store-app.asset.php` names the entry file and stylesheet that `dist/wordpress/.vite/manifest.json` lists for `store-app/hosts/wordpress/main.tsx`.
 
 The AI crawlers' published address ranges are in `includes/data/crawler-ranges.php`, generated by `build-crawler-ranges.mjs` in the repository from each operator's public list.
 
@@ -89,9 +90,11 @@ The connection, the RankX AI user and its Application Password are always remove
 * **Connect.** Clicking **Connect RankX AI** opens `https://app.rankxai.com/connect/wordpress` in a new tab, with this site's address, its wp-admin address, your WordPress user ID and a one-time code in the link. You sign in or create an account there and approve.
 * **The Store page.** When an administrator opens RankX AI › Store or a product's RankX AI panel, the plugin asks `https://app.rankxai.com/api/store-app/wp/session` for a ten-minute session, sending the site and wp-admin addresses, the administrator's user ID and display name, and the site's RankX AI token. The store app (included in the plugin) then calls `https://app.rankxai.com/api/store-app` from the browser as each screen needs: products, AI shopping results, the changes you approve, images and articles. If the store app hits an error, it sends the message, where in its code it happened and the page address to `https://app.rankxai.com/api/store-app/client-error`, at most three a page.
 * **Images.** The store app shows images from `https://assets.rankxai.com` (images made for you) and, in AI shopping results, product images from the stores and image hosts those answers link to.
-* **Product changes.** On a store, when a product is created, updated, moved to the trash, restored or deleted, the plugin sends its ID and what happened (nothing else) to `https://app.rankxai.com/api/store-app/wp/product-events` a minute later, with the site's RankX AI token, so RankX AI checks it again.
+* **Product changes.** On a store, when a product is created, updated, moved to the trash, restored or deleted, the plugin sends its ID, what happened and your site's address (nothing else) to `https://app.rankxai.com/api/store-app/wp/product-events` a minute later, with the site's RankX AI token, so RankX AI checks it again.
 * **Disconnect.** Disconnecting or deactivating tells `https://app.rankxai.com/api/store-app/wp/connection`, then removes the token, the RankX AI user and its Application Password.
 * **What RankX AI stores on this site.** Through this plugin's routes, RankX AI saves the changes you approve (search titles and descriptions, structured data, llms.txt, agents.md and ai.txt, a short block of business facts for the markdown copies) and the Overview's AI visibility summary. llms.txt, agents.md and ai.txt are served only once you tick "Serve it" for each in RankX AI › Settings. It is all data; nothing is run as code.
+* **What RankX AI reads.** As the RankX AI user it reads your posts, pages, products and their terms, and through this plugin's routes the crawler counts, site check results and redirects shown in RankX AI › AI crawlers, Site checks and Settings.
+* **Switches stay on your site.** Markdown copies, missing SEO tags, serving llms.txt, agents.md and ai.txt, crawler counting and customer data are switched on or off only in RankX AI › Settings on your site. RankX AI cannot change them.
 
 = rankxai.com, only if you click it =
 
@@ -123,6 +126,7 @@ The plugin sends no analytics, sets no cookies and collects nothing about your v
 == Credits ==
 
 * The admin pages use the Geist typeface by Vercel and basement.studio, under the SIL Open Font License 1.1 (`assets/fonts/Geist-OFL.txt`), served from your site.
+* The three sample photos in the store app's image studio (`studio`, `on_model` and `in_action`) were made for RankX AI and are released with the plugin under GPLv2 or later.
 * The RankX AI name and logo identify the plugin and are RankX AI's trademarks.
 
 == Changelog ==

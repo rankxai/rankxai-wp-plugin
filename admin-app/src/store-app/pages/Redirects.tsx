@@ -1,4 +1,4 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { useRef, useState } from 'react';
 import { readRedirectsCsv, redirectsToCsv, type CsvReadResult } from '@/lib/shopify-app/redirect-csv-core';
 import { api, toastSuccess } from '../api';
@@ -10,7 +10,6 @@ import { useModal, type WriteResult } from '../components/FixModals';
 import { StatusBadge } from '../components/Status';
 import { addRedirect as writeRedirect, redirectsWrittenLocally, removeRedirect, type RedirectWriteResult } from '../redirect-writes';
 import * as UI from '../ui';
-const LOCAL_IMPORT_MAX = 100;
 interface Suggestion {
     id: string;
     path: string;
@@ -94,7 +93,7 @@ export function RedirectsSection({ setError }: {
         if (!csv || csv.rows.length === 0)
             return;
         if (local) {
-            const rows = csv.rows.slice(0, LOCAL_IMPORT_MAX);
+            const rows = csv.rows;
             const progress = { done: 0, added: 0, failed: [] as Array<{
                     path: string;
                     message: string;
@@ -304,7 +303,7 @@ export function RedirectsSection({ setError }: {
               {csv.rows.length === 0
                 ? 'No redirect in this file can be imported.'
                 : local
-                    ? `${fmtCount(Math.min(csv.rows.length, LOCAL_IMPORT_MAX), 'redirect', 'redirects')} will be added one by one, each only if its old address shows “page not found”.${csv.rows.length > LOCAL_IMPORT_MAX ? ` The first ${fmtNumber(LOCAL_IMPORT_MAX)} are imported; import the rest in another file.` : ''}`
+                    ? `${fmtCount(csv.rows.length, 'redirect', 'redirects')} will be added one by one, each only if its old address shows “page not found”.`
                     : `${fmtCount(csv.rows.length, 'redirect', 'redirects')} ready. Each is checked on your store after it is created, and the import can be undone as one.`}
             </UI.Paragraph>
             {csv.rows.length > 0 ? (<UI.Table variant="auto">

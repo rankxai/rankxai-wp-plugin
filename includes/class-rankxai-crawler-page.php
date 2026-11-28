@@ -466,6 +466,7 @@ class RankXAI_Crawler_Page {
 		$backend = RankXAI_Redirect_Requests::backend();
 		RankXAI_UI::card_open(
 			array(
+				'id'       => 'rankxai-errors',
 				'title'    => __( 'Errors AI crawlers hit', 'rankxai' ),
 				'subtitle' => __( 'Pages that answered with an error, and what to do about each.', 'rankxai' ),
 			)
@@ -476,7 +477,8 @@ class RankXAI_Crawler_Page {
 			echo '<th scope="col">' . esc_html( $header ) . '</th>';
 		}
 		echo '</tr></thead><tbody>';
-		foreach ( array_slice( $report['errors'], 0, 50 ) as $row ) {
+		$paged = RankXAI_UI::page_of( $report['errors'], 'rankxai-errors-page' );
+		foreach ( $paged['items'] as $row ) {
 			$names = array();
 			foreach ( array_unique( $row['bots'] ) as $bot ) {
 				$label   = RankXAI_Crawlers::meta( $bot )['label'];
@@ -511,6 +513,7 @@ class RankXAI_Crawler_Page {
 			echo '</td></tr>';
 		}
 		echo '</tbody></table></div>';
+		RankXAI_UI::pager( $paged, 'rankxai-errors' );
 		if ( $has_form ) {
 			self::destinations_list();
 			RankXAI_UI::note(

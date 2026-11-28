@@ -437,6 +437,61 @@ class RankXAI_UI {
 	}
 
 	/**
+	 * One page of a list. Every item is reachable: the list is split into pages, never cut short.
+	 *
+	 * @param array  $items    Every item.
+	 * @param string $param    Query argument holding this list's page number.
+	 * @param int    $per_page Items per page.
+	 * @return array{items: array, page: int, pages: int, total: int, param: string}
+	 */
+	public static function page_of( $items, $param, $per_page = 25 ) {
+		$total = count( $items );
+		$pages = max( 1, (int) ceil( $total / $per_page ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- A page number for a read-only list.
+		$page = isset( $_GET[ $param ] ) ? absint( $_GET[ $param ] ) : 1;
+		$page = min( max( 1, $page ), $pages );
+		return array(
+			'items' => array_slice( array_values( $items ), ( $page - 1 ) * $per_page, $per_page ),
+			'page'  => $page,
+			'pages' => $pages,
+			'total' => $total,
+			'param' => $param,
+		);
+	}
+
+	/**
+	 * Previous and next links for a list split by `page_of()`. Prints nothing for a single page.
+	 *
+	 * @param array  $paged  The result of `page_of()`.
+	 * @param string $anchor Id of the card to return to.
+	 */
+	public static function pager( $paged, $anchor = '' ) {
+		if ( $paged['pages'] < 2 ) {
+			return;
+		}
+		$link  = function ( $n ) use ( $paged, $anchor ) {
+			return add_query_arg( $paged['param'], $n ) . ( '' !== $anchor ? '#' . $anchor : '' );
+		};
+		$parts = array();
+		if ( $paged['page'] > 1 ) {
+			$parts[] = '<a href="' . esc_url( $link( $paged['page'] - 1 ) ) . '">' . esc_html__( '‹ Previous', 'rankxai' ) . '</a>';
+		}
+		$parts[] = esc_html(
+			sprintf(
+				/* translators: 1: current page, 2: number of pages, 3: number of items. */
+				__( 'Page %1$d of %2$d (%3$d in all)', 'rankxai' ),
+				$paged['page'],
+				$paged['pages'],
+				$paged['total']
+			)
+		);
+		if ( $paged['page'] < $paged['pages'] ) {
+			$parts[] = '<a href="' . esc_url( $link( $paged['page'] + 1 ) ) . '">' . esc_html__( 'Next ›', 'rankxai' ) . '</a>';
+		}
+		echo '<p class="rankxai-pager">' . wp_kses_post( implode( ' · ', $parts ) ) . '</p>';
+	}
+
+	/**
 	 * A caption beneath a band: small, muted, one or two sentences.
 	 *
 	 * @param string $text Text.

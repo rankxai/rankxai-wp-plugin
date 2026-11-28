@@ -1,4 +1,4 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AGE_CHOICES, AGE_CHOICE_LABEL, IMAGE_BRIEF_MAX, IMAGE_REQUEST_MAX, PURPOSE_LABEL, REFERENCES_MAX, SHOOT_CHOICE_LISTS, TAKE_CHOICES, TWEAK_CHOICES, DEFAULT_SHOOT, LOOK_NAME_MAX, keepingState, merchantReadiness, MERCHANT_IMAGE_RULES, shootChoices, type AgeChoice, type ChannelFormat, type ImagePurpose, type ProductShot, type ShootOptions, } from '@/lib/shopify-app/image-studio-choices';
 import { APP_PATHS, productHref } from '@/lib/shopify-app/app-routes-core';

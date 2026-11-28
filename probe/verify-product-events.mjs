@@ -2,7 +2,6 @@
 /**
  * Checks that a connected store reports product changes itself: what is queued,
  * what is sent and where, what happens when RankX AI cannot take it, and that the
- * WooCommerce webhooks earlier versions let RankX AI create are removed once.
  * Every outgoing request is intercepted; nothing leaves the machine.
  *
  * Run:  node probe/verify-product-events.mjs      (wp-env must be running)
@@ -76,12 +75,6 @@ async function run() {
     const g = evalJson(`delete_option( 'rankxai_store_link' ); RankXAI_Product_Events::queue( ${b.id}, 'product.updated' ); update_option( RankXAI_Product_Events::OPTION, array( ${b.id} => 'product.updated' ), false ); ${FAKE(200)} RankXAI_Product_Events::send(); ${STATE}`)
     check(g.sent.length === 0 && Object.keys(g.queue).length === 0, 'once disconnected, nothing is sent and the queue is dropped')
 
-    console.log('\n== E  the old webhooks are removed once ==')
-    const h = evalJson(`$ours = new WC_Webhook(); $ours->set_name( 'RankX AI: product.updated' ); $ours->set_topic( 'product.updated' ); $ours->set_delivery_url( 'https://app.rankxai.com/api/webhooks/woocommerce?w=x' ); $ours->set_status( 'paused' ); $ours->save(); $other = new WC_Webhook(); $other->set_name( 'Someone else' ); $other->set_topic( 'product.updated' ); $other->set_delivery_url( 'https://example.com/hook' ); $other->set_status( 'paused' ); $other->save(); delete_option( RankXAI_Product_Events::OPTION_CLEANED ); wp_set_current_user( 1 ); RankXAI_Product_Events::remove_old_webhooks(); echo wp_json_encode( array( 'ours' => (bool) wc_get_webhook( $ours->get_id() ), 'other' => (bool) wc_get_webhook( $other->get_id() ), 'otherId' => $other->get_id(), 'flag' => get_option( RankXAI_Product_Events::OPTION_CLEANED ) ) );`)
-    check(h.ours === false, 'the webhook delivering to RankX AI is removed')
-    check(h.other === true, "someone else's webhook is left alone")
-    check(String(h.flag) === '1', 'and it happens only once')
-    wpSoft('eval', `$w = wc_get_webhook( ${h.otherId} ); if ( $w ) { $w->delete( true ); }`)
   } finally {
     for (const id of made) wpSoft('post', 'delete', String(id), '--force')
     wpSoft('option', 'delete', 'rankxai_product_events')

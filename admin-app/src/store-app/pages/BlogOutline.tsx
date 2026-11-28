@@ -1,4 +1,4 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from '../router';
 import { APP_PATHS } from '@/lib/shopify-app/app-routes-core';

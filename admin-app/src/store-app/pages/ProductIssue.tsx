@@ -1,4 +1,4 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import type { ReactNode } from 'react';
 import { APP_PATHS, searchHref } from '@/lib/shopify-app/app-routes-core';
 import { FIX_GUIDE, fixGuideFor } from '@/lib/shopify-app/product-detail-core';

@@ -4,7 +4,7 @@ import { alreadyWritten } from '@/lib/shopify-app/article-contents-core';
 import { FEATURED_PRODUCTS_MAX, STORE_ARTICLE_TYPE_COPY, guessArticleType, type StoreArticleType } from '@/lib/content/store-article-types';
 import { api, toastSuccess } from '../api';
 import { host } from '../host';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { useRouter } from '../router';
 import { BackLink, ErrorBanner, PagePrimaryAction, act, creditsLabel, fieldError, useLoad, usePageError, useNoSpend } from '../kit';
 import { SkeletonSection } from '../components/Status';

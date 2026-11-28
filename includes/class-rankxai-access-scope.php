@@ -166,6 +166,10 @@ class RankXAI_Access_Scope {
 		if ( self::content_route( $route ) ) {
 			return true;
 		}
+		// Shipping classes and global attributes are store configuration, and reviews are people's words: read only.
+		if ( preg_match( '#^/wc/v\d+/products/(shipping_classes|attributes|reviews)(/|$)#', $route ) ) {
+			return $read;
+		}
 		if ( preg_match( '#^/wc/v\d+/products(/|$)#', $route ) && ! preg_match( '#/batch$#', $route ) ) {
 			return true;
 		}
@@ -182,7 +186,7 @@ class RankXAI_Access_Scope {
 		$patterns = array(
 			'#^/$#',
 			'#^/[a-z0-9-]+/v\d+$#',
-			'#^/wp/v2/(types|taxonomies|statuses|search|settings|plugins|themes|menus|menu-items|widgets|comments|users|users/me)(/|$)#',
+			'#^/wp/v2/(types|taxonomies|statuses|search|comments|users|users/me)(/|$)#',
 			'#^/wc/v\d+/(system_status|settings|coupons|orders|refunds|customers)(/|$)#',
 			'#^/wp-abilities/v1/abilities$#',
 		);
@@ -216,6 +220,16 @@ class RankXAI_Access_Scope {
 			}
 		}
 		return in_array( $m[1], array_map( 'strtolower', $bases ), true );
+	}
+
+	/**
+	 * Whether a post type holds content (public, and not site structure or design).
+	 *
+	 * @param string $type Post type.
+	 * @return bool
+	 */
+	public static function content_post_type( $type ) {
+		return post_type_exists( $type ) && is_post_type_viewable( $type ) && ! in_array( $type, self::EXCLUDED_POST_TYPES, true );
 	}
 
 	/**

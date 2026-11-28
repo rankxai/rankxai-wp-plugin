@@ -579,6 +579,26 @@
 	margin-block-start: 2px;
 }
 
+.rankxai-app .rankxai-textarea {
+	border: 1px solid var(--rx-border);
+	border-radius: var(--rx-radius);
+	box-sizing: border-box;
+	font-family: inherit;
+	margin-block: 6px;
+	max-width: 48rem;
+	padding: 6px 10px;
+	width: 100%;
+}
+
+.rankxai-app .rankxai-textarea--code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+}
+
+.rankxai-import-log {
+	margin: 6px 0 0;
+}
+
 .rankxai-app .rankxai-input {
 	border: 1px solid var(--rx-border);
 	border-radius: var(--rx-radius);

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { blogNewHref, blogArticleHref } from '@/lib/shopify-app/app-routes-core';
-import { PLAN_CAP_MAX, PLAN_LENGTHS, frequencyLabel, monthlyCeiling, type PlanLength } from '@/lib/shopify-app/blog-plan-core';
+import { PLAN_CAP_MAX, PLAN_LENGTHS, frequencyLabel, monthlyCeiling, type PlanLength } from '@/lib/shopify-app/blog-schedule-core';
 import { api, toastSuccess } from '../api';
-import { usePlan } from '../plan-context';
+import { usePlan } from '../subscription-context';
 import { ErrorBanner, act, creditsLabel, fieldError, formatDate, useLoad, type PageError } from '../kit';
 import { SkeletonSection } from '../components/Status';
 import { fmtNumber } from '../format';

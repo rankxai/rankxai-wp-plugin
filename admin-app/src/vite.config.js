@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { checkChunk, readsWordPressReact } from './store-app/hosts/wordpress/bundle-check';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const shims = path.resolve(here, 'store-app/hosts/wordpress/shims');
-function wordpressReactOnly(): Plugin {
+function wordpressReactOnly() {
     return {
         name: 'rankxai-wordpress-react-only',
         generateBundle(_options, bundle) {

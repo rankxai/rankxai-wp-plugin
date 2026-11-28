@@ -10,7 +10,7 @@ import { FeaturedImagePicker, type ChosenImage } from '../components/FeaturedIma
 import { ImproveCard, ImprovePreview, type ImproveView } from '../components/ArticleImprove';
 import { ArticleRunCard, type ShopifyRun } from '../components/ArticleRun';
 import type { BlogData } from './Blog';
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import * as UI from '../ui';
 import { safeHtml } from '../safe-html';
 interface ArticleData {

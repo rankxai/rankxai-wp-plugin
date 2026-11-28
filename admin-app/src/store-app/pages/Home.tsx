@@ -6,7 +6,7 @@ import { headlineShare } from '@/lib/shopify-app/share-bars-core';
 import { GUIDE_COVERS, setupGuide } from '@/lib/shopify-app/setup-guide-core';
 import { api } from '../api';
 import { host } from '../host';
-import { planToName, usePlan, useStore } from '../plan-context';
+import { planToName, usePlan, useStore } from '../subscription-context';
 import { fmtDate, fmtNumber, fmtPercent } from '../format';
 import { ErrorBanner, GoButton, act, formatDate, useLoad, usePageError } from '../kit';
 import { MetricCard, MetricRow } from '../components/MetricCard';

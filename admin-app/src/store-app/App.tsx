@@ -1,6 +1,6 @@
 import { APP_PATHS } from '@/lib/shopify-app/app-routes-core';
 import { lazy, Suspense, useEffect, useRef, type ReactNode } from 'react';
-import { PlanProvider } from './plan-context';
+import { PlanProvider } from './subscription-context';
 import { RouterProvider, useRouter } from './router';
 import { PAGE_LOADERS } from './page-modules';
 import { PageBoundary } from './PageBoundary';
@@ -21,7 +21,7 @@ const BlogPage = lazy(() => PAGE_LOADERS.blog().then((m) => ({ default: m.BlogPa
 const BlogWritePage = lazy(() => PAGE_LOADERS['blog-new']().then((m) => ({ default: m.BlogWritePage })));
 const BlogOutlinePage = lazy(() => PAGE_LOADERS['blog-plan']().then((m) => ({ default: m.BlogOutlinePage })));
 const ArticlePage = lazy(() => PAGE_LOADERS.article().then((m) => ({ default: m.ArticlePage })));
-const PlanPage = lazy(() => PAGE_LOADERS.plan().then((m) => ({ default: m.PlanPage })));
+const BillingPage = lazy(() => PAGE_LOADERS.plan().then((m) => ({ default: m.BillingPage })));
 const SettingsPage = lazy(() => PAGE_LOADERS.settings().then((m) => ({ default: m.SettingsPage })));
 const NotificationsPage = lazy(() => PAGE_LOADERS.notifications().then((m) => ({ default: m.NotificationsPage })));
 export interface InitialData {
@@ -63,7 +63,7 @@ function Page() {
         case 'article':
             return <ArticlePage key={page.id} id={page.id}/>;
         case 'plan':
-            return <PlanPage />;
+            return <BillingPage />;
         case 'settings':
             return <SettingsPage />;
         case 'notifications':

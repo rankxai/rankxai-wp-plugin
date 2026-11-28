@@ -6,7 +6,7 @@ import { issueHref, storeSettingLink } from '@/lib/shopify-app/product-issues-co
 import type { BatchState } from '@/lib/shopify-app/batch-progress-core';
 import { api, toastSuccess } from '../api';
 import { toastWrite } from '../reviews';
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { adminLocale, fmtCount, fmtDate, fmtNumber } from '../format';
 import { AdminButton, AdminLink, act, useLoad, type Load, type PageError } from '../kit';
 import { BatchProgress, useBatch, type BatchKind } from '../components/BatchProgress';

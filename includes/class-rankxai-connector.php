@@ -300,11 +300,11 @@ class RankXAI_Connector {
 		echo '<li>' . esc_html__( 'create and edit posts, pages and products, and their categories and tags', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'upload images and set their alt text', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'move content to the trash (never delete it permanently)', 'rankxai' ) . '</li>';
-		echo '<li>' . esc_html__( 'add and remove redirects', 'rankxai' ) . '</li></ul>';
+		echo '<li>' . esc_html__( 'read the list of redirects (only you add or remove them, here in wp-admin)', 'rankxai' ) . '</li></ul>';
 		echo '<p><strong>' . esc_html__( 'It cannot:', 'rankxai' ) . '</strong></p><ul class="ul-disc">';
 		echo '<li>' . esc_html__( 'install, change or remove plugins or themes', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'add, change or remove users', 'rankxai' ) . '</li>';
-		echo '<li>' . esc_html__( 'change site settings', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'change site, store or plugin settings, including redirects, shipping and webhooks', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'sign in to wp-admin', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'read orders, customers, users or comments, unless you allow it in RankX AI › Settings', 'rankxai' ) . '</li></ul>';
 		echo '<p>' . esc_html__( 'Content it creates is credited to you. Disconnecting RankX AI removes the user and its password.', 'rankxai' ) . '</p>';

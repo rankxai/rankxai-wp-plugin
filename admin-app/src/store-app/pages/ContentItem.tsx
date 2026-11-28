@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { APP_PATHS, searchHref } from '@/lib/shopify-app/app-routes-core';
 import { api, toastSuccess } from '../api';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { act, ErrorBanner, formatDate, PricedButton, useLoad, usePageError, type LockInfo } from '../kit';
 import { SkeletonSection } from '../components/Status';
 import { PageColumns } from '../components/PageColumns';

@@ -156,7 +156,7 @@ class RankXAI_Twins {
 	 * @return bool False when it is over the size limit.
 	 */
 	public static function save_context( $content ) {
-		$content = (string) $content;
+		$content = rankxai_sanitize_plain_text( $content );
 		if ( strlen( $content ) > self::MAX_CONTEXT_BYTES ) {
 			return false;
 		}

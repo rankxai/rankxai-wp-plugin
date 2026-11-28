@@ -68,6 +68,7 @@ writeFileSync(
 
 const title = wp('option', 'get', 'blogname')
 const created = []
+const createdTerms = []
 try {
   console.log('Never allowed for the RankX AI password')
   check('create a user', refused(await call(ours, 'POST', '/wp/v2/users', { username: 'x', email: 'x@example.com', password: 'x' })))
@@ -126,6 +127,8 @@ try {
   check('orders are readable', (await call(ours, 'GET', '/wc/v3/orders')).status === 200)
   check('the user list is readable', (await call(ours, 'GET', '/wp/v2/users')).status === 200)
   check('writing to a customer is still refused', refused(await call(ours, 'POST', '/wc/v3/customers/1', { first_name: 'x' })))
+  check('product reviews are readable', (await call(ours, 'GET', '/wc/v3/products/reviews')).status === 200)
+  check('writing a product review is still refused', refused(await call(ours, 'POST', '/wc/v3/products/reviews', { product_id: 1, review: 'x', reviewer: 'x', reviewer_email: 'x@example.com' })))
   wp('option', 'delete', 'rankxai_share_personal_data')
 
   console.log('Allowed for the RankX AI password')
@@ -136,9 +139,22 @@ try {
   check('its <script> was filtered (no unfiltered_html)', stored.includes('Hello') && !stored.includes('<script'), stored.slice(0, 80))
   check('permanent delete is refused', refused(await call(ours, 'DELETE', `/wp/v2/posts/${post.json?.id}`, { force: true })))
   check('move to trash', (await call(ours, 'DELETE', `/wp/v2/posts/${post.json?.id}`)).status === 200)
-  check('read plugins', (await call(ours, 'GET', '/wp/v2/plugins')).status === 200)
   check('read the site root', (await call(ours, 'GET', '/')).status === 200)
-  check('read the site settings', (await call(ours, 'GET', '/wp/v2/settings')).status === 200)
+  check('reading plugins is refused (not content)', refused(await call(ours, 'GET', '/wp/v2/plugins')))
+  check('reading the site settings is refused (the public index has the name and address)', refused(await call(ours, 'GET', '/wp/v2/settings')))
+  check('read shipping classes', (await call(ours, 'GET', '/wc/v3/products/shipping_classes')).status === 200)
+  check('creating a shipping class is refused (store configuration)', refused(await call(ours, 'POST', '/wc/v3/products/shipping_classes', { name: 'Scope probe' })))
+  check('creating a global attribute is refused', refused(await call(ours, 'POST', '/wc/v3/products/attributes', { name: 'Scope probe' })))
+  const cat = await call(ours, 'POST', '/wc/v3/products/categories', { name: 'Scope probe cat' })
+  if (cat.json?.id) createdTerms.push(cat.json.id)
+  check('a product category is still writable', cat.status === 201, String(cat.status))
+  const pattern = wp('post', 'create', '--post_type=wp_block', '--post_status=publish', '--post_title=Scope probe pattern', '--post_content=<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->', '--porcelain')
+  const hidden = wp('post', 'create', '--post_type=rxprobe_private', '--post_status=publish', '--post_title=Scope probe private', '--porcelain')
+  created.push(pattern, hidden)
+  for (const [label, id] of [['a synced pattern (wp_block)', pattern], ['a private post type', hidden]]) {
+    const r = await call(ours, 'POST', `/rankxai/v1/seo/${id}`, { fields: { title: 'x' } })
+    check(`the plugin's own SEO route refuses ${label}`, r.status === 403 && r.code === 'rankxai_not_content', `${r.status} ${r.code}`)
+  }
   check('listing redirects (Redirection) is let through', !refused(await call(ours, 'GET', '/redirection/v1/redirect')))
   const mine = await call(ours, 'GET', '/rankxai/v1/connection')
   check('the plugin knows its own password', mine.status === 200 && mine.json?.rankxaiPassword === true, JSON.stringify(mine.json))
@@ -163,6 +179,7 @@ try {
   rmSync(PRIVATE_TYPE, { force: true })
   wp('option', 'update', 'blogname', title)
   for (const id of created) wpSoft('post', 'delete', String(id), '--force')
+  for (const id of createdTerms) wpSoft('term', 'delete', 'product_cat', String(id))
   for (const name of ['scope-probe-rankxai', 'scope-probe-other']) {
     const uuid = wpSoft('user', 'application-password', 'list', 'admin', `--name=${name}`, '--field=uuid')
     if (uuid) wpSoft('user', 'application-password', 'delete', 'admin', uuid)

@@ -191,7 +191,7 @@ class RankXAI_Pages {
 				'subtitle'   => __( 'What AI shopping answers need from your products, checked on this site.', 'rankxai' ),
 				'hero'       => true,
 				'link'       => $store_url,
-				'link_label' => $connected ? __( 'Open the Store', 'rankxai' ) : __( 'See every product', 'rankxai' ),
+				'link_label' => $connected ? __( 'Open the Store', 'rankxai' ) : __( 'See the full product check', 'rankxai' ),
 			)
 		);
 		RankXAI_UI::analysis( RankXAI_Product_Check::headline( $result ) );
@@ -287,6 +287,10 @@ class RankXAI_Pages {
 		RankXAI_UI::open_page( __( 'Settings', 'rankxai' ), __( 'Local switches. Everything here works with or without a RankX AI account.', 'rankxai' ), RankXAI_Admin::PAGE_SETTINGS );
 		self::flash( 'rankxai-saved', __( 'Settings saved.', 'rankxai' ) );
 		self::flash( 'rankxai-redirect-removed', __( 'Redirect removed.', 'rankxai' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only redirect marker.
+		if ( isset( $_GET['rankxai-too-long'] ) ) {
+			echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__( 'Some text was longer than this site stores, so it was not saved. Everything else was.', 'rankxai' ) . '</p></div>';
+		}
 
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="rankxai-stack">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( RankXAI_Admin::ACTION ) . '" />';
@@ -338,6 +342,18 @@ class RankXAI_Pages {
 		}
 		echo '</div></div>';
 
+		$context = RankXAI_Twins::context();
+		echo '<div class="rankxai-field"><div class="rankxai-field__label"><label for="rankxai-twin-context">' . esc_html__( 'About your business', 'rankxai' ) . '</label></div><div>';
+		echo '<textarea class="rankxai-textarea" id="rankxai-twin-context" name="rankxai_twin_context" rows="5" spellcheck="true">' . "\n" . esc_textarea( $context['content'] ) . '</textarea>';
+		echo '<p class="rankxai-field__hint">' . esc_html(
+			sprintf(
+				/* translators: %d: size limit in kilobytes. */
+				__( 'Optional. A few lines on who you are and what you sell, added to the end of every copy. Up to %d KB. A connected RankX AI account can also write it; the last one saved is used.', 'rankxai' ),
+				(int) ( RankXAI_Twins::MAX_CONTEXT_BYTES / 1024 )
+			)
+		) . '</p>';
+		echo '</div></div>';
+
 		if ( $twins['enabled'] ) {
 			$sitemap = RankXAI_Twins::sitemap_url();
 			echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html__( 'Index of copies', 'rankxai' ) . '</div><div>';
@@ -372,9 +388,14 @@ class RankXAI_Pages {
 		}
 
 		$supported = RankXAI_Generate::supported();
+		$limits    = RankXAI_Generate::limits();
 		foreach ( RankXAI_Documents::catalogue() as $slug => $doc ) {
-			$state = RankXAI_Documents::effective( $slug );
-			$url   = home_url( '/' . $doc['path'] );
+			$state     = RankXAI_Documents::effective( $slug );
+			$url       = home_url( '/' . $doc['path'] );
+			$generates = in_array( $slug, $supported, true );
+			$held      = RankXAI_Documents::get( $slug );
+			$text      = null !== $held ? $held['content'] : '';
+			$box       = 'rankxai-document-' . $slug;
 
 			echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html( $doc['label'] ) . '</div><div>';
 			echo '<label class="rankxai-check"><input type="checkbox" name="rankxai_generate[' . esc_attr( $slug ) . ']" value="1" ' . checked( ! empty( $generated[ $slug ] ), true, false ) . ' /> <span>' . esc_html(
@@ -385,13 +406,32 @@ class RankXAI_Pages {
 				)
 			) . '</span></label>';
 			echo '<p class="rankxai-field__hint">' . esc_html(
-				in_array( $slug, $supported, true )
-					? __( 'Off by default. Once on, it serves what you publish from a RankX AI account, or else a copy generated from the content on this site.', 'rankxai' )
-					: __( 'Off by default. Once on, it serves what you publish from a RankX AI account.', 'rankxai' )
+				$generates
+					? __( 'Off by default. Once on, it serves the text below, or a copy generated from the content on this site while the text is empty.', 'rankxai' )
+					: __( 'Off by default. Once on, it serves the text below.', 'rankxai' )
 			) . '</p>';
-			$held = RankXAI_Documents::get( $slug );
-			$kept = empty( $generated[ $slug ] ) && null !== $held && '' !== $held['content'];
-			echo '<p class="rankxai-field__hint">' . esc_html( $kept ? __( 'RankX AI published one, and it is kept here, but nothing is served until you tick the box.', 'rankxai' ) : self::describe_document( $state['source'] ) ) . '</p>';
+			echo '<label class="screen-reader-text" for="' . esc_attr( $box ) . '">' . esc_html(
+				sprintf(
+					/* translators: %s: the document's address, such as /llms.txt. */
+					__( 'Text served at %s', 'rankxai' ),
+					'/' . $doc['path']
+				)
+			) . '</label>';
+			echo '<textarea class="rankxai-textarea rankxai-textarea--code" id="' . esc_attr( $box ) . '" name="rankxai_document[' . esc_attr( $slug ) . ']" rows="8" spellcheck="false">' . "\n" . esc_textarea( $text ) . '</textarea>';
+			if ( $generates ) {
+				echo '<p class="rankxai-field__hint">' . esc_html(
+					sprintf(
+						/* translators: 1: items per content type, 2: items in all, 3: number of content types. */
+						__( 'Write your own, or leave it empty to use the generated copy. A generated copy lists up to %1$d recent items of each content type and %2$d in all, from up to %3$d content types: a short guide to the site rather than an index of every page.', 'rankxai' ),
+						$limits['per_type'],
+						$limits['total'],
+						$limits['types']
+					)
+				) . '</p>';
+			}
+			echo '<p class="rankxai-field__hint">' . esc_html__( 'A connected RankX AI account can also publish this text; the last one saved is served.', 'rankxai' ) . '</p>';
+			$kept = empty( $generated[ $slug ] ) && '' !== $text;
+			echo '<p class="rankxai-field__hint">' . esc_html( $kept ? __( 'Text is saved, but nothing is served until you tick the box.', 'rankxai' ) : self::describe_document( $state['source'] ) ) . '</p>';
 			if ( '' !== $state['content'] || 'file' === $state['source'] ) {
 				echo '<p class="rankxai-field__hint"><a href="' . esc_url( $url ) . '" target="_blank" rel="noopener">' . esc_html( $url ) . '</a></p>';
 			}
@@ -468,12 +508,13 @@ class RankXAI_Pages {
 	}
 
 	/**
-	 * This plugin's own redirects, each removable. Hidden when there is nothing
-	 * to show.
+	 * Redirects, managed here without a RankX AI account: add one, import or export a CSV file,
+	 * and see or remove this plugin's own.
 	 */
 	private static function settings_redirects() {
-		$items     = RankXAI_Redirects::items()['items'];
-		$own       = array_values(
+		$backend = RankXAI_Redirect_Requests::backend();
+		$items   = RankXAI_Redirects::items( '', RankXAI_Redirects::MAX )['items'];
+		$own     = array_values(
 			array_filter(
 				$items,
 				function ( $item ) {
@@ -481,42 +522,67 @@ class RankXAI_Pages {
 				}
 			)
 		);
-		$managers  = RankXAI_Redirects::managers();
-		$elsewhere = '';
-		if ( $managers['redirection']['active'] ) {
-			$elsewhere = __( 'the Redirection plugin', 'rankxai' );
-		} elseif ( $managers['rank_math']['ready'] ) {
-			$elsewhere = __( 'Rank Math', 'rankxai' );
-		}
-		if ( ! $own && '' === $elsewhere ) {
-			return;
-		}
 
 		RankXAI_UI::card_open(
 			array(
+				'id'       => 'rankxai-redirects',
 				'title'    => __( 'Redirects', 'rankxai' ),
-				'subtitle' => __( 'Redirects RankX AI added on this site.', 'rankxai' ),
+				'subtitle' => __( 'Send visitors from an address that no longer exists to one that does. Works without a RankX AI account.', 'rankxai' ),
 			)
 		);
-		if ( '' !== $elsewhere ) {
+		self::redirect_notice();
+
+		if ( '' === $backend['backend'] ) {
+			echo '<p>' . esc_html( $backend['reason'] ) . '</p>';
+		} else {
 			echo '<p>' . esc_html(
 				sprintf(
-					/* translators: %s: the name of another plugin. */
-					__( 'Redirects RankX AI adds on this site go into %s, and are managed in its own screens.', 'rankxai' ),
-					$elsewhere
+					/* translators: %s: where the redirect is stored, such as "the Redirection plugin". */
+					__( 'New redirects go into %s. Each is added only after a check confirms its old address shows "page not found", so a redirect never hides a working page.', 'rankxai' ),
+					$backend['label']
 				)
 			) . '</p>';
+
+			echo '<form class="rankxai-inline-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			echo '<input type="hidden" name="action" value="' . esc_attr( RankXAI_Admin::ACTION_ADD_REDIRECT_NOW ) . '" />';
+			wp_nonce_field( RankXAI_Admin::ACTION_ADD_REDIRECT_NOW );
+			echo '<label class="screen-reader-text" for="rankxai-redirect-from">' . esc_html__( 'Old address', 'rankxai' ) . '</label>';
+			echo '<input class="rankxai-input" id="rankxai-redirect-from" name="rankxai_from" placeholder="' . esc_attr__( '/old-address', 'rankxai' ) . '" required />';
+			echo '<label class="screen-reader-text" for="rankxai-redirect-to">' . esc_html__( 'New address', 'rankxai' ) . '</label>';
+			echo '<input class="rankxai-input" id="rankxai-redirect-to" name="rankxai_to" list="rankxai-destinations" placeholder="' . esc_attr__( '/new-address', 'rankxai' ) . '" required />';
+			echo '<button type="submit" class="rankxai-button rankxai-button--outline">' . esc_html__( 'Add redirect', 'rankxai' ) . '</button>';
+			echo '</form>';
+			RankXAI_Crawler_Page::destinations_list();
+
+			echo '<div class="rankxai-field"><div class="rankxai-field__label"><label for="rankxai-redirect-csv">' . esc_html__( 'Import a CSV file', 'rankxai' ) . '</label></div><div>';
+			echo '<input type="file" id="rankxai-redirect-csv" accept=".csv,text/csv" /> ';
+			echo '<button type="button" class="rankxai-button rankxai-button--outline" id="rankxai-redirect-import">' . esc_html__( 'Import', 'rankxai' ) . '</button>';
+			echo '<p class="rankxai-field__hint">' . esc_html__( 'One redirect per line: the old address, then the new one. A header line is skipped. Each is checked and added in turn.', 'rankxai' ) . '</p>';
+			echo '<ul class="rankxai-import-log" id="rankxai-redirect-import-log" aria-live="polite"></ul>';
+			echo '</div></div>';
 		}
+
+		if ( $items ) {
+			RankXAI_UI::action_form( RankXAI_Admin::ACTION_EXPORT_REDIRECTS, __( 'Download the redirects as a CSV file', 'rankxai' ) );
+		}
+		$managers = RankXAI_Redirects::managers();
+		if ( $managers['redirection']['active'] ) {
+			echo '<p class="rankxai-field__hint">' . esc_html__( 'The Redirection plugin lists, edits and exports its own redirects under Tools → Redirection.', 'rankxai' ) . '</p>';
+		}
+
 		if ( $own ) {
-			echo '<p>' . esc_html__( 'These redirects are kept by this plugin. Each one answers only when its old address would otherwise show "page not found". Hit counts are low when a page cache answers a visit without WordPress.', 'rankxai' ) . '</p>';
-			$rows = array();
-			foreach ( $own as $item ) {
+			echo '<h3 class="rankxai-card__title">' . esc_html__( 'This plugin\'s own list', 'rankxai' ) . '</h3>';
+			echo '<p>' . esc_html__( 'Each answers only when its old address would otherwise show "page not found". Hit counts are low when a page cache answers a visit without WordPress.', 'rankxai' ) . '</p>';
+			$paged = RankXAI_UI::page_of( $own, 'rankxai-redirects-page' );
+			$rows  = array();
+			foreach ( $paged['items'] as $item ) {
 				ob_start();
 				RankXAI_UI::action_form( RankXAI_Admin::ACTION_DELETE_REDIRECT, __( 'Remove', 'rankxai' ), array( 'rankxai_redirect_id' => $item['id'] ), 'danger' );
 				$form   = (string) ob_get_clean();
 				$rows[] = array( '<code>' . esc_html( $item['from'] ) . '</code>', '<code>' . esc_html( $item['to'] ) . '</code>', number_format_i18n( (int) $item['hits'] ), $form );
 			}
 			self::form_table( array( __( 'From', 'rankxai' ), __( 'To', 'rankxai' ), __( 'Hits', 'rankxai' ), '' ), $rows );
+			RankXAI_UI::pager( $paged, 'rankxai-redirects' );
 		}
 		RankXAI_UI::card_close();
 	}
@@ -617,7 +683,7 @@ class RankXAI_Pages {
 			return __( 'A real file already sits at this address on your server, so this plugin leaves it alone.', 'rankxai' );
 		}
 		if ( 'stored' === $source ) {
-			return __( 'Published from a RankX AI account. That is what is being served, and it takes precedence over anything generated here.', 'rankxai' );
+			return __( 'The text above is being served. It takes precedence over a generated copy.', 'rankxai' );
 		}
 		if ( 'generated' === $source ) {
 			return __( 'Generated from the pages and posts on this site, and rebuilt on each request so it never goes stale.', 'rankxai' );

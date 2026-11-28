@@ -16,7 +16,7 @@ export const PAGE_LOADERS = {
     'blog-new': () => import('./pages/BlogWrite'),
     'blog-plan': () => import('./pages/BlogOutline'),
     article: () => import('./pages/Article'),
-    plan: () => import('./pages/Plan'),
+    plan: () => import('./pages/Billing'),
     settings: () => import('./pages/Settings'),
     notifications: () => import('./pages/Notifications'),
 } as const;

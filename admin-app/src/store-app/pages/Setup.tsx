@@ -1,5 +1,5 @@
 import { APP_PATHS } from '@/lib/shopify-app/app-routes-core';
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { useEffect, useState } from 'react';
 import type { SetupPhase } from '@/lib/shopify-app/setup-phase';
 import { api, toastSuccess } from '../api';

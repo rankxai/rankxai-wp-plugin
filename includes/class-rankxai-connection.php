@@ -283,36 +283,8 @@ class RankXAI_Connection {
 		wp_clear_scheduled_hook( 'rankxai_send_product_events' );
 		RankXAI_Session_Cache::clear_all();
 		$removed = self::remove_app_passwords();
-		self::remove_webhooks();
 		RankXAI_Connector::remove_user();
 		delete_option( RankXAI_Connector::OPTION_APPROVER );
-		return $removed;
-	}
-
-	/**
-	 * Remove the WooCommerce webhooks that deliver to RankX AI. Earlier versions let
-	 * RankX AI create them; this plugin now reports product changes itself.
-	 *
-	 * @return int How many were removed.
-	 */
-	public static function remove_webhooks() {
-		if ( ! class_exists( 'WC_Data_Store' ) || ! function_exists( 'wc_get_webhook' ) ) {
-			return 0;
-		}
-		$prefix  = RankXAI_App_Client::APP_ORIGIN . '/api/webhooks/woocommerce';
-		$removed = 0;
-		try {
-			$ids = WC_Data_Store::load( 'webhook' )->search_webhooks( array( 'limit' => -1 ) );
-		} catch ( Exception $e ) {
-			return 0;
-		}
-		foreach ( (array) $ids as $id ) {
-			$webhook = wc_get_webhook( (int) $id );
-			if ( $webhook && 0 === strpos( (string) $webhook->get_delivery_url(), $prefix ) ) {
-				$webhook->delete( true );
-				++$removed;
-			}
-		}
 		return $removed;
 	}
 

@@ -24,9 +24,6 @@ class RankXAI_Crawlers {
 	/** The switch. Autoloaded: it is read on every front-end request. */
 	const OPTION_ENABLED = 'rankxai_crawlers_enabled';
 
-	/** Options earlier versions stored the crawler list and ranges in, removed on upgrade. */
-	const OBSOLETE_OPTIONS = array( 'rankxai_crawler_tokens', 'rankxai_crawler_ranges' );
-
 	/** The UTC day retention last ran. */
 	const OPTION_PRUNED = 'rankxai_crawlers_pruned';
 

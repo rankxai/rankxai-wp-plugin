@@ -4,7 +4,7 @@ import { bulkGate } from '@/lib/shopify-app/fix-index-core';
 import { lengthState } from '@/lib/shopify-app/template-edit-core';
 import { api, toastSuccess } from '../api';
 import { toastWrite } from '../reviews';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { fmtCount, fmtNumber } from '../format';
 import { AdminLink, ErrorBanner, PricedButton, act, fieldError, usePageError, type Load, type PageError } from '../kit';
 import { BatchProgress, useBatch } from '../components/BatchProgress';

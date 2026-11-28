@@ -74,9 +74,6 @@ class RankXAI_View_As_AI {
 		if ( null === self::requested_post() ) {
 			wp_die( esc_html__( 'Sorry, you are not allowed to view this post.', 'rankxai' ), '', array( 'response' => 403 ) );
 		}
-		// Core gives a hidden page no title, and the admin header then passes null
-		// to strip_tags().
-		$GLOBALS['title'] = __( 'View as AI', 'rankxai' ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Core leaves it empty here.
 	}
 
 	/**

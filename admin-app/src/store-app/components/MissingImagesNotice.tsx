@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, toastSuccess } from '../api';
-import { usePlan } from '../plan-context';
+import { usePlan } from '../subscription-context';
 import { ErrorBanner, act, creditsLabel, useLoad, usePageError } from '../kit';
 import { useModal } from './FixModals';
 import * as UI from '../ui';

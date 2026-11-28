@@ -43,7 +43,16 @@ echo "$ARCHIVE_FILES" | sed 's/^/  /'
 # source's package.json and tsconfig.json, so its build tools can be found.
 STRAYS=$(echo "$ARCHIVE_FILES" | grep -iE '\.(sh|mjs|cjs|ya?ml|dist|lock|json)$|^probe/|^\.' | grep -v '^readme\.txt$' | grep -vxE 'admin-app/src/(package|tsconfig)\.json' || true)
 # And inside admin-app/src, only the kinds of file the published source is made of.
-STORE_STRAYS=$(echo "$ARCHIVE_FILES" | grep '^admin-app/' | grep -vE '\.(ts|tsx|css|webp|mts)$|^admin-app/src/(package|tsconfig)\.json$|^admin-app/src/SOURCE\.md$' || true)
+STORE_STRAYS=$(echo "$ARCHIVE_FILES" | grep '^admin-app/' | grep -vE '\.(ts|tsx|css|webp)$|^admin-app/src/(package|tsconfig)\.json$|^admin-app/src/vite\.config\.js$|^admin-app/build/(assets/[^/]+\.(js|css|webp)|store-app\.asset\.php)$' || true)
+# Only file types WordPress.org expects in a plugin (its review named a .mts file as not permitted), and no notes
+# files: readme.txt is the only document besides the licences.
+ODD_TYPES=$(echo "$ARCHIVE_FILES" | grep -viE '\.(php|js|css|txt|png|svg|jpe?g|gif|webp|json|woff2|ts|tsx)$' || true)
+if [ -n "$ODD_TYPES" ]; then
+  echo
+  echo "File types WordPress.org does not expect in a plugin:" >&2
+  echo "$ODD_TYPES" | sed 's/^/  /' >&2
+  exit 1
+fi
 if [ -n "$STORE_STRAYS" ]; then
   echo
   echo "admin-app/ holds files the store app's published source is not made of:" >&2

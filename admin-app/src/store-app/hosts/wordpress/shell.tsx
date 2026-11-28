@@ -3,7 +3,7 @@ import { NAV_ITEMS, APP_PATHS } from '@/lib/shopify-app/app-routes-core';
 import { useRouter } from '../../router';
 import { host } from './host';
 import { dismissToast, onToasts, setLeavePrompt, type Toast } from './registries';
-import { usePlan, useStore } from '../../plan-context';
+import { usePlan, useStore } from '../../subscription-context';
 import { webLinkForPath } from '@/lib/store-app/web-links-core';
 import { SPEND_NOT_ALLOWED } from '../../kit';
 export function WordPressNav() {

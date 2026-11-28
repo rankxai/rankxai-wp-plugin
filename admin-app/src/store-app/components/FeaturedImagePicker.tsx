@@ -1,8 +1,8 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { useState } from 'react';
 import { useLoad, fieldError, type PageError } from '../kit';
 import { useModal } from './FixModals';
-import { usePlan } from '../plan-context';
+import { usePlan } from '../subscription-context';
 import { BlogImagePanel } from './BlogImagePanel';
 import type { ImageJob } from './ImageStudio';
 import * as UI from '../ui';

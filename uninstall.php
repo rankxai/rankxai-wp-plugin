@@ -35,15 +35,11 @@ function rankxai_uninstall_current_site() {
 			delete_option( RankXAI_Connector::OPTION_APPROVER );
 			remove_role( RankXAI_Connector::ROLE );
 		}
-		$rankxai_client = __DIR__ . '/includes/class-rankxai-app-client.php';
-		if ( file_exists( $rankxai_client ) ) {
-			require_once $rankxai_client;
-			RankXAI_Connection::remove_webhooks();
-		}
 	}
 
-	foreach ( array( 'rankxai_scan_batch', 'rankxai_scan_weekly', 'rankxai_confirm_redirect', 'rankxai_product_check_batch' ) as $rankxai_hook ) {
-		wp_clear_scheduled_hook( $rankxai_hook );
+	// Every event of each hook, including those scheduled with arguments.
+	foreach ( array( 'rankxai_scan_batch', 'rankxai_scan_weekly', 'rankxai_confirm_redirect', 'rankxai_product_check_batch', 'rankxai_send_product_events' ) as $rankxai_hook ) {
+		wp_unschedule_hook( $rankxai_hook );
 	}
 
 	if ( get_option( 'rankxai_keep_data' ) ) {

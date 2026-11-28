@@ -1,4 +1,4 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { useEffect, useId, useState } from 'react';
 import { APP_PATHS } from '@/lib/shopify-app/app-routes-core';
 import { api, toastSuccess } from '../api';

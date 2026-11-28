@@ -213,9 +213,7 @@ async function run() {
     check(inRange(cfAddr, 'not-an-ip') === 'out', 'a forwarded value that is not an address is not')
     wp('option', 'update', 'rankxai_crawler_tokens', '{"bots":{"probebot":["RxProbeBot"]}}', '--format=json')
     wp('option', 'update', 'rankxai_crawler_ranges', '{"bots":{"gptbot":["0.0.0.0/0"]}}', '--format=json')
-    evalPhp('RankXAI_Lifecycle::ensure_options();')
-    check(wpSoft('option', 'get', 'rankxai_crawler_tokens') === null && wpSoft('option', 'get', 'rankxai_crawler_ranges') === null,
-      'a list stored by an earlier version is removed on upgrade')
+    check(inRange('198.51.100.7') === 'out', 'a range stored in an option (0.0.0.0/0) is ignored: only the ranges shipped with the plugin count')
     await visit(`/${MARK}-range`, 'Mozilla/5.0 (compatible; RxProbeBot/1.0)')
     c = await readCounts()
     check(rowsFor(c.json, 'probebot', `/${MARK}-range`).length === 0, 'and a crawler only that list named is no longer counted')

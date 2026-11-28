@@ -23,6 +23,9 @@ class RankXAI_Lifecycle {
 		add_action( 'admin_init', array( __CLASS__, 'ensure_options' ) );
 	}
 
+	/** Every scheduled event this plugin creates. */
+	const CRON_HOOKS = array( 'rankxai_scan_batch', 'rankxai_scan_weekly', 'rankxai_confirm_redirect', 'rankxai_product_check_batch', 'rankxai_send_product_events' );
+
 	/**
 	 * The plugin was activated.
 	 */
@@ -37,8 +40,10 @@ class RankXAI_Lifecycle {
 	public static function deactivate() {
 		RankXAI_Connection::on_deactivate();
 		RankXAI_Scan::on_deactivate();
-		wp_clear_scheduled_hook( 'rankxai_product_check_batch' );
-		wp_clear_scheduled_hook( 'rankxai_send_product_events' );
+		// Every event of each hook, including those scheduled with arguments.
+		foreach ( self::CRON_HOOKS as $hook ) {
+			wp_unschedule_hook( $hook );
+		}
 	}
 
 	/**
@@ -48,12 +53,6 @@ class RankXAI_Lifecycle {
 		$autoloaded = wp_load_alloptions();
 		if ( array_key_exists( RankXAI_Fill::OPTION_ALLOWED, $autoloaded ) ) {
 			delete_option( RankXAI_Fill::OPTION_ALLOWED );
-		}
-		// The crawler ranges now ship with the plugin.
-		foreach ( RankXAI_Crawlers::OBSOLETE_OPTIONS as $obsolete ) {
-			if ( false !== get_option( $obsolete, false ) ) {
-				delete_option( $obsolete );
-			}
 		}
 		$defaults = array(
 			RankXAI_Twins::OPTION_SETTINGS   => array(),

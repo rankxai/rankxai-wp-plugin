@@ -221,6 +221,14 @@ if (storeMissing.length || leaked.length) {
   process.exit(1)
 }
 
+// Only file types WordPress.org expects in a plugin. Its review named a .mts file as not permitted, and it reads a
+// stray notes file as AI output, so readme.txt and the licence texts are the only documents.
+const oddTypes = names.filter((n) => !n.endsWith('/') && !/\.(php|js|css|txt|png|svg|jpe?g|gif|webp|json|woff2|ts|tsx)$/i.test(n))
+if (oddTypes.length) {
+  console.error(`${TARGET} build: file types WordPress.org does not expect: ${oddTypes.slice(0, 5).join(', ')}`)
+  process.exit(1)
+}
+
 // Only the github readme describes the update check, and neither keeps a marker line.
 const shippedReadme = execFileSync('unzip', ['-p', OUT, `${SLUG}/readme.txt`], { encoding: 'utf8' })
 const mentionsUpdater = shippedReadme.includes('rankxai-update.json')

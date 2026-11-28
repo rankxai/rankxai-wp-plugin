@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { aiVisibilityHref } from '@/lib/shopify-app/app-routes-core';
 import { api, toastSuccess } from '../api';
-import { usePlan } from '../plan-context';
+import { usePlan } from '../subscription-context';
 import { BackLink, ErrorBanner, PagePrimaryAction, act, formatDate, pricedLabel, useLoad, usePageError } from '../kit';
 import { SkeletonSection } from '../components/Status';
 import { AnswerDays, type AnswerCheckView } from '../components/AnswerParts';

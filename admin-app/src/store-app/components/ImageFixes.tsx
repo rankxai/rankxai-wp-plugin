@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { oversizedGuidance, tooSmallGuidance } from '@/lib/shopify-app/image-guidance-copy';
 import { api, toastSuccess } from '../api';
 import { toastWrite } from '../reviews';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { fmtCount, fmtNumber } from '../format';
 import { AdminButton, AdminLink, ErrorBanner, GoButton, PricedButton, act, fieldError, useLoad, usePageError, type PageError } from '../kit';
 import type { ModalHandle, WriteResult } from './FixModals';

@@ -39,6 +39,12 @@ class RankXAI_Admin {
 	/** Hide the Overview's "Start here" card. */
 	const ACTION_DISMISS_START = 'rankxai_dismiss_start';
 
+	/** Settings: add one redirect now. */
+	const ACTION_ADD_REDIRECT_NOW = 'rankxai_add_redirect_now';
+
+	/** Settings: download the redirects as CSV. */
+	const ACTION_EXPORT_REDIRECTS = 'rankxai_export_redirects';
+
 	/** User meta: this user hid the "Start here" card. */
 	const META_START_DISMISSED = 'rankxai_start_dismissed';
 
@@ -85,6 +91,8 @@ class RankXAI_Admin {
 		add_action( 'admin_post_' . self::ACTION_ADD_REDIRECT, array( __CLASS__, 'handle_add_redirect' ) );
 		add_action( 'admin_post_' . self::ACTION_SCAN, array( __CLASS__, 'handle_scan' ) );
 		add_action( 'admin_post_' . self::ACTION_DISMISS_START, array( __CLASS__, 'handle_dismiss_start' ) );
+		add_action( 'admin_post_' . self::ACTION_ADD_REDIRECT_NOW, array( __CLASS__, 'handle_add_redirect_now' ) );
+		add_action( 'admin_post_' . self::ACTION_EXPORT_REDIRECTS, array( __CLASS__, 'handle_export_redirects' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( RANKXAI_PLUGIN_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -142,10 +150,41 @@ class RankXAI_Admin {
 		if ( $view ) {
 			self::$hooks[] = $view;
 			add_action( 'load-' . $view, array( 'RankXAI_View_As_AI', 'guard' ) );
+			add_action( 'load-' . $view, array( __CLASS__, 'title_view_page' ) );
 		}
 
 		// Hidden page where an administrator approves RankX AI's connection user.
-		add_submenu_page( '', __( 'Connect RankX AI', 'rankxai' ), __( 'Connect RankX AI', 'rankxai' ), 'manage_options', RankXAI_Connector::PAGE, array( 'RankXAI_Connector', 'render' ) );
+		$connect = add_submenu_page( '', __( 'Connect RankX AI', 'rankxai' ), __( 'Connect RankX AI', 'rankxai' ), 'manage_options', RankXAI_Connector::PAGE, array( 'RankXAI_Connector', 'render' ) );
+		if ( $connect ) {
+			add_action( 'load-' . $connect, array( __CLASS__, 'title_connect_page' ) );
+		}
+	}
+
+	/**
+	 * Title for the hidden View as AI page.
+	 */
+	public static function title_view_page() {
+		self::title_hidden_page( __( 'View as AI', 'rankxai' ) );
+	}
+
+	/**
+	 * Title for the hidden Connect page.
+	 */
+	public static function title_connect_page() {
+		self::title_hidden_page( __( 'Connect RankX AI', 'rankxai' ) );
+	}
+
+	/**
+	 * Give a page with no menu entry its title. WordPress finds titles through the
+	 * menu, so a hidden page has none and the admin header would read null.
+	 *
+	 * @param string $text Title.
+	 */
+	private static function title_hidden_page( $text ) {
+		global $title;
+		if ( empty( $title ) ) {
+			$title = $text; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Core reads the page title from this global; a hidden page has none.
+		}
 	}
 
 	/**
@@ -167,6 +206,30 @@ class RankXAI_Admin {
 			return;
 		}
 		wp_enqueue_style( 'rankxai-admin', plugins_url( 'assets/admin.css', RANKXAI_PLUGIN_FILE ), array(), RANKXAI_VERSION );
+		// The CSV import on Settings sends each row to this site's own redirect route, signed in as you.
+		$settings = '_page_' . self::PAGE_SETTINGS;
+		if ( substr( $hook_suffix, -strlen( $settings ) ) === $settings ) {
+			wp_enqueue_script( 'rankxai-redirect-import', plugins_url( 'assets/redirect-import.js', RANKXAI_PLUGIN_FILE ), array(), RANKXAI_VERSION, true );
+			wp_localize_script(
+				'rankxai-redirect-import',
+				'rankxaiRedirectImport',
+				array(
+					'url'   => esc_url_raw( rest_url( RankXAI_REST::NAMESPACE_V1 . '/admin/redirects' ) ),
+					'nonce' => wp_create_nonce( 'wp_rest' ),
+					'text'  => array(
+						'none'     => __( 'Choose a CSV file first.', 'rankxai' ),
+						'empty'    => __( 'No redirect was found in that file.', 'rankxai' ),
+						/* translators: 1: redirects done so far, 2: redirects in the file. */
+						'progress' => __( 'Adding %1$d of %2$d…', 'rankxai' ),
+						'added'    => __( 'Added', 'rankxai' ),
+						'notAdded' => __( 'Not added', 'rankxai' ),
+						'failed'   => __( 'The site did not answer. Try again.', 'rankxai' ),
+						/* translators: 1: redirects added, 2: redirects not added. */
+						'done'     => __( '%1$d added, %2$d not added. Reload the page to see the list.', 'rankxai' ),
+					),
+				)
+			);
+		}
 	}
 
 	/**
@@ -273,6 +336,35 @@ class RankXAI_Admin {
 			$fill[ $feature ] = isset( $_POST['rankxai_fill'][ $feature ] );
 		}
 
+		// Text for each root document and the business summary, saved only when it changed.
+		$too_long = false;
+		$texts    = isset( $_POST['rankxai_document'] ) && is_array( $_POST['rankxai_document'] ) ? wp_unslash( $_POST['rankxai_document'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each value is sanitised by rankxai_sanitize_plain_text() below.
+		foreach ( array_keys( RankXAI_Documents::catalogue() ) as $slug ) {
+			if ( ! isset( $texts[ $slug ] ) || ! is_string( $texts[ $slug ] ) ) {
+				continue;
+			}
+			$text = rankxai_sanitize_plain_text( str_replace( "\r\n", "\n", $texts[ $slug ] ) );
+			if ( strlen( $text ) > RankXAI_Documents::MAX_BYTES ) {
+				$too_long = true;
+				continue;
+			}
+			$held = RankXAI_Documents::get( $slug );
+			if ( ( null !== $held ? $held['content'] : '' ) === $text ) {
+				continue;
+			}
+			if ( '' === trim( $text ) ) {
+				RankXAI_Documents::delete( $slug );
+			} else {
+				RankXAI_Documents::set( $slug, $text );
+			}
+		}
+		if ( isset( $_POST['rankxai_twin_context'] ) ) {
+			$summary = rankxai_sanitize_plain_text( str_replace( "\r\n", "\n", wp_unslash( $_POST['rankxai_twin_context'] ) ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitised by rankxai_sanitize_plain_text().
+			if ( RankXAI_Twins::context()['content'] !== $summary && ! RankXAI_Twins::save_context( $summary ) ) {
+				$too_long = true;
+			}
+		}
+
 		// A submission that chose no post type keeps what is stored.
 		RankXAI_Twins::save_settings( $twins_on, $post_types ? $post_types : null );
 		RankXAI_Generate::save_state( $documents );
@@ -280,7 +372,71 @@ class RankXAI_Admin {
 		update_option( RankXAI_Access_Scope::OPTION_PERSONAL_DATA, $personal ? 1 : 0, false );
 		RankXAI_Fill::save( $fill );
 
-		wp_safe_redirect( add_query_arg( 'rankxai-saved', '1', self::page_url( self::PAGE_SETTINGS ) ) );
+		$flags = array( 'rankxai-saved' => '1' );
+		if ( $too_long ) {
+			$flags['rankxai-too-long'] = '1';
+		}
+		wp_safe_redirect( add_query_arg( $flags, self::page_url( self::PAGE_SETTINGS ) ) );
+		exit;
+	}
+
+	/**
+	 * Add one redirect from Settings, checked and written now.
+	 */
+	public static function handle_add_redirect_now() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to change these settings.', 'rankxai' ), '', array( 'response' => 403 ) );
+		}
+		check_admin_referer( self::ACTION_ADD_REDIRECT_NOW );
+
+		// Keeps percent-encoding, which sanitize_text_field() would strip.
+		$from = isset( $_POST['rankxai_from'] ) ? rankxai_sanitize_path( wp_unslash( $_POST['rankxai_from'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitised by rankxai_sanitize_path().
+		$to   = isset( $_POST['rankxai_to'] ) ? rankxai_sanitize_path( wp_unslash( $_POST['rankxai_to'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitised by rankxai_sanitize_path().
+		// An address typed in full, on this site, becomes its path.
+		if ( 0 === strpos( $from, home_url() ) ) {
+			$from = (string) wp_parse_url( $from, PHP_URL_PATH );
+		}
+		if ( 0 === strpos( $to, home_url() ) ) {
+			$to = (string) wp_parse_url( $to, PHP_URL_PATH );
+		}
+		$result = RankXAI_Redirect_Requests::add_now( $from, $to );
+		set_transient(
+			'rankxai_redirect_notice_' . get_current_user_id(),
+			array(
+				'state'   => 'added' === $result['state'] ? 'added' : 'refused',
+				'message' => 'added' === $result['state'] ? __( 'Redirect added.', 'rankxai' ) : $result['message'],
+			),
+			MINUTE_IN_SECONDS
+		);
+		wp_safe_redirect( self::page_url( self::PAGE_SETTINGS ) . '#rankxai-redirects' );
+		exit;
+	}
+
+	/**
+	 * Download every redirect this site's managers hold (this plugin's list, Rank Math) as CSV.
+	 */
+	public static function handle_export_redirects() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to change these settings.', 'rankxai' ), '', array( 'response' => 403 ) );
+		}
+		check_admin_referer( self::ACTION_EXPORT_REDIRECTS );
+
+		$cell  = function ( $value ) {
+			$value = (string) $value;
+			// A leading formula character would run as a formula in a spreadsheet.
+			if ( '' !== $value && false !== strpos( '=+-@', $value[0] ) ) {
+				$value = "'" . $value;
+			}
+			return preg_match( '/[",\r\n]/', $value ) ? '"' . str_replace( '"', '""', $value ) . '"' : $value;
+		};
+		$lines = array( 'from,to,code' );
+		foreach ( RankXAI_Redirects::items( '', RankXAI_Redirects::MAX )['items'] as $item ) {
+			$lines[] = implode( ',', array( $cell( $item['from'] ), $cell( $item['to'] ), $cell( (int) $item['code'] ) ) );
+		}
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="redirects-' . gmdate( 'Y-m-d' ) . '.csv"' );
+		echo implode( "\n", $lines ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A CSV download; each cell is quoted above.
 		exit;
 	}
 

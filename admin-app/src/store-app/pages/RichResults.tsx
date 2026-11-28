@@ -4,7 +4,7 @@ import { ErrorBanner, useLoad, type PageError } from '../kit';
 import { SkeletonSection } from '../components/Status';
 import { AgentFilesSection, StructuredDataSection } from '../shopify-views/StoreFiles';
 import { WooAgentFilesSection } from '../components/WooAgentFiles';
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import * as UI from '../ui';
 type State = 'pass' | 'warn' | 'fail';
 interface RichData {

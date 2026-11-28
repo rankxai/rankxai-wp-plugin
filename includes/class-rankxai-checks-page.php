@@ -353,9 +353,10 @@ class RankXAI_Checks_Page {
 			if ( ! $findings[ $list ] ) {
 				continue;
 			}
-			echo '<h3 class="rankxai-card__title">' . esc_html( $label ) . '</h3>';
-			$rows = array();
-			foreach ( array_slice( $findings[ $list ], 0, 30 ) as $item ) {
+			echo '<h3 class="rankxai-card__title" id="rankxai-' . esc_attr( $list ) . '">' . esc_html( $label ) . '</h3>';
+			$paged = RankXAI_UI::page_of( $findings[ $list ], 'rankxai-' . $list . '-page' );
+			$rows  = array();
+			foreach ( $paged['items'] as $item ) {
 				$candidates = RankXAI_Scan::link_candidates( $item['id'] );
 				$rows[]     = array(
 					self::post_cell( $item ),
@@ -366,6 +367,7 @@ class RankXAI_Checks_Page {
 				);
 			}
 			RankXAI_UI::table( array( __( 'Page', 'rankxai' ), __( 'AI crawler visits', 'rankxai' ), __( 'Fix it yourself', 'rankxai' ) ), $rows, array( 0, 1, 2 ), array( 1 ) );
+			RankXAI_UI::pager( $paged, 'rankxai-' . $list );
 		}
 		RankXAI_UI::note( __( 'Your home page, posts page and shop pages are reached by design and are never listed. Pages you have marked noindex are left out too.', 'rankxai' ) );
 		RankXAI_UI::card_close();
@@ -383,12 +385,14 @@ class RankXAI_Checks_Page {
 		}
 		RankXAI_UI::card_open(
 			array(
+				'id'       => 'rankxai-unlinked',
 				'title'    => __( 'Posts with no links from your other pages', 'rankxai' ),
 				'subtitle' => __( 'Archives and the shop still list these. AI crawlers follow links in the text, so a link from a related page helps them find each one.', 'rankxai' ),
 			)
 		);
-		$rows = array();
-		foreach ( array_slice( $findings['unlinkedPosts'], 0, 30 ) as $item ) {
+		$paged = RankXAI_UI::page_of( $findings['unlinkedPosts'], 'rankxai-unlinked-page' );
+		$rows  = array();
+		foreach ( $paged['items'] as $item ) {
 			$candidates = RankXAI_Scan::link_candidates( $item['id'] );
 			$rows[]     = array(
 				self::post_cell( $item ),
@@ -396,15 +400,7 @@ class RankXAI_Checks_Page {
 			);
 		}
 		RankXAI_UI::table( array( __( 'Post', 'rankxai' ), __( 'Pages that could link to it', 'rankxai' ) ), $rows, array( 0, 1 ) );
-		if ( count( $findings['unlinkedPosts'] ) > 30 ) {
-			RankXAI_UI::note(
-				sprintf(
-					/* translators: %d: number of posts. */
-					__( '%d more are not shown.', 'rankxai' ),
-					count( $findings['unlinkedPosts'] ) - 30
-				)
-			);
-		}
+		RankXAI_UI::pager( $paged, 'rankxai-unlinked' );
 		RankXAI_UI::card_close();
 	}
 
@@ -432,17 +428,20 @@ class RankXAI_Checks_Page {
 		}
 		RankXAI_UI::card_open(
 			array(
+				'id'       => 'rankxai-images',
 				'title'    => __( 'Images and text descriptions', 'rankxai' ),
 				'subtitle' => __( 'Alt text is how an AI assistant, and a screen reader, knows what an image shows.', 'rankxai' ),
 			)
 		);
 		if ( $findings['missingAlt'] ) {
 			echo '<p>' . esc_html__( 'These pages have images with no alt attribute at all:', 'rankxai' ) . '</p>';
-			$rows = array();
-			foreach ( array_slice( $findings['missingAlt'], 0, 30 ) as $item ) {
+			$paged = RankXAI_UI::page_of( $findings['missingAlt'], 'rankxai-images-page' );
+			$rows  = array();
+			foreach ( $paged['items'] as $item ) {
 				$rows[] = array( self::edit_links( array( $item['id'] ) ), number_format_i18n( $item['missing'] ) );
 			}
 			RankXAI_UI::table( array( __( 'Page', 'rankxai' ), __( 'Images', 'rankxai' ) ), $rows, array( 0 ), array( 1 ) );
+			RankXAI_UI::pager( $paged, 'rankxai-images' );
 		}
 		if ( $findings['emptyAlt'] > 0 ) {
 			RankXAI_UI::note(

@@ -5,7 +5,7 @@ import { FIX_GUIDE, fixGuideFor, wordCount, type LiveProduct, type ProductSectio
 import { PRODUCT_STATE_LABEL, type AiShoppingStatus, type ChannelLine, type GapView, type ProductState } from '@/lib/shopify-app/product-view-core';
 import { api, toastSuccess } from '../api';
 import { toastWrite } from '../reviews';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { adminLocale, fmtCount, fmtNumber } from '../format';
 import { formatPrice } from '@/lib/shopping/catalogue-display';
 import { AdminButton, BackLink, ErrorBanner, act, formatDate, useLoad, usePageError, type PageError } from '../kit';

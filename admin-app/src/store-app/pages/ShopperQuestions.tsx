@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { APP_PATHS, aiVisibilityHref, answerQuestionHref, shoppingQuestionHref } from '@/lib/shopify-app/app-routes-core';
 import type { AssistantCheckStatus } from '@/lib/shopify-app/assistant-status';
 import { api, toastSuccess } from '../api';
-import { usePlan } from '../plan-context';
+import { usePlan } from '../subscription-context';
 import { ErrorBanner, PagePrimaryAction, PricedButton, act, fieldError, formatDate, useLoad, usePagedRows, usePageError } from '../kit';
 import { fmtNumber } from '../format';
 import { SkeletonSection } from '../components/Status';

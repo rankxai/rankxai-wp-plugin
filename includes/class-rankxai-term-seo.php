@@ -215,8 +215,9 @@ class RankXAI_Term_SEO {
 				$meta['wpseo_desc'] = $clean['description'];
 			}
 			WPSEO_Taxonomy_Meta::set_values( $term_id, $taxonomy, $meta );
-			// Yoast renders from indexables, rebuilt on core's `edited_term`. Firing
-			// it avoids depending on Yoast's internal classes.
+			// Yoast renders from indexables, rebuilt on core's `edited_term`. Firing it
+			// avoids Yoast's internal classes; re-saving the term through wp_update_term()
+			// would run its description through kses and could strip the owner's HTML.
 			$term = get_term( $term_id, $taxonomy );
 			if ( $term instanceof WP_Term ) {
 				do_action( 'edited_term', $term_id, (int) $term->term_taxonomy_id, $taxonomy, array() ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core's hook.

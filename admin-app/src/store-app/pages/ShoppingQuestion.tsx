@@ -4,7 +4,7 @@ import { formatPrice } from '@/lib/shopping/catalogue-display';
 import { rivalPriceSentence, type RivalPriceRange } from '@/lib/shopping/rival-price-core';
 import { api, toastSuccess } from '../api';
 import { toastWrite } from '../reviews';
-import { usePlan } from '../plan-context';
+import { usePlan } from '../subscription-context';
 import { BackLink, ErrorBanner, PagePrimaryAction, PricedButton, act, formatDate, lockSentence, pricedLabel, useLoad, usePagedRows, usePageError, useNoSpend } from '../kit';
 import { adminLocale, fmtNumber } from '../format';
 import { SkeletonSection } from '../components/Status';

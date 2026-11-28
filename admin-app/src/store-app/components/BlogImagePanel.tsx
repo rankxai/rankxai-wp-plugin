@@ -1,4 +1,4 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import { useEffect, useRef, useState } from 'react';
 import { BLOG_CROPS, BLOG_PALETTE_OPTIONS, BLOG_TWEAK_OPTIONS, DEFAULT_BLOG_OPTIONS, blogStyleOptionsFor, cropBox, readBlogImageOptions, type BlogConcept, type BlogImageOptions, } from '@/lib/shopify-app/blog-image-choices';
 import { IMAGE_REQUEST_MAX, LOOK_NAME_MAX, TAKE_CHOICES } from '@/lib/shopify-app/image-studio-choices';

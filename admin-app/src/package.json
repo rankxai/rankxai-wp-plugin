@@ -4,7 +4,7 @@
   "license": "GPL-2.0-or-later",
   "type": "module",
   "scripts": {
-    "build": "vite build --config vite.config.mts"
+    "build": "vite build --config vite.config.js"
   },
   "devDependencies": {
     "vite": "8.3.5",

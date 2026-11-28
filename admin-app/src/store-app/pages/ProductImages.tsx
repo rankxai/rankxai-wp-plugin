@@ -4,7 +4,7 @@ import type { ProductShot } from '@/lib/shopify-app/image-studio-choices';
 import { api, toastSuccess } from '../api';
 import { host } from '../host';
 import { useRouter } from '../router';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { BackLink, ErrorBanner, GoButton, PagePrimaryAction, act, useLoad, usePageError } from '../kit';
 import { PhotoStudio, SampleShots, Tile, Viewer, retakeBody, useGallery, type ImageJob, type StudioInfo } from '../components/ImageStudio';
 import { useModal } from '../components/FixModals';

@@ -4,7 +4,7 @@ import { rivalPriceSentence, type RivalPriceRange } from '@/lib/shopping/rival-p
 import { ratingsGapSentence, type RatingsGap } from '@/lib/shopify-app/ratings-gap-copy';
 import { api, toastSuccess } from '../api';
 import { host } from '../host';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { act, formatDate, useLoad, usePagedRows, type PageError } from '../kit';
 import { adminLocale, fmtCount, fmtNumber } from '../format';
 import { ProductCell, SkeletonSection } from '../components/Status';

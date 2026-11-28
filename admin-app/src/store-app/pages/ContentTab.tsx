@@ -1,4 +1,4 @@
-import { useStore } from '../plan-context';
+import { useStore } from '../subscription-context';
 import type { StoreWords } from '../vocabulary';
 import { useMemo, useState } from 'react';
 import { APP_PATHS, contentItemHref } from '@/lib/shopify-app/app-routes-core';

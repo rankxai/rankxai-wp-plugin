@@ -73,11 +73,20 @@ class RankXAI_REST {
 			return false;
 		}
 		$post_id = (int) $request['id'];
-		if ( $post_id <= 0 || ! get_post( $post_id ) ) {
+		$post    = $post_id > 0 ? get_post( $post_id ) : null;
+		if ( ! $post ) {
 			return new WP_Error(
 				'rankxai_not_found',
 				__( 'No such post.', 'rankxai' ),
 				array( 'status' => 404 )
+			);
+		}
+		// Content only: never templates, patterns, menus or a plugin's private post types.
+		if ( ! RankXAI_Access_Scope::content_post_type( $post->post_type ) ) {
+			return new WP_Error(
+				'rankxai_not_content',
+				__( 'RankX AI only edits posts, pages and products, not site structure.', 'rankxai' ),
+				array( 'status' => 403 )
 			);
 		}
 		return current_user_can( 'edit_post', $post_id );
@@ -386,8 +395,9 @@ class RankXAI_REST {
 					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
 					'args'                => array(
 						'content' => array(
-							'required' => true,
-							'type'     => 'string',
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'rankxai_sanitize_plain_text',
 						),
 					),
 				),
@@ -413,6 +423,12 @@ class RankXAI_REST {
 					'methods'             => WP_REST_Server::EDITABLE,
 					'callback'            => array( __CLASS__, 'handle_twins_put' ),
 					'permission_callback' => array( __CLASS__, 'can_manage_documents' ),
+					'args'                => array(
+						'context' => array(
+							'type'              => 'string',
+							'sanitize_callback' => 'rankxai_sanitize_plain_text',
+						),
+					),
 				),
 			)
 		);
@@ -436,6 +452,18 @@ class RankXAI_REST {
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( __CLASS__, 'handle_admin_redirect_add' ),
 				'permission_callback' => array( __CLASS__, 'can_act_in_browser' ),
+				'args'                => array(
+					'from' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'rankxai_sanitize_path',
+					),
+					'to'   => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'rankxai_sanitize_path',
+					),
+				),
 			)
 		);
 

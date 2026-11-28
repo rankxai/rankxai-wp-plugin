@@ -31,6 +31,28 @@ class RankXAI_Generate {
 	const MAX_TYPES = 6;
 
 	/**
+	 * How much a generated llms.txt lists: a short guide to the site, not an index of every page.
+	 * The same for every site, filterable with `rankxai_llms_txt_limits`.
+	 *
+	 * @return array{per_type: int, total: int, types: int}
+	 */
+	public static function limits() {
+		$limits = (array) apply_filters(
+			'rankxai_llms_txt_limits',
+			array(
+				'per_type' => self::MAX_PER_TYPE,
+				'total'    => self::MAX_TOTAL,
+				'types'    => self::MAX_TYPES,
+			)
+		);
+		return array(
+			'per_type' => max( 1, (int) ( isset( $limits['per_type'] ) ? $limits['per_type'] : self::MAX_PER_TYPE ) ),
+			'total'    => max( 1, (int) ( isset( $limits['total'] ) ? $limits['total'] : self::MAX_TOTAL ) ),
+			'types'    => max( 1, (int) ( isset( $limits['types'] ) ? $limits['types'] : self::MAX_TYPES ) ),
+		);
+	}
+
+	/**
 	 * WordPress's default tagline, never used as the site's summary.
 	 */
 	const DEFAULT_TAGLINE = 'Just another WordPress site';
@@ -202,7 +224,7 @@ class RankXAI_Generate {
 		return array_slice(
 			array_values( array_filter( $types, array( __CLASS__, 'is_post_type_object' ) ) ),
 			0,
-			self::MAX_TYPES
+			self::limits()['types']
 		);
 	}
 
@@ -361,13 +383,13 @@ class RankXAI_Generate {
 		$truncated = 0;
 
 		foreach ( self::listed_post_types() as $type ) {
-			$remaining = self::MAX_TOTAL - $listed;
+			$remaining = self::limits()['total'] - $listed;
 			if ( $remaining <= 0 ) {
 				break;
 			}
 
 			// Ask for one extra to learn whether the list was cut short.
-			$cap   = min( self::MAX_PER_TYPE, $remaining );
+			$cap   = min( self::limits()['per_type'], $remaining );
 			$posts = self::posts_of_type( $type->name, $cap + 1 );
 			if ( ! $posts ) {
 				continue;

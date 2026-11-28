@@ -106,7 +106,7 @@ class RankXAI_Documents {
 		update_option(
 			$option,
 			array(
-				'content' => $content,
+				'content' => rankxai_sanitize_plain_text( $content ),
 				'updated' => gmdate( 'c' ),
 			),
 			false

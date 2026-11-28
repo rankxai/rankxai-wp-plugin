@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { PRICES_IN_USD_NOTE, usdPerMonth } from '@/lib/shopify-app/plan-copy-core';
+import { PRICES_IN_USD_NOTE, usdPerMonth } from '@/lib/shopify-app/subscription-copy-core';
 import { api } from '../api';
 import { host } from '../host';
 import { APP_PATHS } from '@/lib/shopify-app/app-routes-core';
-import { usePlan, useStore } from '../plan-context';
+import { usePlan, useStore } from '../subscription-context';
 import { fmtNumber, fmtCount } from '../format';
 import { BackLink, ErrorBanner, PagePrimaryAction, formatDate } from '../kit';
 import { SkeletonSection } from '../components/Status';
 import { PageColumns } from '../components/PageColumns';
 import * as UI from '../ui';
 const money = usdPerMonth;
-export function PlanPage() {
+export function BillingPage() {
     const { plan, error, planPageUrl, reload } = usePlan();
     const topPlanName = plan?.plans.slice().sort((a, b) => (b.priceMonthlyCents ?? 0) - (a.priceMonthlyCents ?? 0))[0]?.name ?? null;
     const onTopPlan = !!plan?.account?.planName && plan.account.planName === topPlanName;
