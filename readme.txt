@@ -16,7 +16,7 @@ Shoppers ask ChatGPT, Gemini and Google's AI Mode what to buy. The answers pick 
 
 = Free, with no account =
 
-* **Product check.** Checks every published product for a barcode (GTIN, UPC, EAN or ISBN), brand, main image and alt text, description, category and price, and lists each one with something missing and where to fix it. Nothing is sent anywhere.
+* **Product check.** Checks every published product for a barcode (GTIN, UPC, EAN or ISBN), brand, main image and alt text, description, category and price, and lists what is missing and where to fix it. Nothing is sent anywhere.
 * **Markdown copies.** A plain-text copy of each page at its own address (`/product/blue-mug.md`), with product facts first and an optional few lines you write about your business. Copies carry `noindex`. Off until you switch them on.
 * **llms.txt, agents.md and ai.txt** at your site's root: written by you in Settings, or llms.txt and agents.md generated from your site (a short guide; the `rankxai_llms_txt_limits` filter sets its length). What you write is always what is served. Nothing is written to your server. Off until you switch each on.
 * **AI crawler visits.** Which AI crawlers (GPTBot, ClaudeBot, PerplexityBot and others) read which pages, per day, for up to 35 days, checked against the address ranges each operator publishes. The ranges ship with the plugin. Off until you switch it on. No IP address or browser details are stored.
@@ -47,7 +47,7 @@ The store app runs from `admin-app/build`. Its full source is in `admin-app/src`
 1. Install from Plugins › Add New and activate it.
 2. Open **RankX AI** in the admin menu and follow "Start here".
 3. On a store, open **RankX AI › Store** for the product check.
-4. Optional: click **Connect RankX AI** to connect an account.
+4. Optional: click **Connect RankX AI** to connect an account (the store app needs WordPress 6.6).
 
 == Frequently Asked Questions ==
 
@@ -59,17 +59,13 @@ No. Everything under "Free, with no account" works without one.
 
 You approve it on a screen in wp-admin. That creates a user called "RankX AI" with its own role and an Application Password only RankX AI holds.
 
-It can create, edit and publish posts, pages, media and products and their categories and tags (including status, address and parent, and a product's price and stock), and move them to the trash. It can read redirects and WooCommerce's settings and status. It cannot change a page's template, trash, unpublish, move or hide from search engines the front page, posts page, privacy policy or store pages, add or remove redirects, change any settings or webhooks, switch this plugin's features on or off, install plugins or themes, manage users, or sign in to wp-admin. The password works only through the REST API and an allow list (posts, pages, products, media, their categories and tags, this plugin's routes, and reading), cannot post unfiltered HTML and cannot delete permanently. Orders, customers, users, reviews and full comments stay off until you allow them in RankX AI › Settings, and are then read only.
+It can create, edit and publish posts, pages, media and products and their categories and tags (including status, address and parent, and a product's price and stock), and move them to the trash. It can read redirects and WooCommerce's settings, status and coupons. It cannot change a page's template, trash, unpublish, move or hide from search engines the front page, posts page, privacy policy or store pages, add or remove redirects, change any settings or webhooks, switch this plugin's features on or off, install plugins or themes, manage users, or sign in to wp-admin. The password works only through the REST API and an allow list (posts, pages, products, media, their categories and tags, this plugin's routes, and reading), cannot post unfiltered HTML and cannot delete permanently. Orders, customers, users, reviews and full comments stay off until you allow them in RankX AI › Settings, and are then read only.
 
 **Disconnect** in RankX AI › Settings, or deactivating the plugin, removes the user and its password.
 
 = What happens if I uninstall it? =
 
 The connection, user and password are removed. Unless you tick "Keep RankX AI's settings and data" in Settings, its settings, counts and cached copies are removed too.
-
-= Which WordPress version do I need? =
-
-6.0 or later; the store app needs 6.6.
 
 == External services ==
 
@@ -81,11 +77,12 @@ RankX AI: https://rankxai.com · Terms: https://rankxai.com/terms-of-service · 
 
 * **Connect** opens `https://app.rankxai.com/connect/wordpress` with this site's address, its wp-admin address, your user ID and a one-time code. When you approve, the browser returns to RankX AI with the site's address, the "RankX AI" user's login and its new Application Password, as WordPress's own Application Password screen does.
 * **The Store page, and a product's RankX AI panel when you open it,** ask `https://app.rankxai.com/api/store-app/wp/session` for a ten-minute session (site and wp-admin addresses, the administrator's user ID and name, the site's token). The store app, or the panel for that one product, then calls `https://app.rankxai.com/api/store-app` from the browser, and sends an error's message, stack trace and page address to `https://app.rankxai.com/api/store-app/client-error`, at most three a page.
+* **Search Console.** Connecting it from the Store page opens Google's sign-in in a new tab, so RankX AI can read this site's Search Console data. Google's terms: https://policies.google.com/terms · privacy: https://policies.google.com/privacy
 * **Images** come from `https://assets.rankxai.com` and, in AI shopping results, from the third-party stores those answers link to, on the Store page only.
 * **Product changes.** When a product is created, updated, trashed, restored or deleted, the plugin sends its ID, what happened and your site's address to `https://app.rankxai.com/api/store-app/wp/product-events` a minute later.
 * **Disconnect**, or deactivating the plugin while connected, tells `https://app.rankxai.com/api/store-app/wp/connection`.
 * **What RankX AI saves on this site**, as approved in your account: search titles, descriptions, link previews, noindex, structured data, llms.txt and agents.md (served only if you switch them on, never in place of your own text) and a business summary for the copies, plus the Overview summary. It is all data; nothing is run as code. ai.txt is written only by you.
-* **What RankX AI reads:** your posts, pages, products and terms; WooCommerce's settings and system status (which include the server environment and the active plugins); and the crawler counts, site checks and redirects this plugin shows. Orders, refunds, customers, the user list, product reviews and full comments only if you allow it in RankX AI › Settings.
+* **What RankX AI reads:** your posts, pages, products and terms; WooCommerce's settings, system status and coupons (the status includes the server environment and the active plugins); and the crawler counts, site checks and redirects this plugin shows. Orders, refunds, customers, the user list, product reviews and full comments only if you allow it in RankX AI › Settings.
 
 = rankxai.com, only if you click it =
 
@@ -115,7 +112,6 @@ Site checks and View as AI fetch your own pages (user agent `RankXAI-SiteCheck`)
 * Geist typeface by Vercel and basement.studio, SIL Open Font License 1.1 (`assets/fonts/Geist-OFL.txt`).
 * The image studio's three sample photos were generated for RankX AI with an AI image model, show no real product, brand or person, and are released under GPLv2 or later.
 * The store app's build includes Vite's module-preload helper, MIT License (https://github.com/vitejs/vite).
-* The RankX AI name and logo are RankX AI's trademarks.
 
 == Changelog ==
 

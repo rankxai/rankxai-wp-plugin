@@ -105,6 +105,8 @@ class RankXAI_Noindex {
 	 */
 	private static function mirror( $post_id, $on ) {
 		$target = RankXAI_Detect::target_plugin();
+		// From the connection, clearing only removes this post's own value, so the SEO plugin's default for the type applies.
+		$only_clear = ! $on && RankXAI_Access_Scope::is_connection_request();
 		if ( 'aioseo' === $target ) {
 			self::aioseo( $post_id, $on );
 			return;
@@ -113,9 +115,15 @@ class RankXAI_Noindex {
 			$robots = get_post_meta( $post_id, 'rank_math_robots', true );
 			$robots = is_array( $robots ) ? $robots : array();
 			$robots = array_values( array_diff( $robots, array( 'index', 'noindex' ) ) );
-			// Rank Math needs an explicit directive either way.
-			$robots[] = $on ? 'noindex' : 'index';
-			update_post_meta( $post_id, 'rank_math_robots', $robots );
+			// Rank Math needs an explicit directive either way, except when the connection only clears its own value.
+			if ( ! $only_clear ) {
+				$robots[] = $on ? 'noindex' : 'index';
+			}
+			if ( $robots ) {
+				update_post_meta( $post_id, 'rank_math_robots', $robots );
+			} else {
+				delete_post_meta( $post_id, 'rank_math_robots' );
+			}
 			return;
 		}
 		// Meta key, the noindex value, and the explicit index value for when the
@@ -136,7 +144,7 @@ class RankXAI_Noindex {
 			return;
 		}
 		delete_post_meta( $post_id, $key );
-		if ( '' !== $show && ( self::type_default_hides( $target, $post_id ) || RankXAI_Twins::is_noindexed( $post_id ) ) ) {
+		if ( ! $only_clear && '' !== $show && ( self::type_default_hides( $target, $post_id ) || RankXAI_Twins::is_noindexed( $post_id ) ) ) {
 			update_post_meta( $post_id, $key, $show );
 		}
 	}

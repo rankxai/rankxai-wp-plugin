@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { parseMarkdown, type Block, type ListItem } from '@/components/prompt-tracker/response-markdown';
+import { parseMarkdown, type Block, type ListItem } from '@/components/prompt-tracker/answer-markdown';
 import type { AssistantCheckStatus } from '@/lib/shopify-app/assistant-status';
 import { MAX_RANGE_DAYS, assistantsIn, clampRange, mergeChecksByDay, rangeEntries, rangeLine, searchesAcross, shiftDay, type DayStatus } from '@/lib/shopify-app/answer-range-core';
 import { blogNewHref } from '@/lib/shopify-app/app-routes-core';

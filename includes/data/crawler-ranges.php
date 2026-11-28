@@ -2,7 +2,7 @@
 /**
  * The address ranges AI crawler operators publish, and Cloudflare's, as of the date below.
  *
- * Copied from each operator's public list (named in the readme); update the whole list, not single entries.
+ * Copied from the public address lists each operator publishes; update the whole list, not single entries.
  *
  * @package RankXAI
  */

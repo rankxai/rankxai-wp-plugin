@@ -303,7 +303,7 @@ class RankXAI_Connector {
 		echo '<li>' . esc_html__( 'set a page\'s search title, description, link previews and noindex, in your SEO plugin\'s fields when you have one, and its structured data', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'publish llms.txt and agents.md text and a business summary for the markdown copies (served only if you switch them on, and never in place of text you wrote)', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'save the summary shown on the RankX AI Overview page, and its own connection token', 'rankxai' ) . '</li>';
-		echo '<li>' . esc_html__( 'read WooCommerce settings and status, the AI crawler counts, the site check results and the list of redirects (only you add or remove redirects, here in wp-admin)', 'rankxai' ) . '</li></ul>';
+		echo '<li>' . esc_html__( 'read WooCommerce settings, status and coupons, the AI crawler counts, the site check results and the list of redirects (only you add or remove redirects, here in wp-admin)', 'rankxai' ) . '</li></ul>';
 		echo '<p><strong>' . esc_html__( 'It cannot:', 'rankxai' ) . '</strong></p><ul class="ul-disc">';
 		echo '<li>' . esc_html__( 'install, change or remove plugins or themes', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'add, change or remove users', 'rankxai' ) . '</li>';

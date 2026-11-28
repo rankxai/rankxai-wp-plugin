@@ -1,4 +1,4 @@
-import type { CataloguePrice, PromptCardRow } from './prompt-card-types';
+import type { CataloguePrice, PromptCardRow } from './question-card-types';
 export const RIVAL_PRICE_MIN_PRICES = 3;
 export const RIVAL_PRICE_MIDDLE_HALF_FROM = 8;
 export interface RivalPriceRange {

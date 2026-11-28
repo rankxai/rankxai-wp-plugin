@@ -1,4 +1,4 @@
-import { isValidApprovedOutline, normaliseBriefOutline, type BriefOutline } from '@/lib/content/brief-outline';
+import { isValidApprovedOutline, normaliseBriefOutline, type BriefOutline } from '@/lib/content/brief-sections';
 export interface GuidedTitle {
     title: string;
 }

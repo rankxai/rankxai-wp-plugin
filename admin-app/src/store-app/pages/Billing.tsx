@@ -111,7 +111,12 @@ export function BillingPage() {
                 </UI.TableBody>
               </UI.Table>
               {platform === 'shopify' ? <UI.Text color="subdued">{PRICES_IN_USD_NOTE}</UI.Text> : null}
-              <UI.Text color="subdued">Free checks your products for what AI shopping needs and fixes them one at a time. Paid plans also monitor products and track AI Shopping and AI answer questions (the limit applies to each kind), and include every feature. {words.billing}</UI.Text>
+              <UI.Text color="subdued">
+                {platform === 'shopify'
+                ? 'Free checks your products for what AI shopping needs and fixes them one at a time. Paid plans also monitor products and track AI Shopping and AI answer questions (the limit applies to each kind), and include every feature. '
+                : 'Plans differ in how many products RankX AI monitors and how many AI Shopping and AI answer questions it tracks (the limit applies to each kind). '}
+                {words.billing}
+              </UI.Text>
             </UI.Section>
           </>} side={<>
             <UI.Section heading={plan.card.title}>
