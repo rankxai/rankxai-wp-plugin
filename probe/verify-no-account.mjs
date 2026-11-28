@@ -574,28 +574,35 @@ echo $generated;
     ? ok('OFF — both addresses go back to 404, leaving them to whatever else would serve them')
     : bad(`OFF — llms=${llmsOff.status} agents=${agentsOff.status}`)
 
-  // ---- RANKX AI CANNOT PUBLISH A ROOT DOCUMENT THE OWNER HAS NOT SWITCHED ON
-  const pushedOff = await apiJson('/rankxai/v1/documents/ai_txt', {
+  // ---- RANKX AI CANNOT WRITE ai.txt, AND A PUBLISHED DOCUMENT WAITS FOR THE OWNER'S SWITCH
+  const aiPut = await apiJson('/rankxai/v1/documents/ai_txt', {
     method: 'PUT',
-    body: JSON.stringify({ content: '# ai.txt pushed while switched off\n' }),
+    body: JSON.stringify({ content: '# ai.txt from RankX AI\n' }),
+  })
+  aiPut.status === 404
+    ? ok('SWITCH — RankX AI has no route to write ai.txt: only the site owner writes it')
+    : bad(`SWITCH — PUT ai_txt answered ${aiPut.status} ${JSON.stringify(aiPut.json)}`)
+  const pushedOff = await apiJson('/rankxai/v1/documents/agents_md', {
+    method: 'PUT',
+    body: JSON.stringify({ content: '# agents.md pushed while switched off\n' }),
   })
   pushedOff.status === 200 && pushedOff.json?.stored === true && pushedOff.json?.switchedOn === false && pushedOff.json?.serving === false
     ? ok('SWITCH — a document RankX AI publishes is stored, and reported as switched off and not serving')
     : bad(`SWITCH — PUT answered ${pushedOff.status} ${JSON.stringify(pushedOff.json)}`)
-  const aiOff = await raw('/ai.txt')
-  aiOff.status === 404
-    ? ok('SWITCH — and /ai.txt is NOT served: only the site owner publishes a root document')
-    : bad(`SWITCH — /ai.txt answered ${aiOff.status} while switched off`)
-  const switchedOn = submitForm({ twinsOn: false, postTypes: ['post', 'page'], generate: { ai_txt: true } })
-  const aiOn = await raw('/ai.txt')
-  has(/^saved:/, switchedOn) && aiOn.status === 200 && has(/pushed while switched off/, aiOn.body)
-    ? ok('SWITCH — once the owner ticks "Serve it at /ai.txt", the stored document is served')
-    : bad(`SWITCH — after ticking it: ${aiOn.status}`)
+  const agentsHeld = await raw('/agents.md')
+  agentsHeld.status === 404
+    ? ok('SWITCH — and /agents.md is NOT served: only the site owner switches a root document on')
+    : bad(`SWITCH — /agents.md answered ${agentsHeld.status} while switched off`)
+  const switchedOn = submitForm({ twinsOn: false, postTypes: ['post', 'page'], generate: { agents_md: true } })
+  const agentsOn = await raw('/agents.md')
+  has(/^saved:/, switchedOn) && agentsOn.status === 200 && has(/pushed while switched off/, agentsOn.body)
+    ? ok('SWITCH — once the owner ticks "Serve it at /agents.md", the stored document is served')
+    : bad(`SWITCH — after ticking it: ${agentsOn.status}`)
   submitForm({ twinsOn: false, postTypes: ['post', 'page'], generate: {} })
-  ;(await raw('/ai.txt')).status === 404
+  ;(await raw('/agents.md')).status === 404
     ? ok('SWITCH — and unticking it stops it again')
-    : bad('SWITCH — /ai.txt still served after unticking')
-  await apiJson('/rankxai/v1/documents/ai_txt', { method: 'DELETE' })
+    : bad('SWITCH — /agents.md still served after unticking')
+  await apiJson('/rankxai/v1/documents/agents_md', { method: 'DELETE' })
 
   // ---- THE LOG ------------------------------------------------------------
   //

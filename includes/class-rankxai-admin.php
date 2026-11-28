@@ -146,45 +146,16 @@ class RankXAI_Admin {
 		}
 
 		// Hidden page, opened from post row actions; it checks the post itself.
-		$view = add_submenu_page( '', __( 'View as AI', 'rankxai' ), __( 'View as AI', 'rankxai' ), 'edit_posts', self::PAGE_VIEW, array( 'RankXAI_View_As_AI', 'render' ) );
+		// Pages with no menu entry are registered under options.php, which is never shown as a menu, so WordPress
+		// still finds their titles. Their addresses stay admin.php?page=….
+		$view = add_submenu_page( 'options.php', __( 'View as AI', 'rankxai' ), __( 'View as AI', 'rankxai' ), 'edit_posts', self::PAGE_VIEW, array( 'RankXAI_View_As_AI', 'render' ) );
 		if ( $view ) {
 			self::$hooks[] = $view;
 			add_action( 'load-' . $view, array( 'RankXAI_View_As_AI', 'guard' ) );
-			add_action( 'load-' . $view, array( __CLASS__, 'title_view_page' ) );
 		}
 
-		// Hidden page where an administrator approves RankX AI's connection user.
-		$connect = add_submenu_page( '', __( 'Connect RankX AI', 'rankxai' ), __( 'Connect RankX AI', 'rankxai' ), 'manage_options', RankXAI_Connector::PAGE, array( 'RankXAI_Connector', 'render' ) );
-		if ( $connect ) {
-			add_action( 'load-' . $connect, array( __CLASS__, 'title_connect_page' ) );
-		}
-	}
-
-	/**
-	 * Title for the hidden View as AI page.
-	 */
-	public static function title_view_page() {
-		self::title_hidden_page( __( 'View as AI', 'rankxai' ) );
-	}
-
-	/**
-	 * Title for the hidden Connect page.
-	 */
-	public static function title_connect_page() {
-		self::title_hidden_page( __( 'Connect RankX AI', 'rankxai' ) );
-	}
-
-	/**
-	 * Give a page with no menu entry its title. WordPress finds titles through the
-	 * menu, so a hidden page has none and the admin header would read null.
-	 *
-	 * @param string $text Title.
-	 */
-	private static function title_hidden_page( $text ) {
-		global $title;
-		if ( empty( $title ) ) {
-			$title = $text; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Core reads the page title from this global; a hidden page has none.
-		}
+		// Where an administrator approves RankX AI's connection user.
+		add_submenu_page( 'options.php', __( 'Connect RankX AI', 'rankxai' ), __( 'Connect RankX AI', 'rankxai' ), 'manage_options', RankXAI_Connector::PAGE, array( 'RankXAI_Connector', 'render' ) );
 	}
 
 	/**
@@ -348,19 +319,13 @@ class RankXAI_Admin {
 				$too_long = true;
 				continue;
 			}
-			$held = RankXAI_Documents::get( $slug );
-			if ( ( null !== $held ? $held['content'] : '' ) === $text ) {
-				continue;
-			}
-			if ( '' === trim( $text ) ) {
-				RankXAI_Documents::delete( $slug );
-			} else {
-				RankXAI_Documents::set( $slug, $text );
+			if ( RankXAI_Documents::own_text( $slug ) !== $text ) {
+				RankXAI_Documents::set_own_text( $slug, $text );
 			}
 		}
 		if ( isset( $_POST['rankxai_twin_context'] ) ) {
 			$summary = rankxai_sanitize_plain_text( str_replace( "\r\n", "\n", wp_unslash( $_POST['rankxai_twin_context'] ) ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitised by rankxai_sanitize_plain_text().
-			if ( RankXAI_Twins::context()['content'] !== $summary && ! RankXAI_Twins::save_context( $summary ) ) {
+			if ( RankXAI_Twins::own_context()['content'] !== $summary && ! RankXAI_Twins::save_own_context( $summary ) ) {
 				$too_long = true;
 			}
 		}
@@ -571,7 +536,7 @@ class RankXAI_Admin {
 				$stamps[] = $stored['updated'];
 			}
 		}
-		$context = RankXAI_Twins::context();
+		$context = RankXAI_Twins::published_context();
 		if ( '' !== $context['updated'] ) {
 			$stamps[] = $context['updated'];
 		}

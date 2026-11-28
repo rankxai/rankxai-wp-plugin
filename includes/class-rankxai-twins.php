@@ -22,6 +22,11 @@ class RankXAI_Twins {
 	 */
 	const OPTION_CONTEXT = 'rankxai_twin_context';
 
+	/**
+	 * The block the site owner wrote in Settings. It always wins over one RankX AI published.
+	 */
+	const OPTION_CONTEXT_OWN = 'rankxai_twin_context_own';
+
 	/** Per-post opt-out. */
 	const META_DISABLED = '_rankxai_twin_disabled';
 
@@ -136,7 +141,36 @@ class RankXAI_Twins {
 	 * @return array{content: string, updated: string}
 	 */
 	public static function context() {
-		$stored = get_option( self::OPTION_CONTEXT, array() );
+		$own = self::own_context();
+		return '' !== trim( $own['content'] ) ? $own : self::published_context();
+	}
+
+	/**
+	 * The block the site owner wrote in RankX AI › Settings.
+	 *
+	 * @return array{content: string, updated: string}
+	 */
+	public static function own_context() {
+		return self::read_context( self::OPTION_CONTEXT_OWN );
+	}
+
+	/**
+	 * The block published from a RankX AI account.
+	 *
+	 * @return array{content: string, updated: string}
+	 */
+	public static function published_context() {
+		return self::read_context( self::OPTION_CONTEXT );
+	}
+
+	/**
+	 * Read a stored block.
+	 *
+	 * @param string $option Option name.
+	 * @return array{content: string, updated: string}
+	 */
+	private static function read_context( $option ) {
+		$stored = get_option( $option, array() );
 		if ( ! is_array( $stored ) || ! isset( $stored['content'] ) || ! is_string( $stored['content'] ) ) {
 			return array(
 				'content' => '',
@@ -156,16 +190,37 @@ class RankXAI_Twins {
 	 * @return bool False when it is over the size limit.
 	 */
 	public static function save_context( $content ) {
+		return self::write_context( self::OPTION_CONTEXT, $content );
+	}
+
+	/**
+	 * Store the block the site owner wrote in Settings.
+	 *
+	 * @param string $content Block.
+	 * @return bool False when it is over the size limit.
+	 */
+	public static function save_own_context( $content ) {
+		return self::write_context( self::OPTION_CONTEXT_OWN, $content );
+	}
+
+	/**
+	 * Store a block.
+	 *
+	 * @param string $option  Option name.
+	 * @param string $content Block.
+	 * @return bool False when it is over the size limit.
+	 */
+	private static function write_context( $option, $content ) {
 		$content = rankxai_sanitize_plain_text( $content );
 		if ( strlen( $content ) > self::MAX_CONTEXT_BYTES ) {
 			return false;
 		}
 		if ( '' === trim( $content ) ) {
-			delete_option( self::OPTION_CONTEXT );
+			delete_option( $option );
 			return true;
 		}
 		update_option(
-			self::OPTION_CONTEXT,
+			$option,
 			array(
 				'content' => $content,
 				'updated' => gmdate( 'c' ),
@@ -915,6 +970,8 @@ class RankXAI_Twins {
 			'sitemapUrl'      => self::sitemap_url(),
 			'contextBytes'    => strlen( $context['content'] ),
 			'contextUpdated'  => $context['updated'],
+			// The site owner wrote their own block in Settings; it is used instead of a published one.
+			'ownText'         => '' !== trim( self::own_context()['content'] ),
 			'maxContextBytes' => self::MAX_CONTEXT_BYTES,
 			'sample'          => $sample,
 		);

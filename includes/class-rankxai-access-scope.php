@@ -210,7 +210,7 @@ class RankXAI_Access_Scope {
 		}
 		$bases = array();
 		foreach ( get_post_types( array( 'show_in_rest' => true ), 'objects' ) as $type ) {
-			if ( is_post_type_viewable( $type ) && ! in_array( $type->name, self::EXCLUDED_POST_TYPES, true ) ) {
+			if ( self::content_post_type( $type->name ) ) {
 				$bases[] = $type->rest_base ? $type->rest_base : $type->name;
 			}
 		}
@@ -223,13 +223,21 @@ class RankXAI_Access_Scope {
 	}
 
 	/**
-	 * Whether a post type holds content (public, and not site structure or design).
+	 * Whether a post type holds content: on the allowed list, public, and not site structure or design.
 	 *
 	 * @param string $type Post type.
 	 * @return bool
 	 */
 	public static function content_post_type( $type ) {
-		return post_type_exists( $type ) && is_post_type_viewable( $type ) && ! in_array( $type, self::EXCLUDED_POST_TYPES, true );
+		/**
+		 * The post types RankX AI's connection may write: posts, pages, products and media by default.
+		 * A theme or page builder may register its headers or layouts as public post types, so the list is
+		 * explicit; a site owner can add a type of their own here.
+		 *
+		 * @param string[] $types Post type names.
+		 */
+		$allowed = (array) apply_filters( 'rankxai_content_post_types', array( 'post', 'page', 'product', 'attachment' ) );
+		return post_type_exists( $type ) && is_post_type_viewable( $type ) && in_array( $type, $allowed, true ) && ! in_array( $type, self::EXCLUDED_POST_TYPES, true );
 	}
 
 	/**

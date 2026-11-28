@@ -712,7 +712,7 @@ class RankXAI_Scan {
 
 		// Broken and redirected targets, each with the pages that link to it.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
-		$rows = $wpdb->get_results( "SELECT to_hash, MIN(to_path) AS to_path, MIN(state) AS state, MAX(http_status) AS http_status, MAX(final_path) AS final_path, GROUP_CONCAT(DISTINCT CASE WHEN from_kind = 'post' THEN from_id END) AS sources, GROUP_CONCAT(DISTINCT CASE WHEN from_kind = 'menu' AND from_id > 0 THEN from_id END) AS menus, MAX(CASE WHEN from_kind = 'menu' AND from_id = 0 THEN 1 ELSE 0 END) AS chrome FROM {$table} WHERE state IN ('broken','redirects') GROUP BY to_hash ORDER BY COUNT(*) DESC LIMIT 200", ARRAY_A );
+		$rows = $wpdb->get_results( "SELECT to_hash, MIN(to_path) AS to_path, MIN(state) AS state, MAX(http_status) AS http_status, MAX(final_path) AS final_path, GROUP_CONCAT(DISTINCT CASE WHEN from_kind = 'post' THEN from_id END) AS sources, GROUP_CONCAT(DISTINCT CASE WHEN from_kind = 'menu' AND from_id > 0 THEN from_id END) AS menus, MAX(CASE WHEN from_kind = 'menu' AND from_id = 0 THEN 1 ELSE 0 END) AS chrome FROM {$table} WHERE state IN ('broken','redirects') GROUP BY to_hash ORDER BY COUNT(*) DESC", ARRAY_A );
 		foreach ( (array) $rows as $r ) {
 			// 'menus' are menus or block navigation holding the link; 'chrome' is
 			// the home page's header or footer.

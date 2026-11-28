@@ -177,12 +177,12 @@ class RankXAI_Checks_Page {
 	 */
 	private static function edit_links( $ids ) {
 		$links = array();
-		foreach ( array_slice( $ids, 0, 5 ) as $id ) {
+		foreach ( array_slice( $ids, 0, 10 ) as $id ) {
 			$url     = get_edit_post_link( $id, 'raw' );
 			$title   = get_the_title( $id );
 			$links[] = $url ? '<a href="' . esc_url( $url ) . '">' . esc_html( '' === $title ? '#' . $id : $title ) . '</a>' : esc_html( $title );
 		}
-		$more = count( $ids ) - 5;
+		$more = count( $ids ) - 10;
 		if ( $more > 0 ) {
 			$links[] = esc_html(
 				sprintf(
@@ -261,6 +261,7 @@ class RankXAI_Checks_Page {
 		$backend = RankXAI_Redirect_Requests::backend();
 		RankXAI_UI::card_open(
 			array(
+				'id'       => 'rankxai-broken',
 				'title'    => __( 'Broken internal links', 'rankxai' ),
 				'subtitle' => __( 'This site answered "not found" for each of these addresses.', 'rankxai' ),
 			)
@@ -271,7 +272,8 @@ class RankXAI_Checks_Page {
 		}
 		echo '</tr></thead><tbody>';
 		$forms = false;
-		foreach ( $findings['broken'] as $item ) {
+		$paged = RankXAI_UI::page_of( $findings['broken'], 'rankxai-broken-page' );
+		foreach ( $paged['items'] as $item ) {
 			echo '<tr><td><code>' . esc_html( $item['path'] ) . '</code></td>';
 			echo '<td>' . wp_kses_post( self::link_sources( $item ) ) . '</td>';
 			echo '<td>' . esc_html( self::broken_advice( $item ) ) . '</td><td>';
@@ -287,6 +289,7 @@ class RankXAI_Checks_Page {
 			echo '</td></tr>';
 		}
 		echo '</tbody></table></div>';
+		RankXAI_UI::pager( $paged, 'rankxai-broken' );
 		if ( $forms ) {
 			RankXAI_Crawler_Page::destinations_list();
 		}
@@ -304,12 +307,14 @@ class RankXAI_Checks_Page {
 		}
 		RankXAI_UI::card_open(
 			array(
+				'id'       => 'rankxai-redirected',
 				'title'    => __( 'Links through a redirect', 'rankxai' ),
 				'subtitle' => __( 'These work, but each makes a visitor or a crawler take an extra step. Point them straight at the final page.', 'rankxai' ),
 			)
 		);
-		$rows = array();
-		foreach ( $findings['redirects'] as $item ) {
+		$rows  = array();
+		$paged = RankXAI_UI::page_of( $findings['redirects'], 'rankxai-redirected-page' );
+		foreach ( $paged['items'] as $item ) {
 			$rows[] = array(
 				'<code>' . esc_html( $item['path'] ) . '</code>',
 				'' === $item['final'] ? esc_html__( 'Somewhere else', 'rankxai' ) : '<code>' . esc_html( $item['final'] ) . '</code>',
@@ -317,6 +322,7 @@ class RankXAI_Checks_Page {
 			);
 		}
 		RankXAI_UI::table( array( __( 'Link points at', 'rankxai' ), __( 'Final page', 'rankxai' ), __( 'Linked from', 'rankxai' ) ), $rows, array( 0, 1, 2 ) );
+		RankXAI_UI::pager( $paged, 'rankxai-redirected' );
 		RankXAI_UI::card_close();
 	}
 

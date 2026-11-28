@@ -634,6 +634,42 @@ class RankXAI_Crawlers {
 	}
 
 	/**
+	 * Every page each crawler read in the window, a page of rows at a time.
+	 *
+	 * @param int $days     Window in days.
+	 * @param int $page     Page number, from 1.
+	 * @param int $per_page Rows per page.
+	 * @return array{rows: array<int, array<string, mixed>>, total: int}
+	 */
+	public static function pages_read( $days, $page, $per_page ) {
+		global $wpdb;
+		$out = array(
+			'rows'  => array(),
+			'total' => 0,
+		);
+		if ( ! self::table_exists() ) {
+			return $out;
+		}
+		$table = esc_sql( self::table() );
+		$since = self::window_start( $days );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Plugin's own table; name escaped above.
+		$out['total'] = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM ( SELECT 1 FROM {$table} WHERE day >= %s AND status < 400 AND path <> %s GROUP BY bot, path_hash, path ) counted", $since, self::OTHER ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT bot, path, SUM(hits) AS hits, SUM(CASE WHEN in_range = 1 THEN hits ELSE 0 END) AS in_range, COUNT(DISTINCT day) AS days, MAX(day) AS last_day FROM {$table} WHERE day >= %s AND status < 400 AND path <> %s GROUP BY bot, path_hash, path ORDER BY hits DESC, path ASC LIMIT %d OFFSET %d", $since, self::OTHER, max( 1, (int) $per_page ), max( 0, ( (int) $page - 1 ) * (int) $per_page ) ), ARRAY_A );
+		foreach ( (array) $rows as $r ) {
+			$out['rows'][] = array(
+				'bot'     => (string) $r['bot'],
+				'path'    => (string) $r['path'],
+				'hits'    => (int) $r['hits'],
+				'inRange' => (int) $r['in_range'],
+				'days'    => (int) $r['days'],
+				'lastDay' => (string) $r['last_day'],
+			);
+		}
+		return $out;
+	}
+
+	/**
 	 * Everything the AI crawlers page shows, from counts already stored.
 	 *
 	 * @param int $days Window length, including today.
@@ -679,7 +715,7 @@ class RankXAI_Crawlers {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- As above.
-		$errors = $wpdb->get_results( $wpdb->prepare( "SELECT path, status, bot, SUM(hits) AS hits, MAX(in_range) AS in_range, COUNT(DISTINCT day) AS days, MAX(day) AS last_day FROM {$table} WHERE day >= %s AND status >= 400 AND path <> %s GROUP BY path_hash, path, status, bot ORDER BY hits DESC LIMIT 500", $since, self::OTHER ), ARRAY_A );
+		$errors = $wpdb->get_results( $wpdb->prepare( "SELECT path, status, bot, SUM(hits) AS hits, MAX(in_range) AS in_range, COUNT(DISTINCT day) AS days, MAX(day) AS last_day FROM {$table} WHERE day >= %s AND status >= 400 AND path <> %s GROUP BY path_hash, path, status, bot ORDER BY hits DESC", $since, self::OTHER ), ARRAY_A );
 		foreach ( (array) $errors as $r ) {
 			$key = (string) $r['path'] . '|' . (int) $r['status'];
 			if ( ! isset( $out['errors'][ $key ] ) ) {

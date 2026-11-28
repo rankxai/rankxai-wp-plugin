@@ -83,7 +83,7 @@ function buildStoreApp() {
     '/**',
     ' * The store app build: its entry module, stylesheets and version.',
     ' *',
-    ' * Written by build-zip.mjs from the build manifest; never edited by hand.',
+    ' * Read from dist/wordpress/.vite/manifest.json after `npm run build` in admin-app/src.',
     ' *',
     ' * @package RankXAI',
     ' */',

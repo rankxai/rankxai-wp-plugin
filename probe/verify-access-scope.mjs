@@ -63,7 +63,7 @@ async function xmlrpc(pw) {
 const PRIVATE_TYPE = join(dirname(fileURLToPath(import.meta.url)), 'mu-plugins', 'rankxai-scope-private-type.php')
 writeFileSync(
   PRIVATE_TYPE,
-  "<?php\nadd_action( 'init', function () {\n\tregister_post_type( 'rxprobe_private', array( 'public' => false, 'show_ui' => true, 'show_in_rest' => true, 'rest_base' => 'rxprobe-private', 'label' => 'Probe' ) );\n} );\n",
+  "<?php\nadd_action( 'init', function () {\n\tregister_post_type( 'rxprobe_private', array( 'public' => false, 'show_ui' => true, 'show_in_rest' => true, 'rest_base' => 'rxprobe-private', 'label' => 'Probe' ) );\n\tregister_post_type( 'rxprobe_layout', array( 'public' => true, 'show_in_rest' => true, 'rest_base' => 'rxprobe-layouts', 'label' => 'Probe layouts' ) );\n} );\n",
 )
 
 const title = wp('option', 'get', 'blogname')
@@ -102,6 +102,7 @@ try {
   const commentId = wp('comment', 'list', '--number=1', '--field=comment_ID') || wp('comment', 'create', '--comment_post_ID=1', '--comment_content=Probe', '--porcelain')
   check("a comment's text sent in the query string", refused(await call(ours, 'POST', `/wp/v2/comments/${commentId}`, { status: 'approved' }, '&content=changed')))
   check('a private post type', refused(await call(ours, 'GET', '/wp/v2/rxprobe-private')))
+  check('a public post type that is not on the content list (a theme or builder layout)', refused(await call(ours, 'POST', '/wp/v2/rxprobe-layouts', { title: 'x', status: 'draft' })))
   check('change the site title', refused(await call(ours, 'POST', '/wp/v2/settings', { title: `${title} (probe)` })))
   check('change the time zone', refused(await call(ours, 'POST', '/wp/v2/settings', { timezone: 'UTC' })))
   check('moderate a comment', refused(await call(ours, 'POST', `/wp/v2/comments/${commentId}`, { status: 'hold' })))
@@ -151,7 +152,9 @@ try {
   const pattern = wp('post', 'create', '--post_type=wp_block', '--post_status=publish', '--post_title=Scope probe pattern', '--post_content=<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->', '--porcelain')
   const hidden = wp('post', 'create', '--post_type=rxprobe_private', '--post_status=publish', '--post_title=Scope probe private', '--porcelain')
   created.push(pattern, hidden)
-  for (const [label, id] of [['a synced pattern (wp_block)', pattern], ['a private post type', hidden]]) {
+  const layout = wp('post', 'create', '--post_type=rxprobe_layout', '--post_status=publish', '--post_title=Scope probe layout', '--porcelain')
+  created.push(layout)
+  for (const [label, id] of [['a synced pattern (wp_block)', pattern], ['a private post type', hidden], ['a public layout post type', layout]]) {
     const r = await call(ours, 'POST', `/rankxai/v1/seo/${id}`, { fields: { title: 'x' } })
     check(`the plugin's own SEO route refuses ${label}`, r.status === 403 && r.code === 'rankxai_not_content', `${r.status} ${r.code}`)
   }

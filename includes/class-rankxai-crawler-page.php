@@ -48,12 +48,12 @@ class RankXAI_Crawler_Page {
 	/**
 	 * The window the page covers, from `?days=`.
 	 *
-	 * @return int 7 or 30.
+	 * @return int 7, 30 or 35 (everything kept).
 	 */
 	private static function days() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display choice only.
 		$days = isset( $_GET['days'] ) ? absint( wp_unslash( $_GET['days'] ) ) : 7;
-		return 30 === $days ? 30 : 7;
+		return in_array( $days, array( 30, 35 ), true ) ? $days : 7;
 	}
 
 	/**
@@ -70,6 +70,7 @@ class RankXAI_Crawler_Page {
 		self::robots_card( $robots, $report );
 		if ( $report['bots'] ) {
 			self::visits_card( $report, $checked );
+			self::pages_card( $days, $checked );
 		}
 		if ( $report['errors'] ) {
 			self::errors_card( $report, $checked );
@@ -130,9 +131,9 @@ class RankXAI_Crawler_Page {
 		}
 
 		echo '<div class="rankxai-actions" role="group" aria-label="' . esc_attr__( 'Period', 'rankxai' ) . '">';
-		foreach ( array( 7, 30 ) as $option ) {
+		foreach ( array( 7, 30, 35 ) as $option ) {
 			$url   = add_query_arg( 'days', $option, RankXAI_Admin::page_url( RankXAI_Admin::PAGE_CRAWLERS ) );
-			$label = sprintf(
+			$label = 35 === $option ? __( 'Everything kept (35 days)', 'rankxai' ) : sprintf(
 				/* translators: %d: number of days. */
 				_n( 'Last %d day', 'Last %d days', $option, 'rankxai' ),
 				$option
@@ -413,7 +414,7 @@ class RankXAI_Crawler_Page {
 		RankXAI_UI::card_open(
 			array(
 				'title'    => __( 'Visits by crawler', 'rankxai' ),
-				'subtitle' => __( 'Grouped by what the visit is for, and the pages each one read most.', 'rankxai' ),
+				'subtitle' => __( 'Grouped by what the visit is for, and the page each one read most. Every page is listed below.', 'rankxai' ),
 			)
 		);
 		$by_group = array();
@@ -452,6 +453,56 @@ class RankXAI_Crawler_Page {
 					wp_date( (string) get_option( 'date_format' ), (int) strtotime( RankXAI_Crawlers::config_summary()['updated'] . ' 12:00:00 UTC' ) )
 				)
 				: __( 'Crawlers are named from what they say they are.', 'rankxai' )
+		);
+		RankXAI_UI::card_close();
+	}
+
+	/**
+	 * Every page each crawler read in the window, paged.
+	 *
+	 * @param int  $days    Window in days.
+	 * @param bool $checked Visits can be checked against published ranges.
+	 */
+	private static function pages_card( $days, $checked ) {
+		$per = 25;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- A page number for a read-only list.
+		$page  = isset( $_GET['rankxai-pages-page'] ) ? max( 1, absint( $_GET['rankxai-pages-page'] ) ) : 1;
+		$found = RankXAI_Crawlers::pages_read( $days, $page, $per );
+		if ( 0 === $found['total'] ) {
+			return;
+		}
+		$pages = max( 1, (int) ceil( $found['total'] / $per ) );
+		if ( $page > $pages ) {
+			$page  = $pages;
+			$found = RankXAI_Crawlers::pages_read( $days, $page, $per );
+		}
+		RankXAI_UI::card_open(
+			array(
+				'id'       => 'rankxai-pages-read',
+				'title'    => __( 'Pages read', 'rankxai' ),
+				'subtitle' => __( 'Every page each crawler read in this period, most visits first.', 'rankxai' ),
+			)
+		);
+		$rows = array();
+		foreach ( $found['rows'] as $row ) {
+			$label  = RankXAI_Crawlers::meta( $row['bot'] )['label'];
+			$rows[] = array(
+				'<code>' . esc_html( $row['path'] ) . '</code>',
+				esc_html( $checked && $row['inRange'] > 0 ? $label : sprintf( /* translators: %s: a crawler name. */ __( 'says it is %s', 'rankxai' ), $label ) ),
+				number_format_i18n( $row['hits'] ),
+				number_format_i18n( $row['days'] ),
+				esc_html( $row['lastDay'] ),
+			);
+		}
+		RankXAI_UI::table( array( __( 'Page', 'rankxai' ), __( 'Crawler', 'rankxai' ), __( 'Visits', 'rankxai' ), __( 'Days', 'rankxai' ), __( 'Last visit', 'rankxai' ) ), $rows, array( 0, 1 ), array( 2, 3 ) );
+		RankXAI_UI::pager(
+			array(
+				'page'  => $page,
+				'pages' => $pages,
+				'total' => $found['total'],
+				'param' => 'rankxai-pages-page',
+			),
+			'rankxai-pages-read'
 		);
 		RankXAI_UI::card_close();
 	}

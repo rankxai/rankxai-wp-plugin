@@ -472,7 +472,7 @@ class RankXAI_Product_Check {
 		wp_clear_scheduled_hook( self::HOOK );
 		self::restart();
 		self::advance( self::PAGE_BUDGET );
-		wp_safe_redirect( add_query_arg( 'rankxai-checked', '1', admin_url( 'admin.php?page=' . RankXAI_Store_Admin::PAGE ) ) );
+		wp_safe_redirect( self::page_url( array( 'rankxai-checked' => '1' ) ) );
 		exit;
 	}
 
@@ -483,6 +483,10 @@ class RankXAI_Product_Check {
 	 * @return string
 	 */
 	private static function page_url( $args = array() ) {
+		// Once connected, the check is its own view of the Store page; keep it there.
+		if ( RankXAI_Connection::is_connected() ) {
+			$args['rankxai-view'] = 'check';
+		}
 		return add_query_arg( $args, admin_url( 'admin.php?page=' . RankXAI_Store_Admin::PAGE ) );
 	}
 

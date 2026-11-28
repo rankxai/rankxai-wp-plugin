@@ -2,8 +2,7 @@
 /**
  * What this site's robots.txt says to each AI crawler.
  *
- * Tested against the shared cases in probe/fixtures/robots-fixtures.json. The file
- * is fetched over HTTP, so the answer is what the site really serves. Read only.
+ * The file is fetched over HTTP, so the answer is what the site really serves. Read only.
  *
  * @package RankXAI
  */

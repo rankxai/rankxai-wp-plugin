@@ -35,6 +35,27 @@ class RankXAI_Term_SEO {
 	}
 
 	/**
+	 * Yoast renders a term archive from its indexable, so rebuild it through Yoast's own watcher.
+	 *
+	 * @param int $term_id Term ID.
+	 */
+	private static function rebuild_yoast_indexable( $term_id ) {
+		$watcher = '\Yoast\WP\SEO\Integrations\Watchers\Indexable_Term_Watcher';
+		if ( ! function_exists( 'YoastSEO' ) || ! class_exists( $watcher ) ) {
+			return;
+		}
+		try {
+			$instance = YoastSEO()->classes->get( $watcher );
+			if ( is_object( $instance ) && method_exists( $instance, 'build_indexable' ) ) {
+				$instance->build_indexable( (int) $term_id );
+			}
+		} catch ( Throwable $e ) {
+			// Yoast's own save rebuilds it next time; the stored values are already right.
+			unset( $e );
+		}
+	}
+
+	/**
 	 * Hook the output filters for term archives.
 	 */
 	public static function init() {
@@ -215,13 +236,7 @@ class RankXAI_Term_SEO {
 				$meta['wpseo_desc'] = $clean['description'];
 			}
 			WPSEO_Taxonomy_Meta::set_values( $term_id, $taxonomy, $meta );
-			// Yoast renders from indexables, rebuilt on core's `edited_term`. Firing it
-			// avoids Yoast's internal classes; re-saving the term through wp_update_term()
-			// would run its description through kses and could strip the owner's HTML.
-			$term = get_term( $term_id, $taxonomy );
-			if ( $term instanceof WP_Term ) {
-				do_action( 'edited_term', $term_id, (int) $term->term_taxonomy_id, $taxonomy, array() ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core's hook.
-			}
+			self::rebuild_yoast_indexable( $term_id );
 			return;
 		}
 		$grouped = self::grouped_storage();

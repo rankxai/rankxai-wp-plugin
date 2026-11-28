@@ -172,7 +172,9 @@ class RankXAI_Markdown {
 
 		$previous = isset( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
 
-		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Loop context for `the_content`; restored below.
+		// Core's own `the_content` filters (blocks, shortcodes, embeds) read the current post from this global,
+		// as in the loop. It is set for this one call and the previous value is restored straight after.
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- See above.
 		$GLOBALS['post'] = $post;
 		setup_postdata( $post );
 

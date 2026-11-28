@@ -342,16 +342,20 @@ class RankXAI_Pages {
 		}
 		echo '</div></div>';
 
-		$context = RankXAI_Twins::context();
+		$context   = RankXAI_Twins::own_context();
+		$published = RankXAI_Twins::published_context();
 		echo '<div class="rankxai-field"><div class="rankxai-field__label"><label for="rankxai-twin-context">' . esc_html__( 'About your business', 'rankxai' ) . '</label></div><div>';
 		echo '<textarea class="rankxai-textarea" id="rankxai-twin-context" name="rankxai_twin_context" rows="5" spellcheck="true">' . "\n" . esc_textarea( $context['content'] ) . '</textarea>';
 		echo '<p class="rankxai-field__hint">' . esc_html(
 			sprintf(
 				/* translators: %d: size limit in kilobytes. */
-				__( 'Optional. A few lines on who you are and what you sell, added to the end of every copy. Up to %d KB. A connected RankX AI account can also write it; the last one saved is used.', 'rankxai' ),
+				__( 'Optional. A few lines on who you are and what you sell, added to the end of every copy. Up to %d KB. What you write here is always what is used.', 'rankxai' ),
 				(int) ( RankXAI_Twins::MAX_CONTEXT_BYTES / 1024 )
 			)
 		) . '</p>';
+		if ( '' !== trim( $published['content'] ) ) {
+			echo '<p class="rankxai-field__hint">' . esc_html( '' === trim( $context['content'] ) ? __( 'A summary published from your RankX AI account is used while this is empty.', 'rankxai' ) : __( 'A summary published from your RankX AI account is held here, but yours above is used instead.', 'rankxai' ) ) . '</p>';
+		}
 		echo '</div></div>';
 
 		if ( $twins['enabled'] ) {
@@ -378,11 +382,11 @@ class RankXAI_Pages {
 		);
 
 		if ( RankXAI_Generate::site_discourages_indexing() ) {
-			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site is set to discourage search engines (Settings → Reading), so nothing is generated here and markdown copies are not served. A document you switched on below that RankX AI published is still served.', 'rankxai' ) . '</p></div>';
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site is set to discourage search engines (Settings → Reading), so nothing is generated here and markdown copies are not served. A document you switched on below that you wrote or RankX AI published is still served.', 'rankxai' ) . '</p></div>';
 		}
 		$coming_soon = RankXAI_Woo::coming_soon();
 		if ( 'site' === $coming_soon ) {
-			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Your site is in WooCommerce’s “Coming soon” mode, so nothing is generated here and markdown copies are not served until it is live. A document you switched on below that RankX AI published is still served.', 'rankxai' ) . '</p></div>';
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Your site is in WooCommerce’s “Coming soon” mode, so nothing is generated here and markdown copies are not served until it is live. A document you switched on below that you wrote or RankX AI published is still served.', 'rankxai' ) . '</p></div>';
 		} elseif ( 'store' === $coming_soon ) {
 			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Your store is in WooCommerce’s “Coming soon” mode, so products and store pages get no markdown copy and are left out of llms.txt until the store is live.', 'rankxai' ) . '</p></div>';
 		}
@@ -393,8 +397,9 @@ class RankXAI_Pages {
 			$state     = RankXAI_Documents::effective( $slug );
 			$url       = home_url( '/' . $doc['path'] );
 			$generates = in_array( $slug, $supported, true );
-			$held      = RankXAI_Documents::get( $slug );
-			$text      = null !== $held ? $held['content'] : '';
+			$text      = RankXAI_Documents::own_text( $slug );
+			$publishes = in_array( $slug, RankXAI_Documents::PUBLISHABLE, true );
+			$held      = $publishes ? RankXAI_Documents::get( $slug ) : null;
 			$box       = 'rankxai-document-' . $slug;
 
 			echo '<div class="rankxai-field"><div class="rankxai-field__label">' . esc_html( $doc['label'] ) . '</div><div>';
@@ -407,8 +412,8 @@ class RankXAI_Pages {
 			) . '</span></label>';
 			echo '<p class="rankxai-field__hint">' . esc_html(
 				$generates
-					? __( 'Off by default. Once on, it serves the text below, or a copy generated from the content on this site while the text is empty.', 'rankxai' )
-					: __( 'Off by default. Once on, it serves the text below.', 'rankxai' )
+					? __( 'Off by default. Once on, it serves your text below. While that is empty, it serves a version published from your RankX AI account, if there is one, or else a copy generated from the content on this site.', 'rankxai' )
+					: __( 'Off by default. Once on, it serves your text below.', 'rankxai' )
 			) . '</p>';
 			echo '<label class="screen-reader-text" for="' . esc_attr( $box ) . '">' . esc_html(
 				sprintf(
@@ -418,19 +423,22 @@ class RankXAI_Pages {
 				)
 			) . '</label>';
 			echo '<textarea class="rankxai-textarea rankxai-textarea--code" id="' . esc_attr( $box ) . '" name="rankxai_document[' . esc_attr( $slug ) . ']" rows="8" spellcheck="false">' . "\n" . esc_textarea( $text ) . '</textarea>';
+			echo '<p class="rankxai-field__hint">' . esc_html__( 'Your text. What you write here is always what is served; nothing else replaces it.', 'rankxai' ) . '</p>';
 			if ( $generates ) {
 				echo '<p class="rankxai-field__hint">' . esc_html(
 					sprintf(
 						/* translators: 1: items per content type, 2: items in all, 3: number of content types. */
-						__( 'Write your own, or leave it empty to use the generated copy. A generated copy lists up to %1$d recent items of each content type and %2$d in all, from up to %3$d content types: a short guide to the site rather than an index of every page.', 'rankxai' ),
+						__( 'A generated copy is a short guide to the site rather than an index of every page: up to %1$d recent items of each content type and %2$d in all, from up to %3$d content types.', 'rankxai' ),
 						$limits['per_type'],
 						$limits['total'],
 						$limits['types']
 					)
 				) . '</p>';
 			}
-			echo '<p class="rankxai-field__hint">' . esc_html__( 'A connected RankX AI account can also publish this text; the last one saved is served.', 'rankxai' ) . '</p>';
-			$kept = empty( $generated[ $slug ] ) && '' !== $text;
+			if ( null !== $held && '' !== $held['content'] ) {
+				echo '<p class="rankxai-field__hint">' . esc_html( '' === trim( $text ) ? __( 'A version published from your RankX AI account is held here.', 'rankxai' ) : __( 'A version published from your RankX AI account is held here, but your text above is served instead.', 'rankxai' ) ) . '</p>';
+			}
+			$kept = empty( $generated[ $slug ] ) && ( '' !== trim( $text ) || ( null !== $held && '' !== $held['content'] ) );
 			echo '<p class="rankxai-field__hint">' . esc_html( $kept ? __( 'Text is saved, but nothing is served until you tick the box.', 'rankxai' ) : self::describe_document( $state['source'] ) ) . '</p>';
 			if ( '' !== $state['content'] || 'file' === $state['source'] ) {
 				echo '<p class="rankxai-field__hint"><a href="' . esc_url( $url ) . '" target="_blank" rel="noopener">' . esc_html( $url ) . '</a></p>';
@@ -642,7 +650,7 @@ class RankXAI_Pages {
 			if ( '' !== $blocked ) {
 				RankXAI_UI::note( $blocked );
 			}
-			echo '<p class="rankxai-muted">' . esc_html__( 'Disconnecting removes this site’s RankX AI token and the Application Passwords RankX AI’s approval created, so RankX AI can no longer reach the site. A password you created by hand for RankX AI is not removed: delete it in Users › Profile. Your RankX AI account and its data stay.', 'rankxai' ) . '</p>';
+			echo '<p class="rankxai-muted">' . esc_html__( 'Disconnecting removes this site’s RankX AI token and the Application Passwords RankX AI’s approval created, so RankX AI can no longer reach the site. Your RankX AI account and its data stay.', 'rankxai' ) . '</p>';
 			echo '<div class="rankxai-actions">';
 			echo wp_kses_post( RankXAI_UI::button_link( __( 'Open in RankX AI', 'rankxai' ), RankXAI_Connection::app_url() . '/overview', 'outline', true ) );
 			RankXAI_UI::action_form( RankXAI_Connection::ACTION_DISCONNECT, __( 'Disconnect', 'rankxai' ), array(), 'danger' );
@@ -682,8 +690,11 @@ class RankXAI_Pages {
 		if ( 'file' === $source ) {
 			return __( 'A real file already sits at this address on your server, so this plugin leaves it alone.', 'rankxai' );
 		}
+		if ( 'own' === $source ) {
+			return __( 'Your text above is being served.', 'rankxai' );
+		}
 		if ( 'stored' === $source ) {
-			return __( 'The text above is being served. It takes precedence over a generated copy.', 'rankxai' );
+			return __( 'The version published from your RankX AI account is being served.', 'rankxai' );
 		}
 		if ( 'generated' === $source ) {
 			return __( 'Generated from the pages and posts on this site, and rebuilt on each request so it never goes stale.', 'rankxai' );

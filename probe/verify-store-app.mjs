@@ -178,6 +178,10 @@ async function main() {
     const settingsConnected = await page(jar, '/wp-admin/admin.php?page=rankxai-settings')
     check(settingsConnected.html.includes('rankxai-pill--success') && settingsConnected.html.includes('Connected to RankX AI'), 'once connected, the header on the plugin pages says so')
     check(/<div class="wrap"><h1 class="screen-reader-text">[^<]+<\/h1><hr class="wp-header-end">/.test(mounted.html) && mounted.html.includes('<div id="rx-store"></div>'), 'the mount point inside .wrap with a screen-reader heading')
+    check(/href="[^"]*page=rankxai-store[^"]*rankxai-view=check/.test(mounted.html) && mounted.html.includes('works without an account'), 'connected, the free product check stays one click away')
+    const localCheck = await page(jar, '/wp-admin/admin.php?page=rankxai-store&rankxai-view=check')
+    check(localCheck.status === 200 && localCheck.html.includes('Your products, as AI shopping answers need them') && !localCheck.html.includes('id="rx-store"') && !localCheck.html.includes('rankxai-store-js-module'), 'and it opens the product check on this site, without the store app')
+    check(localCheck.html.includes('Back to the store app') && !localCheck.html.includes('rankxai_connect'), 'with a way back, and no Connect offer while connected')
     const moduleTag = /<script\b[^>]*\bid="rankxai-store-js-module"[^>]*>/.exec(mounted.html)
     check(Boolean(moduleTag) && /type="module"/.test(moduleTag[0]) && moduleTag[0].includes(`admin-app/build/${entry}`), 'the entry is a script module, from this plugin’s own files')
     // Lazy chunks import the entry by its bare file name, so a `?ver=` on the tag would load it twice

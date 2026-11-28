@@ -46,6 +46,55 @@ class RankXAI_Documents {
 	const MAX_BYTES = 524288;
 
 	/**
+	 * Documents RankX AI may publish. ai.txt says which AI crawlers may use the site, so only the site owner writes it.
+	 */
+	const PUBLISHABLE = array( 'llms_txt', 'agents_md' );
+
+	/**
+	 * The option holding the text the site owner wrote in Settings.
+	 *
+	 * @param string $slug Document slug.
+	 * @return string|null
+	 */
+	public static function own_option_name( $slug ) {
+		$option = self::option_name( $slug );
+		return null === $option ? null : $option . '_own';
+	}
+
+	/**
+	 * The text the site owner wrote in Settings, or ''.
+	 *
+	 * @param string $slug Document slug.
+	 * @return string
+	 */
+	public static function own_text( $slug ) {
+		$option = self::own_option_name( $slug );
+		$stored = null === $option ? '' : get_option( $option, '' );
+		return is_string( $stored ) ? $stored : '';
+	}
+
+	/**
+	 * Save the site owner's text; '' removes it.
+	 *
+	 * @param string $slug Document slug.
+	 * @param string $text Text.
+	 * @return bool
+	 */
+	public static function set_own_text( $slug, $text ) {
+		$option = self::own_option_name( $slug );
+		if ( null === $option ) {
+			return false;
+		}
+		$text = rankxai_sanitize_plain_text( $text );
+		if ( '' === trim( $text ) ) {
+			delete_option( $option );
+		} else {
+			update_option( $option, $text, false );
+		}
+		return true;
+	}
+
+	/**
 	 * Register the serving route late, so an earlier claimant keeps the URL.
 	 */
 	public static function init() {
@@ -132,11 +181,11 @@ class RankXAI_Documents {
 	/**
 	 * What this site would serve at a document's address, and where it came from.
 	 *
-	 * Order: a real file, then a published document, then a generated one, then
-	 * nothing. A published document always beats a generated one.
+	 * Order: a real file, then the site owner's own text, then a document RankX AI
+	 * published, then a generated one, then nothing. What the owner wrote always wins.
 	 *
 	 * @param string $slug Document slug.
-	 * @return array{content: string, source: string} Source is '', 'file', 'stored' or 'generated'.
+	 * @return array{content: string, source: string} Source is '', 'file', 'own', 'stored' or 'generated'.
 	 */
 	public static function effective( $slug ) {
 		$none = array(
@@ -158,7 +207,15 @@ class RankXAI_Documents {
 			return $none;
 		}
 
-		$stored = self::get( $slug );
+		$own = self::own_text( $slug );
+		if ( '' !== trim( $own ) ) {
+			return array(
+				'content' => $own,
+				'source'  => 'own',
+			);
+		}
+
+		$stored = in_array( $slug, self::PUBLISHABLE, true ) ? self::get( $slug ) : null;
 		if ( null !== $stored && '' !== $stored['content'] ) {
 			return array(
 				'content' => $stored['content'],
@@ -257,12 +314,18 @@ class RankXAI_Documents {
 		header( 'X-Content-Type-Options: nosniff' );
 		// Tells this virtual route apart from a real file.
 		header( 'X-RankXAI-Source: virtual-route' );
-		// Whether the body was published or generated here.
-		header( 'X-RankXAI-Document: ' . ( 'generated' === $doc['source'] ? 'generated' : 'published' ) );
+		// Who wrote it: the site owner, RankX AI, or this plugin from the site's content.
+		$by = array(
+			'own'       => 'site',
+			'generated' => 'generated',
+		);
+		header( 'X-RankXAI-Document: ' . ( isset( $by[ $doc['source'] ] ) ? $by[ $doc['source'] ] : 'published' ) );
 		// No caching header of our own: the site's cache setup decides.
 		header( 'X-Robots-Tag: noindex' );
 
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain-text body; escaping would corrupt it.
+		// The body is plain text or markdown, sent as text/plain or text/markdown with nosniff above, so a browser
+		// never reads it as HTML. HTML-escaping would corrupt it. It was sanitised when saved.
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- See above.
 		echo $doc['content'];
 		exit;
 	}

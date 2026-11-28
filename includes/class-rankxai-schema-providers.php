@@ -377,6 +377,13 @@ class RankXAI_Schema_Providers {
 				'reason'    => 'not_active',
 			);
 		}
+		// RankX AI's connection never calls another plugin's API: its schema joins Rank Math's graph instead.
+		if ( RankXAI_Access_Scope::is_rankxai_password() ) {
+			return array(
+				'available' => false,
+				'reason'    => 'connection_joins_graph',
+			);
+		}
 		$needs = array(
 			array( '\RankMath\Schema\DB', 'get_schemas' ),
 			array( '\RankMath\Rest\Sanitize', 'get' ),

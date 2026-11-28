@@ -80,8 +80,6 @@ class RankXAI_Loopback {
 				'redirection'         => 0,
 				'user-agent'          => self::user_agent(),
 				'headers'             => array( 'Cache-Control' => 'no-cache' ),
-				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core's filter, used as core's loopback test does.
-				'sslverify'           => apply_filters( 'https_local_ssl_verify', false ),
 				'limit_response_size' => 2 * MB_IN_BYTES,
 			)
 		);

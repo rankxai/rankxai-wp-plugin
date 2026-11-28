@@ -9,6 +9,7 @@ import { BatchProgress, useBatch } from '../components/BatchProgress';
 import { useModal, type WriteResult } from '../components/FixModals';
 import { StatusBadge } from '../components/Status';
 import { addRedirect as writeRedirect, redirectsWrittenLocally, removeRedirect, type RedirectWriteResult } from '../redirect-writes';
+import { host } from '../host';
 import * as UI from '../ui';
 interface Suggestion {
     id: string;
@@ -118,7 +119,10 @@ export function RedirectsSection({ setError }: {
             void list.reload();
             return;
         }
-        const r = await act(() => api('fixes/redirects/import', { method: 'POST', body: { rows: csv.rows } }), (b) => setBusy(b ? 'import' : null), setImportError);
+        const server = host.serverRedirects;
+        if (!server)
+            return;
+        const r = await act(() => server.importRows(csv.rows), (b) => setBusy(b ? 'import' : null), setImportError);
         if (r.ok && batch.begin(r.data, 'apply')) {
             importModal.hide();
             setCsv(null);
@@ -138,7 +142,10 @@ export function RedirectsSection({ setError }: {
             void list.reload();
             return;
         }
-        const r = await act(() => api<WriteResult>(`fixes/redirect-suggestions/${s.id}/apply`, { method: 'POST', body: { target } }), (b) => setBusy(b ? s.id : null), setError);
+        const server = host.serverRedirects;
+        if (!server)
+            return;
+        const r = await act(() => server.applySuggestion(s.id, target), (b) => setBusy(b ? s.id : null), setError);
         if (r.ok && r.data) {
             setHandled((h) => ({ ...h, [s.id]: r.data!.verified ? 'redirected' : 'unconfirmed' }));
             toastWrite(r.data.verified, 'Redirect created and confirmed', 'Redirect created');

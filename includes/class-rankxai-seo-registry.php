@@ -4,7 +4,6 @@
  *
  * Values are mirrored into the plugin's own fields so they stay editable in its
  * screens, and its output filters have the last word at render.
- * `probe/run-filter-matrix.sh` checks the filters against a live install.
  *
  * @package RankXAI
  */

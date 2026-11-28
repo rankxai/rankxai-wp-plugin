@@ -12,6 +12,7 @@ export type WooSupport = {
     woo: 'none';
     reason: string;
 };
+const WOO_REDIRECTS_SITE_ONLY = 'On WordPress, redirects are added and removed by the site’s administrator in wp-admin. RankX AI only reads them.';
 export const STORE_APP_ROUTE_POLICY: Record<string, WooSupport> = {
     "GET overview": { routeClass: 'read', woo: 'ready' },
     "GET content": { routeClass: 'read', woo: 'ready' },
@@ -86,14 +87,14 @@ export const STORE_APP_ROUTE_POLICY: Record<string, WooSupport> = {
     "GET catalogue/images": { routeClass: 'read', woo: 'ready' },
     "POST fixes/image/alt-suggest": { routeClass: 'spend', woo: 'ready' },
     "GET fixes/redirects": { routeClass: 'read', woo: 'ready' },
-    "POST fixes/redirects": { routeClass: 'write', woo: 'ready' },
-    "POST fixes/redirects/delete": { routeClass: 'write', woo: 'ready' },
+    "POST fixes/redirects": { routeClass: 'write', woo: 'none', reason: WOO_REDIRECTS_SITE_ONLY },
+    "POST fixes/redirects/delete": { routeClass: 'write', woo: 'none', reason: WOO_REDIRECTS_SITE_ONLY },
     "GET fixes/redirect-suggestions": { routeClass: 'read', woo: 'ready' },
-    "POST fixes/redirect-suggestions/:id/apply": { routeClass: 'write', woo: 'ready' },
+    "POST fixes/redirect-suggestions/:id/apply": { routeClass: 'write', woo: 'none', reason: WOO_REDIRECTS_SITE_ONLY },
     "POST fixes/redirect-suggestions/:id/dismiss": { routeClass: 'write', woo: 'ready' },
     "POST fixes/redirect-suggestions/:id/resolved": { routeClass: 'write', woo: 'ready' },
     "GET fixes/redirects/export": { routeClass: 'read', woo: 'ready' },
-    "POST fixes/redirects/import": { routeClass: 'write', woo: 'ready' },
+    "POST fixes/redirects/import": { routeClass: 'write', woo: 'none', reason: WOO_REDIRECTS_SITE_ONLY },
     "GET templates": { routeClass: 'read', woo: 'ready' },
     "PUT templates": { routeClass: 'write', woo: 'ready' },
     "POST templates/preview": { routeClass: 'read', woo: 'ready' },

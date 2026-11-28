@@ -44,7 +44,7 @@ export function WooAgentFilesSection({ setError }: {
     const d = info.data;
     return (<UI.Section heading="llms.txt and agents.md">
       <UI.Stack gap="small-200">
-        <UI.Paragraph>The files AI assistants read to learn what your store is, published at your site’s address by the RankX AI plugin. Free on every plan.</UI.Paragraph>
+        <UI.Paragraph>The files AI assistants read to learn what your store is, published at your site’s address by the RankX AI plugin. You can also write them yourself in RankX AI › Settings, with no account.</UI.Paragraph>
         <UI.Text color="subdued">Google says llms.txt will neither help nor harm a store in Google Search. AI assistants and shopping agents may read it.</UI.Text>
         {!d && info.loading ? <UI.Text color="subdued">Reading your files…</UI.Text> : null}
         {!d && !info.loading ? <UI.Paragraph>{info.error ?? 'We could not read your files just now.'}</UI.Paragraph> : null}

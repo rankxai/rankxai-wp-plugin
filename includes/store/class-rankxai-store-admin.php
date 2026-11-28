@@ -59,7 +59,17 @@ class RankXAI_Store_Admin {
 	 * @return bool
 	 */
 	public static function mounts() {
-		return RankXAI_Connection::is_connected() && self::runtime_available() && null !== self::assets();
+		return RankXAI_Connection::is_connected() && self::runtime_available() && null !== self::assets() && ! self::local_view();
+	}
+
+	/**
+	 * Whether this request asks for the product check on this site rather than the store app.
+	 *
+	 * @return bool
+	 */
+	public static function local_view() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Which view to show; changes nothing.
+		return isset( $_GET['rankxai-view'] ) && 'check' === sanitize_key( wp_unslash( $_GET['rankxai-view'] ) );
 	}
 
 	/**
@@ -111,6 +121,8 @@ class RankXAI_Store_Admin {
 			'redirectsUrl' => rest_url( RankXAI_REST::NAMESPACE_V1 . '/admin/redirects' ),
 		);
 		echo '<div class="wrap"><h1 class="screen-reader-text">' . esc_html__( 'RankX AI', 'rankxai' ) . '</h1><hr class="wp-header-end">';
+		// The free product check stays one click away, with or without an account.
+		echo '<p><a href="' . esc_url( add_query_arg( 'rankxai-view', 'check', admin_url( 'admin.php?page=' . self::PAGE ) ) ) . '">' . esc_html__( 'Product check on this site (works without an account)', 'rankxai' ) . '</a></p>';
 		wp_print_inline_script_tag(
 			(string) wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES ),
 			array(
@@ -131,8 +143,17 @@ class RankXAI_Store_Admin {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Your products were checked again.', 'rankxai' ) . '</p></div>';
 		}
 
+		if ( RankXAI_Connection::is_connected() && self::local_view() ) {
+			echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=' . self::PAGE ) ) . '">' . esc_html__( '‹ Back to the store app', 'rankxai' ) . '</a></p>';
+		}
+
 		if ( class_exists( 'RankXAI_Product_Check' ) ) {
 			RankXAI_Product_Check::render();
+		}
+
+		if ( RankXAI_Connection::is_connected() ) {
+			RankXAI_UI::close_page();
+			return;
 		}
 
 		RankXAI_UI::card_open(

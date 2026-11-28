@@ -382,7 +382,7 @@ class RankXAI_REST {
 		// The pattern limits the slug; RankXAI_Documents checks it again.
 		register_rest_route(
 			self::NAMESPACE_V1,
-			'/documents/(?P<slug>llms_txt|agents_md|ai_txt)',
+			'/documents/(?P<slug>llms_txt|agents_md)',
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
@@ -1188,8 +1188,11 @@ class RankXAI_REST {
 				'stored'           => null !== $doc,
 				'content'          => null !== $doc ? $doc['content'] : '',
 				'updated'          => null !== $doc ? $doc['updated'] : '',
-				// False when a real file on disk owns the path, or the site owner has not switched it on.
-				'serving'          => null !== $doc && ! $blocked && RankXAI_Generate::switched_on( $slug ),
+				// False when a real file on disk owns the path, the site owner has not switched it on, or
+				// the site owner wrote their own text, which is served instead.
+				'serving'          => null !== $doc && ! $blocked && RankXAI_Generate::switched_on( $slug ) && '' === trim( RankXAI_Documents::own_text( $slug ) ),
+				// The site owner wrote their own text in RankX AI › Settings; it is served instead of this one.
+				'ownText'          => '' !== trim( RankXAI_Documents::own_text( $slug ) ),
 				'fileOnDisk'       => $blocked,
 				// The site owner's own switch, in RankX AI › Settings › Root documents.
 				'switchedOn'       => RankXAI_Generate::switched_on( $slug ),

@@ -297,16 +297,20 @@ class RankXAI_Connector {
 		$existing = self::user_id();
 		echo '<p>' . esc_html__( 'RankX AI will sign in to this site as its own user, called “RankX AI”, with a password only it holds.', 'rankxai' ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'That user can:', 'rankxai' ) . '</strong></p><ul class="ul-disc">';
-		echo '<li>' . esc_html__( 'create and edit posts, pages and products, and their categories and tags', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'create and edit posts, pages and products (titles, text, excerpts and addresses), and their categories and tags', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'upload images and set their alt text', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'move content to the trash (never delete it permanently)', 'rankxai' ) . '</li>';
-		echo '<li>' . esc_html__( 'read the list of redirects (only you add or remove them, here in wp-admin)', 'rankxai' ) . '</li></ul>';
+		echo '<li>' . esc_html__( 'set a page\'s search title, description, link previews and noindex, in your SEO plugin\'s fields when you have one, and its structured data', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'publish llms.txt and agents.md text and a business summary for the markdown copies (served only if you switch them on, and never in place of text you wrote)', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'save the summary shown on the RankX AI Overview page, and its own connection token', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'read WooCommerce settings and status, the AI crawler counts, the site check results and the list of redirects (only you add or remove redirects, here in wp-admin)', 'rankxai' ) . '</li></ul>';
 		echo '<p><strong>' . esc_html__( 'It cannot:', 'rankxai' ) . '</strong></p><ul class="ul-disc">';
 		echo '<li>' . esc_html__( 'install, change or remove plugins or themes', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'add, change or remove users', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'change site, store or plugin settings, including redirects, shipping and webhooks', 'rankxai' ) . '</li>';
 		echo '<li>' . esc_html__( 'sign in to wp-admin', 'rankxai' ) . '</li>';
-		echo '<li>' . esc_html__( 'read orders, customers, users or comments, unless you allow it in RankX AI › Settings', 'rankxai' ) . '</li></ul>';
+		echo '<li>' . esc_html__( 'switch any of this plugin\'s features on or off, or write ai.txt', 'rankxai' ) . '</li>';
+		echo '<li>' . esc_html__( 'read orders, customers, users or comments, unless you allow it in RankX AI › Settings (and even then it cannot change them)', 'rankxai' ) . '</li></ul>';
 		echo '<p>' . esc_html__( 'Content it creates is credited to you. Disconnecting RankX AI removes the user and its password.', 'rankxai' ) . '</p>';
 		if ( $existing > 0 ) {
 			echo '<p>' . esc_html__( 'RankX AI is already connected. Approving again replaces its password.', 'rankxai' ) . '</p>';
@@ -401,6 +405,8 @@ class RankXAI_Connector {
 		if ( empty( $allcaps[ self::CAP ] ) || ! RankXAI_Access_Scope::personal_data_allowed() || ! self::is_connector( $user->ID ) ) {
 			return $allcaps;
 		}
+		// WordPress asks for these to READ orders, the user list and comments in full. Every write to them is
+		// still refused by RankXAI_Access_Scope, which lets these routes through for reading only.
 		foreach ( array( 'read_private_shop_orders', 'list_users', 'moderate_comments' ) as $cap ) {
 			$allcaps[ $cap ] = true;
 		}

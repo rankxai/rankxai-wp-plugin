@@ -1,5 +1,5 @@
 import { host } from './host';
-import { api, type ApiResult } from './api';
+import type { ApiResult } from './api';
 import type { LocalRedirectResult } from './host-types';
 import type { WriteResult } from './components/FixModals';
 export type RedirectWriteResult = WriteResult & {
@@ -22,11 +22,18 @@ function fromLocal(r: LocalRedirectResult): ApiResult<RedirectWriteResult> {
 export async function addRedirect(path: string, target: string): Promise<ApiResult<RedirectWriteResult>> {
     if (host.redirects)
         return fromLocal(await host.redirects.add(path, target));
-    const r = await api<WriteResult>('fixes/redirects', { method: 'POST', body: { path, target } });
+    if (!host.serverRedirects)
+        return unavailable();
+    const r = await host.serverRedirects.add(path, target);
     return { ...r, data: r.data ? { ...r.data, localId: null } : null };
 }
 export async function removeRedirect(id: string): Promise<ApiResult<unknown>> {
     if (host.redirects)
         return fromLocal(await host.redirects.remove(id));
-    return api('fixes/redirects/delete', { method: 'POST', body: { redirectId: id } });
+    if (!host.serverRedirects)
+        return unavailable();
+    return host.serverRedirects.remove(id);
+}
+function unavailable<T>(): ApiResult<T> {
+    return { ok: false, status: 409, data: null, error: 'Redirects cannot be changed from here.', code: 'unavailable', remedy: null, field: null };
 }

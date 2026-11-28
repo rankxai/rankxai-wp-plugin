@@ -331,8 +331,13 @@ class RankXAI_Redirects {
 	 * @return array<int, array{pattern: string, comparison: string}>
 	 */
 	private static function rank_math_sources( $row ) {
-		$sources = isset( $row['sources'] ) ? maybe_unserialize( $row['sources'] ) : array();
-		$out     = array();
+		$sources = isset( $row['sources'] ) ? $row['sources'] : array();
+		if ( is_string( $sources ) && is_serialized( $sources ) ) {
+			// Rank Math's own column; read as plain arrays only, never objects.
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize -- allowed_classes is false.
+			$sources = unserialize( $sources, array( 'allowed_classes' => false ) );
+		}
+		$out = array();
 		if ( ! is_array( $sources ) ) {
 			return $out;
 		}

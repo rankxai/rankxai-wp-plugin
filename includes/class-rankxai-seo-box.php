@@ -1,9 +1,11 @@
 <?php
 /**
- * The search title, description and canonical address, edited in WordPress.
+ * The search title, description, canonical address, link previews and noindex,
+ * and the page's structured data, edited in WordPress.
  *
- * Shown only while no SEO plugin is active, because only then does this plugin
- * print them (RankXAI_Head). With an SEO plugin, that plugin's own fields apply.
+ * The search fields show only while no SEO plugin is active, because only then
+ * does this plugin print them (RankXAI_Head). The structured data box always
+ * shows: it is printed with or without an SEO plugin.
  *
  * @package RankXAI
  */
@@ -18,6 +20,9 @@ class RankXAI_SEO_Box {
 	/** Nonce action and field. */
 	const NONCE = 'rankxai_seo_box';
 
+	/** Nonce action and field for the structured data box. */
+	const NONCE_SCHEMA = 'rankxai_schema_box';
+
 	/**
 	 * Hooks.
 	 */
@@ -28,7 +33,7 @@ class RankXAI_SEO_Box {
 	}
 
 	/**
-	 * Whether the box belongs on this site now.
+	 * Whether the search title box belongs on this site now.
 	 *
 	 * @return bool
 	 */
@@ -37,19 +42,22 @@ class RankXAI_SEO_Box {
 	}
 
 	/**
-	 * Add the box to content types.
+	 * Add the boxes to content types.
 	 *
 	 * @param string $post_type Post type.
 	 */
 	public static function register( $post_type ) {
-		if ( ! self::active() || 'attachment' === $post_type || ! RankXAI_Access_Scope::content_post_type( $post_type ) ) {
+		if ( 'attachment' === $post_type || ! RankXAI_Access_Scope::content_post_type( $post_type ) ) {
 			return;
 		}
-		add_meta_box( 'rankxai-seo', __( 'Search title and description', 'rankxai' ), array( __CLASS__, 'render' ), $post_type, 'normal', 'low' );
+		if ( self::active() ) {
+			add_meta_box( 'rankxai-seo', __( 'Search title and description', 'rankxai' ), array( __CLASS__, 'render' ), $post_type, 'normal', 'low' );
+		}
+		add_meta_box( 'rankxai-schema', __( 'Structured data (JSON-LD)', 'rankxai' ), array( __CLASS__, 'render_schema' ), $post_type, 'normal', 'low' );
 	}
 
 	/**
-	 * The box.
+	 * The search title box.
 	 *
 	 * @param WP_Post $post Post.
 	 */
@@ -58,45 +66,78 @@ class RankXAI_SEO_Box {
 		wp_nonce_field( self::NONCE, self::NONCE );
 		echo '<p>' . esc_html__( 'What search engines and AI assistants show for this page. Leave a field empty to use the page title and excerpt.', 'rankxai' ) . '</p>';
 		foreach ( self::post_fields() as $field => $label ) {
+			if ( 'og_title' === $field ) {
+				echo '<p><strong>' . esc_html__( 'Link previews', 'rankxai' ) . '</strong><br />' . esc_html__( 'Optional. Leave empty to use the search title and description.', 'rankxai' ) . '</p>';
+			}
 			$id = 'rankxai-seo-' . $field;
-			echo '<p><label for="' . esc_attr( $id ) . '"><strong>' . esc_html( $label ) . '</strong></label><br />';
-			if ( 'description' === $field ) {
-				echo '<textarea class="widefat" rows="3" id="' . esc_attr( $id ) . '" name="rankxai_seo[' . esc_attr( $field ) . ']">' . esc_textarea( isset( $values[ $field ] ) ? $values[ $field ] : '' ) . '</textarea>';
+			echo '<p><label for="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</label><br />';
+			if ( in_array( $field, array( 'description', 'og_description', 'twitter_description' ), true ) ) {
+				echo '<textarea class="widefat" rows="2" id="' . esc_attr( $id ) . '" name="rankxai_seo[' . esc_attr( $field ) . ']">' . esc_textarea( isset( $values[ $field ] ) ? $values[ $field ] : '' ) . '</textarea>';
 			} else {
 				echo '<input class="widefat" type="' . ( 'canonical' === $field ? 'url' : 'text' ) . '" id="' . esc_attr( $id ) . '" name="rankxai_seo[' . esc_attr( $field ) . ']" value="' . esc_attr( isset( $values[ $field ] ) ? $values[ $field ] : '' ) . '" />';
 			}
 			echo '</p>';
 		}
-		echo '<p class="description">' . esc_html__( 'Shown here because no SEO plugin is active. Link previews use the same title and description.', 'rankxai' ) . '</p>';
+		echo '<p><label><input type="checkbox" name="rankxai_seo_noindex" value="1" ' . checked( '1', RankXAI_Noindex::own( $post->ID ), false ) . ' /> ' . esc_html__( 'Keep search engines out of this page (noindex)', 'rankxai' ) . '</label></p>';
+		echo '<p class="description">' . esc_html__( 'Shown here because no SEO plugin is active.', 'rankxai' ) . '</p>';
 	}
 
 	/**
-	 * The fields the box edits, with labels.
+	 * The structured data box: one JSON-LD document printed in the page's head.
+	 *
+	 * @param WP_Post $post Post.
+	 */
+	public static function render_schema( $post ) {
+		$stored = RankXAI_Schema::get( $post->ID );
+		wp_nonce_field( self::NONCE_SCHEMA, self::NONCE_SCHEMA );
+		echo '<p><label for="rankxai-schema-json">' . esc_html__( 'Structured data for this page, as JSON-LD. Leave empty for none.', 'rankxai' ) . '</label></p>';
+		echo '<textarea class="widefat code" rows="6" id="rankxai-schema-json" name="rankxai_schema_json" spellcheck="false">' . esc_textarea( null !== $stored ? $stored['content'] : '' ) . '</textarea>';
+		echo '<p class="description">' . esc_html__( 'Printed in a script tag of type application/ld+json. With an SEO plugin active, it joins that plugin\'s structured data. Invalid JSON is not saved.', 'rankxai' ) . '</p>';
+	}
+
+	/**
+	 * The fields the search title box edits, with labels.
 	 *
 	 * @return array<string, string>
 	 */
 	private static function post_fields() {
 		return array(
-			'title'       => __( 'Search title', 'rankxai' ),
-			'description' => __( 'Search description', 'rankxai' ),
-			'canonical'   => __( 'Canonical address (optional)', 'rankxai' ),
+			'title'               => __( 'Search title', 'rankxai' ),
+			'description'         => __( 'Search description', 'rankxai' ),
+			'canonical'           => __( 'Canonical address (optional)', 'rankxai' ),
+			'og_title'            => __( 'Title in link previews (Open Graph)', 'rankxai' ),
+			'og_description'      => __( 'Description in link previews (Open Graph)', 'rankxai' ),
+			'twitter_title'       => __( 'Title on X (Twitter)', 'rankxai' ),
+			'twitter_description' => __( 'Description on X (Twitter)', 'rankxai' ),
 		);
 	}
 
 	/**
-	 * Save the box. Acts only on the edit form's own submission, never on a REST or other save.
+	 * Save the boxes. Each acts only on the edit form's own submission, never on a REST or other save.
 	 *
 	 * @param int     $post_id Post ID.
 	 * @param WP_Post $post    Post.
 	 */
 	public static function save_post( $post_id, $post ) {
-		if ( ! isset( $_POST[ self::NONCE ] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST[ self::NONCE ] ) ), self::NONCE ) ) {
+		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) || ! current_user_can( 'edit_post', $post_id ) ) {
 			return;
 		}
-		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) || ! current_user_can( 'edit_post', $post_id ) || ! self::active() ) {
+		if ( ! RankXAI_Access_Scope::content_post_type( $post->post_type ) ) {
 			return;
 		}
-		if ( ! RankXAI_Access_Scope::content_post_type( $post->post_type ) || ! isset( $_POST['rankxai_seo'] ) || ! is_array( $_POST['rankxai_seo'] ) ) {
+		if ( isset( $_POST[ self::NONCE_SCHEMA ] ) && wp_verify_nonce( sanitize_key( wp_unslash( $_POST[ self::NONCE_SCHEMA ] ) ), self::NONCE_SCHEMA ) && isset( $_POST['rankxai_schema_json'] ) ) {
+			// Checked as JSON by RankXAI_Schema::rejection(); it is printed escaped for a script element.
+			$json = trim( (string) wp_unslash( $_POST['rankxai_schema_json'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON, validated by RankXAI_Schema::set().
+			if ( '' === $json ) {
+				RankXAI_Schema::delete( $post_id );
+			} else {
+				RankXAI_Schema::set( $post_id, $json );
+			}
+		}
+		if ( ! isset( $_POST[ self::NONCE ] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST[ self::NONCE ] ) ), self::NONCE ) || ! self::active() ) {
+			return;
+		}
+		if ( ! isset( $_POST['rankxai_seo'] ) || ! is_array( $_POST['rankxai_seo'] ) ) {
 			return;
 		}
 		$posted = wp_unslash( $_POST['rankxai_seo'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each field is checked and sanitised by RankXAI_SEO::check_field() below.
@@ -112,6 +153,7 @@ class RankXAI_SEO_Box {
 		if ( $values ) {
 			RankXAI_SEO::set( $post_id, $values );
 		}
+		RankXAI_Noindex::set( $post_id, isset( $_POST['rankxai_seo_noindex'] ) );
 	}
 
 	/**
